@@ -1,0 +1,22 @@
+# Arquivos de log
+*.log
+npm-debug.log*
+
+# Arquivos de sistema operacional
+.DS_Store
+Thumbs.db
+
+# Arquivos de configuração de IDEs
+.idea
+.vscode
+
+# === Backend (Node.js) ===
+backend/node_modules/
+backend/.env
+backend/coverage/
+
+# === Frontend (Vue.js / Quasar) ===
+frontend/node_modules/
+frontend/.env*
+frontend/.quasar/
+frontend/dist/
