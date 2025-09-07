@@ -1,0 +1,44 @@
+# .github/workflows/backend-ci.yml
+
+# Nome do fluxo de trabalho que aparecerá na aba "Actions" do GitHub
+name: Backend CI - Testes
+
+# Define quando o workflow deve rodar
+on:
+  # Roda quando houver um push para a branch 'main'
+  push:
+    branches: [ "main" ]
+  # Roda também quando um Pull Request for aberto para a branch 'main'
+  pull_request:
+    branches: [ "main" ]
+
+# Define os "trabalhos" a serem executados
+jobs:
+  # Nosso trabalho se chama 'build-and-test'
+  build-and-test:
+    # O tipo de máquina virtual que vamos usar
+    runs-on: ubuntu-latest
+
+    # Os passos que serão executados
+    steps:
+      # 1. Baixa o seu código para a máquina virtual
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      # 2. Configura a versão do Node.js que queremos usar
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      # 3. Instala as dependências do projeto
+      - name: Instalar dependências
+        # O comando é executado dentro da pasta 'backend'
+        run: npm ci
+        working-directory: ./backend
+
+      # 4. Roda os testes com cobertura
+      - name: Rodar testes
+        # O comando também é executado dentro da pasta 'backend'
+        run: npm run test:coverage
+        working-directory: ./backend

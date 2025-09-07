@@ -20,3 +20,5 @@ frontend/node_modules/
 frontend/.env*
 frontend/.quasar/
 frontend/dist/
+frontend
+INTRUCOES.TXT

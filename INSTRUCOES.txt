@@ -1,0 +1,34 @@
+--- CHECKLIST RÁPIDO DO PROJETO SGVN ---
+
+--- INSTALAÇÃO (FAZER APENAS UMA VEZ) ---
+
+1. Clonar o repositório:
+   git clone [URL_DO_REPOSITORIO]
+
+2. Instalar a CLI do Quasar globalmente:
+   npm install -g @quasar/cli
+
+3. Configurar o Backend:
+   - Navegar para a pasta 'backend'
+   - Criar e configurar o arquivo '.env'
+   - Rodar 'npm install'
+
+4. Configurar o Frontend:
+   - Navegar para a pasta 'frontend'
+   - Criar e configurar o arquivo '.env'
+   - Rodar 'npm install'
+
+
+--- PARA COMEÇAR A TRABALHAR (DIA A DIA) ---
+
+**Requisito: Ter dois terminais abertos na pasta do projeto.**
+
+**No Terminal 1 (Backend):**
+cd backend
+npm run dev
+
+**No Terminal 2 (Frontend):**
+cd frontend
+quasar dev
+
+**Acessar a aplicação no navegador no endereço do Frontend (ex: http://localhost:9000)**
