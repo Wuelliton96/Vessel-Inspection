@@ -1,11 +1,11 @@
 # Nome do fluxo de trabalho que aparecerá na aba "Actions" do GitHub
-name: Backend CI - Testes
+name: Backend CI/CD Pipeline
 
 # Define quando o workflow deve rodar
 on:
-  # Roda quando houver um push para a branch 'main'
+  # Roda quando houver um push para a branch 'master'
   push:
-    branches: [ "master" ]
+    branches: [ "main" ]
   # Roda também quando um Pull Request for aberto para a branch 'main'
   pull_request:
     branches: [ "master" ]
@@ -17,26 +17,49 @@ jobs:
     # O tipo de máquina virtual que vamos usar
     runs-on: ubuntu-latest
 
+    # Define o diretório de trabalho padrão para todos os 'run' steps no job
+    defaults:
+      run:
+        working-directory: ./backend
+
     # Os passos que serão executados
     steps:
       # 1. Baixa o seu código para a máquina virtual
       - name: Checkout do código
         uses: actions/checkout@v4
 
-      # 2. Configura a versão do Node.js que queremos usar
-      - name: Configurar Node.js
+      # 2. Configura a versão do Node.js e habilita o cache de dependências
+      - name: Configurar Node.js v20 com cache
         uses: actions/setup-node@v4
         with:
           node-version: '20.x'
+          # Habilita o cache para acelerar a instalação de dependências em builds futuros
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
 
       # 3. Instala as dependências do projeto
+      # Usa 'npm ci' que é mais rápido e seguro para CI, pois instala as versões exatas do package-lock.json
       - name: Instalar dependências
-        # O comando é executado dentro da pasta 'backend'
         run: npm ci
-        working-directory: ./backend
 
-      # 4. Roda os testes com cobertura
-      - name: Rodar testes
-        # O comando também é executado dentro da pasta 'backend'
+      # 4. (Opcional) Copia variáveis de ambiente de um arquivo de exemplo
+      # Muitos projetos precisam de um arquivo .env para rodar.
+      # Este passo cria o .env a partir de um .env.example, que deve estar no seu repositório.
+      - name: Criar arquivo de ambiente (.env)
+        run: if [ -f ".env.example" ]; then cp .env.example .env; fi
+
+      # 5. Roda o Linter para verificar a qualidade e o padrão do código
+      # Adicione um script "lint" ao seu package.json para que isso funcione.
+      # Ex: "lint": "eslint ."
+      - name: Verificar qualidade do código (Lint)
+        run: npm run lint --if-present
+
+      # 6. Roda os testes com cobertura de código
+      - name: Rodar testes com cobertura
         run: npm run test:coverage
-        working-directory: ./backend
+        
+      # 7. Roda o build da aplicação para garantir que está funcionando
+      # Adicione um script "build" ao seu package.json.
+      # Ex: "build": "tsc" ou "babel src -d dist"
+      - name: Buildar a aplicação
+        run: npm run build --if-present
