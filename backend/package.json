@@ -4,8 +4,16 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
+    "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --watchAll=false",
+    "test:models": "jest tests/models/",
+    "test:routes": "jest tests/routes/",
+    "test:middleware": "jest tests/middleware/",
+    "test:server": "jest tests/server.test.js",
+    "test:custom": "node scripts/test.js",
+    "test:clean": "jest --clearCache && jest",
     "dev": "nodemon server.js"
   },
   "keywords": [],
@@ -21,6 +29,9 @@
   },
   "devDependencies": {
     "jest": "^30.0.5",
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10",
+    "supertest": "^7.0.0",
+    "@types/jest": "^29.5.12",
+    "jest-environment-node": "^29.7.0"
   }
 }

@@ -34,14 +34,16 @@ Vistoria.hasMany(Foto, { foreignKey: 'vistoria_id' });
 Foto.belongsTo(Vistoria, { foreignKey: 'vistoria_id' });
 Foto.belongsTo(TipoFotoChecklist, { foreignKey: 'tipo_foto_id' });
 
-Vistoria.hasOne(Laudo, { foreignKey: 'vistoria_id' });
-Laudo.belongsTo(Vistoria, { foreignKey: 'vistoria_id' });
+Vistoria.hasOne(Laudo, { as: 'Laudo', foreignKey: 'vistoria_id' });
+Laudo.belongsTo(Vistoria, { as: 'Vistoria', foreignKey: 'vistoria_id' });
 
 
-// Sincronizando o banco de dados
-sequelize.sync({ alter: true })
-  .then(() => console.log('Banco de dados sincronizado com sucesso.'))
-  .catch(err => console.error('Erro ao sincronizar o banco de dados:', err));
+// Sincronizando o banco de dados (evita em ambiente de teste)
+if (process.env.NODE_ENV !== 'test') {
+  sequelize.sync({ alter: true })
+    .then(() => console.log('Banco de dados sincronizado com sucesso.'))
+    .catch(err => console.error('Erro ao sincronizar o banco de dados:', err));
+}
 
 // Exportando todos os models e a instância do sequelize
 module.exports = {

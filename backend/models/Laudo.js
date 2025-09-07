@@ -15,9 +15,21 @@ const Laudo = sequelize.define('Laudo', {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW
+  },
+  vistoria_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false
   }
 }, {
-  tableName: 'laudos'
+  tableName: 'laudos',
+  hooks: {
+    beforeUpdate: (laudo) => {
+      if (laudo.changed('data_geracao')) {
+        // Reverter qualquer tentativa de alteração do campo imutável
+        laudo.set('data_geracao', laudo.previous('data_geracao'));
+      }
+    }
+  }
 });
 
 module.exports = Laudo;

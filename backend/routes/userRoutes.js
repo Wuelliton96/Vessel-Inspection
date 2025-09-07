@@ -7,7 +7,9 @@ const { Usuario, NivelAcesso } = require('../models'); // Importamos os models
 // Sincroniza um novo usuário do Clerk com o banco de dados local.
 router.post('/sync', async (req, res) => {
   try {
-    const { id: clerk_user_id, email, nome } = req.body;
+    // Garante que o corpo é um objeto antes de desestruturar (evita erro com corpo malformado)
+    const safeBody = (req && req.body && typeof req.body === 'object') ? req.body : {};
+    const { id: clerk_user_id, email, nome } = safeBody;
 
     // Validação básica
     if (!clerk_user_id || !email || !nome) {

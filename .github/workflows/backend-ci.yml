@@ -1,5 +1,3 @@
-# .github/workflows/backend-ci.yml
-
 # Nome do fluxo de trabalho que aparecerá na aba "Actions" do GitHub
 name: Backend CI - Testes
 
@@ -7,10 +5,10 @@ name: Backend CI - Testes
 on:
   # Roda quando houver um push para a branch 'main'
   push:
-    branches: [ "main" ]
+    branches: [ "master" ]
   # Roda também quando um Pull Request for aberto para a branch 'main'
   pull_request:
-    branches: [ "main" ]
+    branches: [ "master" ]
 
 # Define os "trabalhos" a serem executados
 jobs:
