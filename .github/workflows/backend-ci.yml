@@ -1,58 +1,71 @@
-# Nome do fluxo de trabalho que aparecerá na aba "Actions" do GitHub
 name: Backend CI/CD Pipeline
 
-# Define quando o workflow deve rodar
 on:
-  # Roda quando houver um push para a branch 'master'
   push:
     branches: [ "master" ]
-  # Roda também quando um Pull Request for aberto para a branch 'master'
   pull_request:
     branches: [ "master" ]
 
-# Define os "trabalhos" a serem executados
 jobs:
-  # Nosso trabalho se chama 'build-and-test'
   build-and-test:
-    # O tipo de máquina virtual que vamos usar
     runs-on: ubuntu-latest
 
-    # Define o diretório de trabalho padrão para todos os 'run' steps no job
+    # Sobe um Postgres para os testes
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     defaults:
       run:
         working-directory: ./backend
 
-    # Os passos que serão executados
     steps:
-      # 1. Baixa o seu código para a máquina virtual
       - name: Checkout do código
         uses: actions/checkout@v4
 
-      # 2. Configura a versão do Node.js e habilita o cache de dependências
       - name: Configurar Node.js v20 com cache
         uses: actions/setup-node@v4
         with:
           node-version: '20.x'
-          # Habilita o cache para acelerar a instalação de dependências em builds futuros
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
 
-      # 3. Instala as dependências do projeto
       - name: Instalar dependências
         run: npm ci
 
-      # 4. (Opcional) Copia variáveis de ambiente de um arquivo de exemplo
+      # Define variáveis de teste para o job inteiro
+      - name: Definir variáveis de ambiente de teste
+        run: |
+          echo "NODE_ENV=test" >> $GITHUB_ENV
+          echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/app_test" >> $GITHUB_ENV
+          # Adicione aqui outras variáveis necessárias pelos testes, se houver:
+          # echo "JWT_SECRET=ci-secret" >> $GITHUB_ENV
+
+      # (Opcional) criar .env a partir de exemplo — mantém, mas agora não dependemos dele
       - name: Criar arquivo de ambiente (.env)
         run: if [ -f ".env.example" ]; then cp .env.example .env; fi
 
-      # 5. Roda o Linter para verificar a qualidade e o padrão do código
       - name: Verificar qualidade do código (Lint)
         run: npm run lint --if-present
 
-      # 6. Roda os testes com cobertura (não falha se não houver testes)
-      - name: Rodar testes com cobertura
-        run: npm run test:coverage -- --passWithNoTests
+      # Executa migrações antes dos testes (se você usa sequelize-cli)
+      - name: Rodar migrações (se existirem)
+        run: npx --yes sequelize-cli db:migrate || echo "Sem migrations"
 
-      # 7. Roda o build da aplicação para garantir que está funcionando
+      # Testes com cobertura (não falha se não houver testes)
+      - name: Rodar testes com cobertura
+        run: npm run test:coverage -- --passWithNoTests --runInBand
+
       - name: Buildar a aplicação
         run: npm run build --if-present
