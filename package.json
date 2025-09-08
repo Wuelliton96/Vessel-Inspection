@@ -10,7 +10,7 @@
     "install:all": "npm install && cd backend && npm install && cd ../frontend-react && npm install",
     "build": "cd frontend-react && npm run build",
     "test": "cd backend && npm test",
-     "test:coverage": "jest --coverage --passWithNoTests"
+    "test:coverage": "cd backend && npm run test:coverage"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
