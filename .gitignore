@@ -16,9 +16,9 @@ backend/.env
 backend/coverage/
 
 # === Frontend (Vue.js / Quasar) ===
-frontend/node_modules/
-frontend/.env*
-frontend/.quasar/
-frontend/dist/
-frontend
+frontend-react/node_modules/
+frontend-react/.env*
+frontend-react
+frontend-react/dist/
+node_modules/
 INTRUCOES.TXT

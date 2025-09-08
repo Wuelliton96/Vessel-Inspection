@@ -1,0 +1,21 @@
+{
+  "name": "sgvn-sistema",
+  "version": "1.0.0",
+  "description": "Sistema de Gestão de Vistorias Náuticas",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend-react && npm run dev",
+    "dev:frontend-vue": "cd frontend && npm run dev",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend-react && npm install",
+    "build": "cd frontend-react && npm run build",
+    "test": "cd backend && npm test",
+     "test:coverage": "jest --coverage --passWithNoTests"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": ["vistorias", "nauticas", "vue", "quasar", "node", "express"],
+  "author": "Wuelliton96",
+  "license": "ISC"
+}

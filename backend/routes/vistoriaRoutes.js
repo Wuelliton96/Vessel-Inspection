@@ -52,4 +52,66 @@ router.post('/', [requireAuth, requireAdmin], async (req, res) => {
   }
 });
 
+// Rota: GET /api/vistorias
+router.get('/', requireAuth, async (req, res) => {
+  try {
+    const vistorias = await Vistoria.findAll({
+      include: [
+        { model: Embarcacao, as: 'Embarcacao' },
+        { model: Local, as: 'Local' },
+        { model: StatusVistoria, as: 'StatusVistoria' }
+      ]
+    });
+    res.json(vistorias);
+  } catch (error) {
+    console.error("Erro ao buscar vistorias:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
+// Rota: GET /api/vistorias/vistoriador - Vistorias atribuídas ao vistoriador logado
+router.get('/vistoriador', requireAuth, async (req, res) => {
+  try {
+    const vistorias = await Vistoria.findAll({
+      where: {
+        vistoriador_id: req.user.id
+      },
+      include: [
+        { model: Embarcacao, as: 'Embarcacao' },
+        { model: Local, as: 'Local' },
+        { model: StatusVistoria, as: 'StatusVistoria' }
+      ],
+      order: [['created_at', 'DESC']]
+    });
+    res.json(vistorias);
+  } catch (error) {
+    console.error("Erro ao buscar vistorias do vistoriador:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
+// Rota: PUT /api/vistorias/:id - Atualizar vistoria
+router.put('/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const vistoria = await Vistoria.findByPk(id);
+    if (!vistoria) {
+      return res.status(404).json({ error: "Vistoria não encontrada" });
+    }
+
+    // Verificar se o usuário pode editar esta vistoria
+    if (vistoria.vistoriador_id !== req.user.id && req.user.role !== 'administrador') {
+      return res.status(403).json({ error: "Acesso negado" });
+    }
+
+    await vistoria.update(updateData);
+    res.json(vistoria);
+  } catch (error) {
+    console.error("Erro ao atualizar vistoria:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
 module.exports = router;

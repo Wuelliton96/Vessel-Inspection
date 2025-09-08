@@ -1,7 +1,10 @@
 const express = require('express');
 const { sequelize } = require('./models');
 const userRoutes = require('./routes/userRoutes');
-const vistoriaRoutes = require('./routes/vistoriaRoutes'); // <-- LINHA ADICIONADA
+const vistoriaRoutes = require('./routes/vistoriaRoutes');
+const authRoutes = require('./routes/authRoutes');
+const embarcacaoRoutes = require('./routes/embarcacaoRoutes');
+const localRoutes = require('./routes/localRoutes');
 require('dotenv').config();
 
 const app = express();
@@ -21,8 +24,11 @@ app.get('/', (req, res) => {
 });
 
 // "Plug-in" das rotas na aplicação principal
+app.use('/api/auth', authRoutes);
 app.use('/api/usuarios', userRoutes);
-app.use('/api/vistorias', vistoriaRoutes); 
+app.use('/api/vistorias', vistoriaRoutes);
+app.use('/api/embarcacoes', embarcacaoRoutes);
+app.use('/api/locais', localRoutes); 
 
 // Inicia o servidor
 app.listen(PORT, () => {
