@@ -1,14 +1,24 @@
-name: Backend Tests
+name: Backend CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ master, develop ]
     paths:
       - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
   pull_request:
-    branches: [ main, develop ]
+    branches: [ master, develop ]
     paths:
       - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -18,51 +28,64 @@ jobs:
       postgres:
         image: postgres:13
         env:
+          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: sgvn_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
         ports:
           - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 15
+
+    defaults:
+      run:
+        working-directory: backend
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # Sonar precisa do histórico completo para cálculo de novos códigos, etc.
-          fetch-depth: 0
+          fetch-depth: 0 # Sonar precisa do histórico completo
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
 
       - name: Install dependencies
-        working-directory: ./backend
         run: npm ci
 
-      - name: Create test database
-        working-directory: ./backend
+      - name: Wait for Postgres & create DB
+        env:
+          PGPASSWORD: postgres
         run: |
-          PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE DATABASE sgvn_test;"
+          for i in {1..30}; do
+            if pg_isready -h 127.0.0.1 -p 5432 -U postgres; then
+              echo "Postgres pronto"; break
+            fi
+            echo "Aguardando Postgres ($i/30)..." && sleep 2
+          done
+          psql -h 127.0.0.1 -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='sgvn_test'" | grep -q 1 || \
+          psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE sgvn_test;"
 
       - name: Run tests (with coverage)
-        working-directory: ./backend
         env:
           NODE_ENV: test
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/sgvn_test
-          TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/sgvn_test
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/sgvn_test
+          TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/sgvn_test
           CLERK_SECRET_KEY: test_secret_key
           CLERK_PUBLISHABLE_KEY: test_publishable_key
         run: npm run test:ci
+        # garanta que o script gera:
+        # - coverage/lcov.info
+        # - test-results/ (ex.: JUnit XML)
 
-      # --- SonarCloud scan (usa o lcov gerado acima) ---
       - name: SonarCloud Scan
+        if: ${{ success() || failure() }} # executa mesmo com testes falhando
         uses: SonarSource/sonarcloud-github-action@v2
         with:
           projectBaseDir: backend
@@ -70,19 +93,22 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-      # Mantém teu upload para Codecov
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v3
+      - name: Upload coverage to Codecov
+        if: ${{ success() || failure() }}
+        uses: codecov/codecov-action@v4
         with:
-          file: ./backend/coverage/lcov.info
+          files: ./backend/coverage/lcov.info
           flags: backend
           name: backend-coverage
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Archive test results
-        uses: actions/upload-artifact@v3
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: backend-test-results
           path: |
             backend/coverage/
             backend/test-results/
