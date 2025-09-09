@@ -2,11 +2,11 @@ name: Backend CI + Sonar
 
 on:
   push:
-    branches: [ master, develop ]
+    branches: [ main, develop ]
     paths:
       - 'backend/**'
   pull_request:
-    branches: [ master, develop ]
+    branches: [ main, develop ]
     paths:
       - 'backend/**'
 
@@ -22,7 +22,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Sonar precisa do histórico completo
+          fetch-depth: 0 # Sonar precisa do histórico
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -38,10 +38,9 @@ jobs:
         env:
           NODE_ENV: test
         run: npm run test:ci
-        # precisa gerar backend/coverage/lcov.info
+        # gera backend/coverage/lcov.info
 
       - name: SonarCloud Scan
-        if: ${{ success() || failure() }} # roda mesmo se os testes falharem
         uses: SonarSource/sonarcloud-github-action@v2
         with:
           projectBaseDir: backend
