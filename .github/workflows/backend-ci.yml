@@ -16,6 +16,10 @@ permissions:
   contents: read
   pull-requests: read
 
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-and-analyze:
     runs-on: ubuntu-latest
@@ -41,25 +45,28 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@<SHA-CHECKOUT> # v4.x
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@<SHA-SETUP-NODE> # v4.x
         with:
           node-version: '18'
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
 
-      - name: Install
+      - name: Install dependencies
         run: npm ci
 
-      - name: Wait & create DB
-        env: { PGPASSWORD: postgres }
+      - name: Wait for Postgres & create DB
+        env:
+          PGPASSWORD: postgres
         run: |
           for i in {1..30}; do
-            if pg_isready -h 127.0.0.1 -p 5432 -U postgres; then break; fi
+            if pg_isready -h 127.0.0.1 -p 5432 -U postgres; then
+              echo "Postgres pronto"; break
+            fi
             echo "Aguardando Postgres ($i/30)..." && sleep 2
           done
           psql -h 127.0.0.1 -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='sgvn_test'" | grep -q 1 || \
@@ -76,7 +83,7 @@ jobs:
 
       - name: SonarCloud Scan
         if: ${{ success() || failure() }}
-        uses: SonarSource/sonarcloud-github-action@v2
+        uses: SonarSource/sonarcloud-github-action@<SHA-SONARCLOUD-ACTION> # v2.x
         with:
           projectBaseDir: backend
         env:
@@ -85,7 +92,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: ${{ success() || failure() }}
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@<SHA-CODECOV> # v4.x
         with:
           files: ./backend/coverage/lcov.info
           flags: backend
@@ -94,9 +101,9 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-      - name: Artifacts
+      - name: Archive test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@<SHA-UPLOAD-ARTIFACT> # v4.x
         with:
           name: backend-test-results
           path: |
