@@ -1,48 +1,139 @@
 // backend/middleware/auth.js
 
-const { ClerkExpressRequireAuth } = require('@clerk/clerk-sdk-node');
-const { Usuario, NivelAcesso } = require('../models'); // Importamos os models
+const jwt = require('jsonwebtoken');
+const { Usuario, NivelAcesso } = require('../models');
 
-// Middleware do Clerk que verifica se o usuário está logado
-// Ele injeta as informações do usuário em 'req.auth'
-const requireAuth = ClerkExpressRequireAuth();
-
-// Nosso middleware customizado que verifica se o usuário é um Administrador
-const requireAdmin = async (req, res, next) => {
+// Middleware que verifica o token JWT
+const requireAuth = async (req, res, next) => {
   try {
-    // req.auth é preenchido pelo middleware 'requireAuth' que roda antes
-    if (!req.auth || !req.auth.userId) {
-      return res.status(401).json({ error: 'Autenticação necessária.' });
+    console.log('=== MIDDLEWARE AUTH INICIADO ===');
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    console.log('Token recebido:', token ? '[PRESENTE]' : '[AUSENTE]');
+    
+    if (!token) {
+      console.log('Token não fornecido');
+      return res.status(401).json({ error: 'Token não fornecido.' });
     }
 
-    const clerkUserId = req.auth.userId;
-
-    // Buscamos o usuário no nosso banco de dados usando o ID do Clerk
-    const usuario = await Usuario.findOne({
-      where: { clerk_user_id: clerkUserId },
-      // Incluímos a tabela NivelAcesso para já trazer o nome do papel
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'sua-chave-secreta-jwt');
+    console.log('Token decodificado:', { userId: decoded.userId, email: decoded.email });
+    
+    // Buscar usuário no banco de dados
+    console.log('Buscando usuário no banco com ID:', decoded.userId);
+    const usuario = await Usuario.findByPk(decoded.userId, {
       include: {
         model: NivelAcesso,
-        attributes: ['nome']
+        attributes: ['id', 'nome', 'descricao']
       }
     });
 
-    // Se não encontrarmos o usuário no nosso DB ou o papel dele não for 'ADMINISTRADOR'
-    if (!usuario || usuario.NivelAcesso.nome !== 'ADMINISTRADOR') {
+    if (!usuario) {
+      console.log('Usuário não encontrado no banco com ID:', decoded.userId);
+      return res.status(401).json({ error: 'Usuário não encontrado.' });
+    }
+
+    console.log('Usuário encontrado:', {
+      id: usuario.id,
+      nome: usuario.nome,
+      email: usuario.email,
+      nivelAcesso: usuario.NivelAcesso?.nome,
+      deveAtualizarSenha: usuario.deve_atualizar_senha
+    });
+
+    // Verificar se o usuário deve atualizar a senha
+    if (usuario.deve_atualizar_senha) {
+      console.log('Usuário deve atualizar senha');
+      return res.status(403).json({ 
+        error: 'Senha deve ser atualizada',
+        code: 'PASSWORD_UPDATE_REQUIRED',
+        message: 'Você deve atualizar sua senha antes de continuar'
+      });
+    }
+
+    // Anexar informações do usuário à requisição
+    req.user = usuario;
+    req.userInfo = decoded;
+
+    console.log('=== MIDDLEWARE AUTH CONCLUÍDO COM SUCESSO ===');
+    next();
+  } catch (error) {
+    console.log('=== ERRO NO MIDDLEWARE AUTH ===');
+    console.error("Erro na verificação do token:", error);
+    console.log('=== FIM DO ERRO ===');
+    res.status(401).json({ error: 'Token inválido.' });
+  }
+};
+
+// Middleware que verifica se o usuário é um Administrador
+const requireAdmin = async (req, res, next) => {
+  try {
+    if (!req.user || !req.user.NivelAcesso) {
+      return res.status(401).json({ error: 'Usuário não autenticado.' });
+    }
+
+    if (req.user.NivelAcesso.id !== 1) { // ID 1 = ADMINISTRADOR
       return res.status(403).json({ error: 'Acesso negado. Permissão de administrador necessária.' });
     }
 
-    // Se chegou até aqui, o usuário é um admin.
-    // Anexamos o usuário do nosso banco à requisição para usá-lo depois
-    req.user = usuario;
-
-    // Permite que a requisição continue para a próxima etapa (a rota em si)
     next();
-
   } catch (error) {
     console.error("Erro no middleware de admin:", error);
     res.status(500).json({ error: "Erro interno do servidor." });
   }
 };
 
-module.exports = { requireAuth, requireAdmin };
+// Middleware que verifica se o usuário é Vistoriador ou Administrador
+const requireVistoriador = async (req, res, next) => {
+  try {
+    if (!req.user || !req.user.NivelAcesso) {
+      return res.status(401).json({ error: 'Usuário não autenticado.' });
+    }
+
+    const nivelId = req.user.NivelAcesso.id;
+    if (nivelId !== 1 && nivelId !== 2) { // ID 1 = ADMINISTRADOR, ID 2 = VISTORIADOR
+      return res.status(403).json({ error: 'Acesso negado. Permissão de vistoriador necessária.' });
+    }
+
+    next();
+  } catch (error) {
+    console.error("Erro no middleware de vistoriador:", error);
+    res.status(500).json({ error: "Erro interno do servidor." });
+  }
+};
+
+// Middleware que permite acesso mesmo quando deve atualizar senha
+const requireAuthAllowPasswordUpdate = async (req, res, next) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({ error: 'Token não fornecido.' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'sua-chave-secreta-jwt');
+    
+    // Buscar usuário no banco de dados
+    const usuario = await Usuario.findByPk(decoded.userId, {
+      include: {
+        model: NivelAcesso,
+        attributes: ['id', 'nome', 'descricao']
+      }
+    });
+
+    if (!usuario) {
+      return res.status(401).json({ error: 'Usuário não encontrado.' });
+    }
+
+    // Anexar informações do usuário à requisição (sem verificar deve_atualizar_senha)
+    req.user = usuario;
+    req.userInfo = decoded;
+
+    next();
+  } catch (error) {
+    console.error("Erro na verificação do token:", error);
+    res.status(401).json({ error: 'Token inválido.' });
+  }
+};
+
+module.exports = { requireAuth, requireAdmin, requireVistoriador, requireAuthAllowPasswordUpdate };

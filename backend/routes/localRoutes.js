@@ -3,10 +3,10 @@
 const express = require('express');
 const router = express.Router();
 const { Local } = require('../models');
-const { requireAuth, syncUserAndGenerateToken, requireVistoriador } = require('../middleware/authComplete');
+const { requireAuth, requireVistoriador } = require('../middleware/auth');
 
 // Aplicar middleware de autenticação em todas as rotas
-router.use(requireAuth, syncUserAndGenerateToken, requireVistoriador);
+router.use(requireAuth, requireVistoriador);
 
 // GET /api/locais - Listar todos os locais
 router.get('/', async (req, res) => {

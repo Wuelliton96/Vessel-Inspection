@@ -8,6 +8,7 @@ const {
   Laudo,
   NivelAcesso
 } = require('../models')
+const bcrypt = require('bcryptjs')
 
 async function seedDatabase() {
   try {
@@ -35,38 +36,43 @@ async function seedDatabase() {
 
     console.log('✅ Status de vistorias criados')
 
-    // Criar Níveis de Acesso
+    // Criar Níveis de Acesso (IDs fixos para consistência)
     const nivelAdmin = await NivelAcesso.create({
-      nome: 'administrador',
+      id: 1, // ID fixo para ADMINISTRADOR
+      nome: 'ADMINISTRADOR',
       descricao: 'Acesso completo ao sistema'
     })
 
     const nivelVistoriador = await NivelAcesso.create({
-      nome: 'vistoriador',
+      id: 2, // ID fixo para VISTORIADOR
+      nome: 'VISTORIADOR',
       descricao: 'Acesso limitado às vistorias'
     })
 
     // Criar Usuários
+    const adminSenhaHash = await bcrypt.hash('admin123', 10)
     const admin = await Usuario.create({
-      clerk_user_id: 'admin_clerk_123',
       nome: 'Administrador Sistema',
       email: 'admin@sgvn.com',
+      senha_hash: adminSenhaHash,
       nivel_acesso_id: nivelAdmin.id,
       ativo: true
     })
 
+    const vistoriador1SenhaHash = await bcrypt.hash('senha123', 10)
     const vistoriador1 = await Usuario.create({
-      clerk_user_id: 'vistoriador1_clerk_456',
       nome: 'João Silva',
       email: 'joao.silva@sgvn.com',
+      senha_hash: vistoriador1SenhaHash,
       nivel_acesso_id: nivelVistoriador.id,
       ativo: true
     })
 
+    const vistoriador2SenhaHash = await bcrypt.hash('senha123', 10)
     const vistoriador2 = await Usuario.create({
-      clerk_user_id: 'vistoriador2_clerk_789',
       nome: 'Maria Santos',
       email: 'maria.santos@sgvn.com',
+      senha_hash: vistoriador2SenhaHash,
       nivel_acesso_id: nivelVistoriador.id,
       ativo: true
     })

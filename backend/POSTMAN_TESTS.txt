@@ -1,0 +1,371 @@
+===============================================
+🧪 GUIA COMPLETO PARA TESTES NO POSTMAN
+===============================================
+
+📋 CONFIGURAÇÃO INICIAL
+===============================================
+
+1. Abra o Postman
+2. Crie uma nova Collection chamada "SGVN API Tests"
+3. Configure a variável de ambiente:
+   - Variable: base_url
+   - Value:   npm run test:all   npm run test:all
+===============================================
+🔐 TESTES DE AUTENTICAÇÃO
+===============================================
+
+1️⃣ LOGIN (POST)
+-----------------------------------------------
+Method: POST
+URL: {{base_url}}/auth/login
+Headers: Content-Type: application/json
+
+Body (raw JSON):
+{
+  "email": "admin@sgvn.com",
+  "senha": "admin123"
+}
+
+✅ Salve o token da resposta para usar nos próximos testes!
+
+2️⃣ DADOS DO USUÁRIO (GET)
+-----------------------------------------------
+Method: GET
+URL: {{base_url}}/auth/me
+Headers: 
+  - Authorization: Bearer {{token}}
+  - Content-Type: application/json
+
+3️⃣ REGISTRO DE USUÁRIO (POST)
+-----------------------------------------------
+Method: POST
+URL: {{base_url}}/auth/register
+Headers: Content-Type: application/json
+
+Body (raw JSON):
+{
+  "nome": "Usuário Teste",
+  "email": "teste@email.com",
+  "senha": "senha123"
+}
+
+4️⃣ STATUS DA SENHA (GET)
+-----------------------------------------------
+Method: GET
+URL: {{base_url}}/auth/password-status
+Headers: 
+  - Authorization: Bearer {{token}}
+  - Content-Type: application/json
+
+5️⃣ ALTERAR SENHA (PUT)
+-----------------------------------------------
+Method: PUT
+URL: {{base_url}}/auth/change-password
+Headers: 
+  - Authorization: Bearer {{token}}
+  - Content-Type: application/json
+
+Body (raw JSON):
+{
+  "senhaAtual": "admin123",
+  "novaSenha": "novasenha123"
+}
+
+6️⃣ LISTAR USUÁRIOS (GET) - APENAS ADMIN
+-----------------------------------------------
+Method: GET
+URL: {{base_url}}/auth/users
+Headers: 
+  - Authorization: Bearer {{admin_token}}
+  - Content-Type: application/json
+
+7️⃣ DEFINIR SENHA TEMPORÁRIA (POST) - APENAS ADMIN
+-----------------------------------------------
+Method: POST
+URL: {{base_url}}/auth/user/2/temp-password
+Headers: 
+  - Authorization: Bearer {{admin_token}}
+  - Content-Type: application/json
+
+Body (raw JSON):
+{
+  "senhaTemporaria": "1234"
+}
+
+===============================================
+🏢 TESTES DE LOCAIS
+===============================================
+
+8️⃣ LISTAR LOCAIS (GET)
+-----------------------------------------------
+Method: GET
+URL: {{base_url}}/locais
+Headers: 
+  - Authorization: Bearer {{token}}
+  - Content-Type: application/json
+
+9️⃣ BUSCAR LOCAL ESPECÍFICO (GET)
+-----------------------------------------------
+Method: GET
+URL: {{base_url}}/locais/1
+Headers: 
+  - Authorization: Bearer {{token}}
+  - Content-Type: application/json
+
+🔟 CRIAR LOCAL (POST)
+-----------------------------------------------
+Method: POST
+URL: {{base_url}}/locais
+Headers: 
+  - Authorization: Bearer {{token}}
+  - Content-Type: application/json
+
+Body (raw JSON):
+{
+  "nome": "Porto de Santos",
+  "endereco": "Av. do Porto, 1000",
+  "cidade": "Santos",
+  "estado": "SP",
+  "cep": "11000-000",
+  "telefone": "(13) 99999-9999",
+  "email": "porto@santos.com",
+  "observacoes": "Porto principal de Santos"
+}
+
+1️⃣1️⃣ ATUALIZAR LOCAL (PUT)
+-----------------------------------------------
+Method: PUT
+URL: {{base_url}}/locais/1
+Headers: 
+  - Authorization: Bearer {{token}}
+  - Content-Type: application/json
+
+Body (raw JSON):
+{
+  "nome": "Porto de Santos Atualizado",
+  "observacoes": "Informações atualizadas"
+}
+
+1️⃣2️⃣ DELETAR LOCAL (DELETE)
+-----------------------------------------------
+Method: DELETE
+URL: {{base_url}}/locais/1
+Headers: 
+  - Authorization: Bearer {{token}}
+  - Content-Type: application/json
+
+===============================================
+🚢 TESTES DE EMBARCAÇÕES
+===============================================
+
+1️⃣3️⃣ LISTAR EMBARCAÇÕES (GET)
+-----------------------------------------------
+Method: GET
+URL: {{base_url}}/embarcacoes
+Headers: 
+  - Authorization: Bearer {{token}}
+  - Content-Type: application/json
+
+1️⃣4️⃣ BUSCAR EMBARCAÇÃO ESPECÍFICA (GET)
+-----------------------------------------------
+Method: GET
+URL: {{base_url}}/embarcacoes/1
+Headers: 
+  - Authorization: Bearer {{token}}
+  - Content-Type: application/json
+
+1️⃣5️⃣ CRIAR EMBARCAÇÃO (POST)
+-----------------------------------------------
+Method: POST
+URL: {{base_url}}/embarcacoes
+Headers: 
+  - Authorization: Bearer {{token}}
+  - Content-Type: application/json
+
+Body (raw JSON):
+{
+  "nome": "Barco de Pesca",
+  "tipo": "Lancha",
+  "comprimento": 15.5,
+  "largura": 5.2,
+  "altura": 4.0,
+  "proprietario": "João da Silva",
+  "telefone": "(21) 88888-8888",
+  "email": "joao@pesca.com"
+}
+
+1️⃣6️⃣ ATUALIZAR EMBARCAÇÃO (PUT)
+-----------------------------------------------
+Method: PUT
+URL: {{base_url}}/embarcacoes/1
+Headers: 
+  - Authorization: Bearer {{token}}
+  - Content-Type: application/json
+
+Body (raw JSON):
+{
+  "nome": "Barco de Pesca Atualizado",
+  "proprietario": "João da Silva Santos"
+}
+
+1️⃣7️⃣ DELETAR EMBARCAÇÃO (DELETE)
+-----------------------------------------------
+Method: DELETE
+URL: {{base_url}}/embarcacoes/1
+Headers: 
+  - Authorization: Bearer {{token}}
+  - Content-Type: application/json
+
+===============================================
+📋 TESTES DE VISTORIAS
+===============================================
+
+1️⃣8️⃣ LISTAR VISTORIAS (GET)
+-----------------------------------------------
+Method: GET
+URL: {{base_url}}/vistorias
+Headers: 
+  - Authorization: Bearer {{token}}
+  - Content-Type: application/json
+
+1️⃣9️⃣ BUSCAR VISTORIA ESPECÍFICA (GET)
+-----------------------------------------------
+Method: GET
+URL: {{base_url}}/vistorias/1
+Headers: 
+  - Authorization: Bearer {{token}}
+  - Content-Type: application/json
+
+2️⃣0️⃣ CRIAR VISTORIA (POST)
+-----------------------------------------------
+Method: POST
+URL: {{base_url}}/vistorias
+Headers: 
+  - Authorization: Bearer {{token}}
+  - Content-Type: application/json
+
+Body (raw JSON):
+{
+  "embarcacao_id": 1,
+  "local_id": 1,
+  "data_vistoria": "2024-01-15",
+  "observacoes": "Vistoria de segurança"
+}
+
+2️⃣1️⃣ ATUALIZAR VISTORIA (PUT)
+-----------------------------------------------
+Method: PUT
+URL: {{base_url}}/vistorias/1
+Headers: 
+  - Authorization: Bearer {{token}}
+  - Content-Type: application/json
+
+Body (raw JSON):
+{
+  "data_vistoria": "2024-01-16",
+  "observacoes": "Vistoria atualizada"
+}
+
+2️⃣2️⃣ DELETAR VISTORIA (DELETE)
+-----------------------------------------------
+Method: DELETE
+URL: {{base_url}}/vistorias/1
+Headers: 
+  - Authorization: Bearer {{token}}
+  - Content-Type: application/json
+
+===============================================
+⚠️ TESTES DE VALIDAÇÃO
+===============================================
+
+2️⃣3️⃣ TESTE SEM TOKEN (GET)
+-----------------------------------------------
+Method: GET
+URL: {{base_url}}/locais
+Headers: Content-Type: application/json
+(Não incluir Authorization)
+
+2️⃣4️⃣ TESTE COM TOKEN INVÁLIDO (GET)
+-----------------------------------------------
+Method: GET
+URL: {{base_url}}/locais
+Headers: 
+  - Authorization: Bearer token_invalido
+  - Content-Type: application/json
+
+2️⃣5️⃣ TESTE DE CAMPOS OBRIGATÓRIOS (POST)
+-----------------------------------------------
+Method: POST
+URL: {{base_url}}/locais
+Headers: 
+  - Authorization: Bearer {{token}}
+  - Content-Type: application/json
+
+Body (raw JSON):
+{
+  "nome": ""
+}
+
+2️⃣6️⃣ TESTE DE ACESSO NEGADO (GET)
+-----------------------------------------------
+Method: GET
+URL: {{base_url}}/auth/users
+Headers: 
+  - Authorization: Bearer {{vistoriador_token}}
+  - Content-Type: application/json
+
+===============================================
+🎯 ORDEM RECOMENDADA DE TESTES
+===============================================
+
+1. Login (teste 1)
+2. Dados do usuário (teste 2)
+3. Listar locais (teste 8)
+4. Criar local (teste 10)
+5. Atualizar local (teste 11)
+6. Deletar local (teste 12)
+7. Listar embarcações (teste 13)
+8. Criar embarcação (teste 15)
+9. Atualizar embarcação (teste 16)
+10. Deletar embarcação (teste 17)
+11. Testar validações (testes 23-26)
+
+===============================================
+📝 CONFIGURAÇÃO DE VARIÁVEIS NO POSTMAN
+===============================================
+
+1. Vá em Environment
+2. Crie um novo Environment chamado "SGVN Local"
+3. Adicione as variáveis:
+   - base_url: http://localhost:3000/api
+   - token: (cole aqui o token do login)
+   - admin_token: (cole aqui o token do admin)
+   - vistoriador_token: (cole aqui o token do vistoriador)
+
+===============================================
+✅ RESULTADOS ESPERADOS
+===============================================
+
+✅ SUCESSO (200/201):
+- Login retorna token
+- GET retorna dados
+- POST/PUT/DELETE funcionam
+- Headers corretos
+
+❌ ERRO ESPERADO:
+- 401: Token inválido/ausente
+- 403: Acesso negado
+- 400: Dados inválidos
+- 404: Recurso não encontrado
+
+===============================================
+🚀 PRONTO PARA TESTAR!
+===============================================
+
+1. Configure o ambiente no Postman
+2. Execute os testes na ordem recomendada
+3. Verifique os status codes
+4. Confirme que os dados estão corretos
+
+Boa sorte com os testes! 🎉
+

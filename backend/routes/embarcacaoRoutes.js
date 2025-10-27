@@ -3,10 +3,10 @@
 const express = require('express');
 const router = express.Router();
 const { Embarcacao } = require('../models');
-const { requireAuth, syncUserAndGenerateToken, requireVistoriador } = require('../middleware/authComplete');
+const { requireAuth, requireVistoriador } = require('../middleware/auth');
 
 // Aplicar middleware de autenticação em todas as rotas
-router.use(requireAuth, syncUserAndGenerateToken, requireVistoriador);
+router.use(requireAuth, requireVistoriador);
 
 // GET /api/embarcacoes - Listar todas as embarcações
 router.get('/', async (req, res) => {
