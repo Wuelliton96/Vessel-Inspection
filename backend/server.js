@@ -13,6 +13,9 @@ const vistoriaRoutes = require('./routes/vistoriaRoutes');
 const authRoutes = require('./routes/authRoutes');
 const embarcacaoRoutes = require('./routes/embarcacaoRoutes');
 const localRoutes = require('./routes/localRoutes');
+const fotoRoutes = require('./routes/fotoRoutes');
+const tipoFotoChecklistRoutes = require('./routes/tipoFotoChecklistRoutes');
+const vistoriadorRoutes = require('./routes/vistoriadorRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,6 +28,9 @@ app.use(cors({
 
 // Middleware para JSON
 app.use(express.json());
+
+// Middleware para servir arquivos estáticos (fotos)
+app.use('/uploads', express.static('uploads'));
 
 // Teste de conexão ao iniciar o servidor
 sequelize.authenticate()
@@ -54,6 +60,9 @@ app.use('/api/usuarios', userRoutes);
 app.use('/api/vistorias', vistoriaRoutes);
 app.use('/api/embarcacoes', embarcacaoRoutes);
 app.use('/api/locais', localRoutes);
+app.use('/api/fotos', fotoRoutes);
+app.use('/api/tipos-foto-checklist', tipoFotoChecklistRoutes);
+app.use('/api/vistoriador', vistoriadorRoutes);
 
 // Sobe o servidor
 app.listen(PORT, () => {

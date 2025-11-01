@@ -2,11 +2,11 @@ name: Backend CI + Sonar
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, master ]
     paths:
       - 'backend/**'
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, develop, master ]
     paths:
       - 'backend/**'
 

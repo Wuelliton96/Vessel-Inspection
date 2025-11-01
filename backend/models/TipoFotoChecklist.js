@@ -19,13 +19,16 @@ const TipoFotoChecklist = sequelize.define('TipoFotoChecklist', {
   descricao: {
     type: DataTypes.TEXT
   },
-    obrigatorio: { // Essencial para o requisito RF05 [cite: 64]
+  obrigatorio: { // Essencial para o requisito RF05 [cite: 64]
     type: DataTypes.BOOLEAN,
     allowNull: false,
     defaultValue: true
   }
 }, {
-  tableName: 'tipos_foto_checklist'
+  tableName: 'tipos_foto_checklist',
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at'
 });
 
 module.exports = TipoFotoChecklist;

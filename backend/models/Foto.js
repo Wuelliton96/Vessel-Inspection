@@ -12,10 +12,22 @@ const Foto = sequelize.define('Foto', {
     allowNull: false
   },
   observacao: {
-    type: DataTypes.TEXT
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  vistoria_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  tipo_foto_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false
   }
 }, {
-  tableName: 'fotos'
+  tableName: 'fotos',
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at'
 });
 
 module.exports = Foto;

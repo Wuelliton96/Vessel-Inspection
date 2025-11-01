@@ -36,14 +36,15 @@ Vistoria.belongsTo(Usuario, { as: 'administrador', foreignKey: 'administrador_id
 Vistoria.belongsTo(Usuario, { as: 'aprovador', foreignKey: 'aprovado_por_id' });
 
 // Vistoria <-> Embarcação / Local / Status
-Vistoria.belongsTo(Embarcacao, { foreignKey: 'embarcacao_id' });
-Vistoria.belongsTo(Local, { foreignKey: 'local_id' });
-Vistoria.belongsTo(StatusVistoria, { foreignKey: 'status_id' });
+Vistoria.belongsTo(Embarcacao, { as: 'Embarcacao', foreignKey: 'embarcacao_id' });
+Vistoria.belongsTo(Local, { as: 'Local', foreignKey: 'local_id' });
+Vistoria.belongsTo(StatusVistoria, { as: 'StatusVistoria', foreignKey: 'status_id' });
 
 // Vistoria <-> Foto / Laudo
-Vistoria.hasMany(Foto, { foreignKey: 'vistoria_id' });
-Foto.belongsTo(Vistoria, { foreignKey: 'vistoria_id' });
-Foto.belongsTo(TipoFotoChecklist, { foreignKey: 'tipo_foto_id' });
+Vistoria.hasMany(Foto, { as: 'Fotos', foreignKey: 'vistoria_id' });
+Foto.belongsTo(Vistoria, { as: 'Vistoria', foreignKey: 'vistoria_id' });
+Foto.belongsTo(TipoFotoChecklist, { as: 'TipoFotoChecklist', foreignKey: 'tipo_foto_id' });
+TipoFotoChecklist.hasMany(Foto, { as: 'Fotos', foreignKey: 'tipo_foto_id' });
 
 Vistoria.hasOne(Laudo, { as: 'Laudo', foreignKey: 'vistoria_id' });
 Laudo.belongsTo(Vistoria, { as: 'Vistoria', foreignKey: 'vistoria_id' });

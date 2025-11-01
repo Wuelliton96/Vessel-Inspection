@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Fundo gradiente azul oceano -->
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#1e3a8a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="yacht" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f1f5f9;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Fundo com bordas arredondadas -->
+  <rect width="32" height="32" fill="url(#bg)" rx="6"/>
+  
+  <!-- Yacht elegante -->
+  <!-- Casco principal -->
+  <path d="M4 24 Q16 20 28 24 L26 26 Q16 22 6 26 Z" fill="url(#yacht)"/>
+  
+  <!-- Convés -->
+  <path d="M6 22 Q16 18 26 22 L24 24 Q16 20 8 24 Z" fill="#ffffff" opacity="0.9"/>
+  
+  <!-- Mastro principal -->
+  <line x1="16" y1="6" x2="16" y2="22" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Vela principal triangular -->
+  <path d="M16 6 L28 12 L16 18 Z" fill="#ffffff" opacity="0.95"/>
+  
+  <!-- Vela menor -->
+  <path d="M16 10 L24 13 L16 16 Z" fill="#ffffff" opacity="0.85"/>
+  
+  <!-- Bandeira no topo -->
+  <rect x="14" y="4" width="4" height="2" fill="#ef4444" rx="0.5"/>
+  
+  <!-- Ondas do mar -->
+  <path d="M2 26 Q8 24 14 26 T22 26 T30 26" stroke="#ffffff" stroke-width="1.5" fill="none" opacity="0.8"/>
+  <path d="M0 28 Q6 26 12 28 T20 28 T32 28" stroke="#ffffff" stroke-width="1" fill="none" opacity="0.6"/>
+  
+  <!-- Reflexo da lua -->
+  <circle cx="24" cy="8" r="2" fill="#ffffff" opacity="0.7"/>
+  
+  <!-- Estrelas -->
+  <circle cx="8" cy="6" r="0.5" fill="#ffffff" opacity="0.8"/>
+  <circle cx="12" cy="4" r="0.5" fill="#ffffff" opacity="0.6"/>
+</svg>

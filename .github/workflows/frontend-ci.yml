@@ -1,0 +1,66 @@
+name: Frontend CI + Sonar
+
+on:
+  push:
+    branches: [ main, develop, master ]
+    paths:
+      - 'frontend-react/**'
+  pull_request:
+    branches: [ main, develop, master ]
+    paths:
+      - 'frontend-react/**'
+
+jobs:
+  test-and-sonar:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend-react
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Sonar precisa do histórico completo
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend-react/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests with coverage
+        run: npm test -- --coverage --watchAll=false --passWithNoTests
+        env:
+          CI: true
+
+      - name: Build application
+        run: npm run build
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@v2
+        with:
+          projectBaseDir: frontend-react
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend-react/coverage/
+
+      - name: Upload build artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend-react/build/
+

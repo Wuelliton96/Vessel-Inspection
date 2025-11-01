@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <!-- Fundo gradiente azul oceano -->
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#1e3a8a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="yacht" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f1f5f9;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Fundo com bordas arredondadas -->
+  <rect width="192" height="192" fill="url(#bg)" rx="36"/>
+  
+  <!-- Yacht elegante -->
+  <!-- Casco principal -->
+  <path d="M24 144 Q96 120 168 144 L156 156 Q96 132 36 156 Z" fill="url(#yacht)"/>
+  
+  <!-- Convés -->
+  <path d="M36 132 Q96 108 156 132 L144 144 Q96 120 48 144 Z" fill="#ffffff" opacity="0.9"/>
+  
+  <!-- Mastro principal -->
+  <line x1="96" y1="36" x2="96" y2="132" stroke="#ffffff" stroke-width="12" stroke-linecap="round"/>
+  
+  <!-- Vela principal triangular -->
+  <path d="M96 36 L168 72 L96 108 Z" fill="#ffffff" opacity="0.95"/>
+  
+  <!-- Vela menor -->
+  <path d="M96 60 L144 78 L96 96 Z" fill="#ffffff" opacity="0.85"/>
+  
+  <!-- Bandeira no topo -->
+  <rect x="84" y="24" width="24" height="12" fill="#ef4444" rx="3"/>
+  
+  <!-- Ondas do mar -->
+  <path d="M12 156 Q48 144 84 156 T120 156 T168 156 T180 156" stroke="#ffffff" stroke-width="9" fill="none" opacity="0.8"/>
+  <path d="M0 168 Q36 156 72 168 T108 168 T144 168 T192 168" stroke="#ffffff" stroke-width="6" fill="none" opacity="0.6"/>
+  
+  <!-- Reflexo da lua -->
+  <circle cx="144" cy="48" r="12" fill="#ffffff" opacity="0.7"/>
+  
+  <!-- Estrelas -->
+  <circle cx="48" cy="36" r="3" fill="#ffffff" opacity="0.8"/>
+  <circle cx="72" cy="24" r="3" fill="#ffffff" opacity="0.6"/>
+  <circle cx="120" cy="30" r="2" fill="#ffffff" opacity="0.7"/>
+  
+  <!-- Texto SVN estilizado -->
+  <text x="96" y="180" font-family="Arial, sans-serif" font-size="28" font-weight="bold" text-anchor="middle" fill="#ffffff" opacity="0.9">SVN</text>
+</svg>

@@ -128,7 +128,7 @@ router.post('/login', async (req, res) => {
 
     if (!usuario) {
       console.log('Usuário não encontrado para email:', email);
-      return res.status(401).json({ error: 'Credenciais inválidas.' });
+      return res.status(401).json({ error: 'Email não cadastrado no sistema.' });
     }
 
     console.log('Usuário encontrado:', {
@@ -144,7 +144,7 @@ router.post('/login', async (req, res) => {
     const senhaValida = await bcrypt.compare(senha, usuario.senha_hash);
     if (!senhaValida) {
       console.log('Senha inválida para usuário:', usuario.email);
-      return res.status(401).json({ error: 'Credenciais inválidas.' });
+      return res.status(401).json({ error: 'Senha incorreta.' });
     }
 
     console.log('Senha válida!');
@@ -177,7 +177,8 @@ router.post('/login', async (req, res) => {
         nome: usuario.nome,
         email: usuario.email,
         nivelAcesso: usuario.NivelAcesso.nome,
-        nivelAcessoId: usuario.NivelAcesso.id
+        nivelAcessoId: usuario.NivelAcesso.id,
+        deveAtualizarSenha: usuario.deve_atualizar_senha
       }
     });
   } catch (error) {
@@ -328,6 +329,120 @@ router.put('/change-password', requireAuthAllowPasswordUpdate, async (req, res) 
   }
 });
 
+// Rota para atualização obrigatória de senha (quando deve_atualizar_senha = true)
+router.put('/force-password-update', async (req, res) => {
+  try {
+    const { token, novaSenha } = req.body;
+
+    // Validações básicas
+    if (!token || !novaSenha) {
+      return res.status(400).json({ error: 'Token e nova senha são obrigatórios.' });
+    }
+
+    // Validar critérios da nova senha
+    const senhaValidation = validatePassword(novaSenha);
+    if (!senhaValidation.isValid) {
+      return res.status(400).json({ 
+        error: 'Senha não atende aos critérios',
+        details: senhaValidation.errors
+      });
+    }
+
+    // Verificar token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'sua-chave-secreta-jwt');
+    
+    // Buscar usuário
+    const usuario = await Usuario.findByPk(decoded.userId, {
+      include: {
+        model: NivelAcesso,
+        attributes: ['id', 'nome', 'descricao']
+      }
+    });
+
+    if (!usuario) {
+      return res.status(404).json({ error: 'Usuário não encontrado.' });
+    }
+
+    // Verificar se realmente deve atualizar senha
+    if (!usuario.deve_atualizar_senha) {
+      return res.status(400).json({ error: 'Usuário não precisa atualizar senha.' });
+    }
+
+    // Hash da nova senha
+    const novaSenhaHash = await bcrypt.hash(novaSenha, 10);
+
+    // Atualizar senha e remover flag de atualização obrigatória
+    await usuario.update({
+      senha_hash: novaSenhaHash,
+      deve_atualizar_senha: false
+    });
+
+    // Gerar novo token
+    const tokenPayload = {
+      userId: usuario.id,
+      email: usuario.email,
+      nome: usuario.nome,
+      nivelAcesso: usuario.NivelAcesso.nome,
+      nivelAcessoId: usuario.NivelAcesso.id
+    };
+
+    const newToken = jwt.sign(tokenPayload, process.env.JWT_SECRET || 'sua-chave-secreta-jwt', {
+      expiresIn: '24h'
+    });
+
+    res.json({
+      success: true,
+      message: 'Senha atualizada com sucesso',
+      token: newToken,
+      user: {
+        id: usuario.id,
+        nome: usuario.nome,
+        email: usuario.email,
+        nivelAcesso: usuario.NivelAcesso.nome,
+        nivelAcessoId: usuario.NivelAcesso.id
+      }
+    });
+  } catch (error) {
+    console.error('Erro na atualização obrigatória de senha:', error);
+    
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'Token inválido.' });
+    }
+    
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Função para validar critérios de senha
+const validatePassword = (senha) => {
+  const errors = [];
+  
+  if (senha.length < 8) {
+    errors.push('Senha deve ter pelo menos 8 caracteres');
+  }
+  
+  if (!/[A-Z]/.test(senha)) {
+    errors.push('Senha deve conter pelo menos uma letra maiúscula');
+  }
+  
+  if (!/[a-z]/.test(senha)) {
+    errors.push('Senha deve conter pelo menos uma letra minúscula');
+  }
+  
+  if (!/[0-9]/.test(senha)) {
+    errors.push('Senha deve conter pelo menos um número');
+  }
+  
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(senha)) {
+    errors.push('Senha deve conter pelo menos um caractere especial');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors: errors
+  };
+};
+
 // Rota para administrador atualizar senha de outro usuário
 router.put('/user/:id/password', requireAuth, requireAdmin, async (req, res) => {
   try {
@@ -339,8 +454,13 @@ router.put('/user/:id/password', requireAuth, requireAdmin, async (req, res) => 
       return res.status(400).json({ error: 'Nova senha é obrigatória.' });
     }
 
-    if (novaSenha.length < 6) {
-      return res.status(400).json({ error: 'Nova senha deve ter pelo menos 6 caracteres.' });
+    // Validar critérios da nova senha
+    const senhaValidation = validatePassword(novaSenha);
+    if (!senhaValidation.isValid) {
+      return res.status(400).json({ 
+        error: 'Senha não atende aos critérios',
+        details: senhaValidation.errors
+      });
     }
 
     // Buscar usuário
