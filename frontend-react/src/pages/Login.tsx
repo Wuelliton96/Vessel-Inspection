@@ -208,15 +208,16 @@ const Button = styled.button`
 
 const ErrorMessage = styled.div`
   background: #fef2f2;
-  border: 1px solid #fecaca;
+  border: 2px solid #fca5a5;
   color: #dc2626;
-  padding: 0.75rem;
-  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
   font-size: 0.875rem;
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  align-items: flex-start;
+  gap: 0.75rem;
   animation: fadeIn 0.3s ease-in;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.1);
   
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(-10px); }
@@ -327,24 +328,31 @@ const Login: React.FC = () => {
       let messageType: 'error' | 'info' = 'error';
       
       // Verificar se é erro de resposta HTTP
-      if (err.response?.data?.error) {
-        const backendError = err.response.data.error;
+      if (err.response?.data) {
+        const backendError = err.response.data;
         console.log('Erro do backend:', backendError);
         
-        if (backendError === 'Email não cadastrado no sistema.') {
-          errorMessage = 'Este email não está cadastrado no sistema. Verifique o email ou entre em contato com o administrador.';
-          messageType = 'error';
-        } else if (backendError === 'Senha incorreta.') {
-          errorMessage = 'Senha incorreta. Verifique sua senha e tente novamente.';
-          messageType = 'error';
-        } else if (backendError === 'Email e senha são obrigatórios.') {
-          errorMessage = 'Por favor, preencha todos os campos';
-          messageType = 'error';
-        } else {
-          errorMessage = backendError;
+        // Priorizar a mensagem detalhada do backend
+        if (backendError.message) {
+          errorMessage = backendError.message;
+        } else if (backendError.error) {
+          errorMessage = backendError.error;
         }
-      } else if (err.response?.data?.message) {
-        errorMessage = err.response.data.message;
+
+        // Tratar códigos específicos
+        if (backendError.code === 'EMAIL_NAO_ENCONTRADO') {
+          errorMessage = 'Email não encontrado no sistema. Verifique se digitou corretamente ou entre em contato com o administrador.';
+          messageType = 'error';
+        } else if (backendError.code === 'SENHA_INCORRETA') {
+          errorMessage = 'Senha incorreta. Por favor, verifique sua senha e tente novamente. Se esqueceu sua senha, entre em contato com o administrador.';
+          messageType = 'error';
+        } else if (backendError.code === 'CAMPOS_OBRIGATORIOS') {
+          errorMessage = 'Por favor, preencha o email e a senha para continuar.';
+          messageType = 'error';
+        } else if (backendError.code === 'EMAIL_INVALIDO') {
+          errorMessage = 'Por favor, digite um email válido no formato: exemplo@email.com';
+          messageType = 'error';
+        }
       } else if (err.message) {
         if (err.message.includes('Network Error') || err.message.includes('fetch')) {
           errorMessage = 'Erro de conexão. Verifique sua internet e tente novamente.';
@@ -380,14 +388,16 @@ const Login: React.FC = () => {
         <Form onSubmit={handleSubmit}>
           {error && messageType === 'error' && (
             <ErrorMessage>
-              <AlertCircle size={16} />
-              <div>
-                <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>
-                  {error.includes('email não está cadastrado') ? 'Email não encontrado' : 
+              <AlertCircle size={20} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: '700', marginBottom: '0.5rem', fontSize: '1rem' }}>
+                  {error.includes('Email não encontrado') ? 'Email não encontrado' : 
                    error.includes('Senha incorreta') ? 'Senha incorreta' : 
+                   error.includes('preencha') ? 'Campos obrigatórios' :
+                   error.includes('email válido') ? 'Email inválido' :
                    'Erro no login'}
                 </div>
-                <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>
+                <div style={{ fontSize: '0.875rem', lineHeight: '1.5' }}>
                   {error}
                 </div>
               </div>
@@ -455,17 +465,22 @@ const Login: React.FC = () => {
           <div style={{ 
             textAlign: 'center', 
             marginTop: '1rem', 
-            fontSize: '0.8rem', 
+            fontSize: '0.85rem', 
             color: '#6b7280',
-            lineHeight: '1.4'
+            lineHeight: '1.6',
+            padding: '1rem',
+            background: 'rgba(59, 130, 246, 0.05)',
+            borderRadius: '8px',
+            border: '1px solid rgba(59, 130, 246, 0.1)'
           }}>
-            <div style={{ marginBottom: '0.5rem' }}>
-              <strong>Precisa de ajuda?</strong>
+            <div style={{ marginBottom: '0.75rem', fontWeight: '600', color: '#374151' }}>
+              Problemas para entrar?
             </div>
-            <div>
-              • Verifique se o email está correto<br/>
-              • Confirme se a senha está digitada corretamente<br/>
-              • Entre em contato com o administrador se necessário
+            <div style={{ fontSize: '0.8rem' }}>
+              <div style={{ marginBottom: '0.25rem' }}>• Verifique se o email está digitado corretamente</div>
+              <div style={{ marginBottom: '0.25rem' }}>• Confirme se a senha está correta (diferencia maiúsculas/minúsculas)</div>
+              <div style={{ marginBottom: '0.25rem' }}>• Se esqueceu sua senha, entre em contato com o administrador</div>
+              <div>• Caso o problema persista, solicite suporte ao administrador do sistema</div>
             </div>
           </div>
         </Form>

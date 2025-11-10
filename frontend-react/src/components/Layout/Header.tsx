@@ -55,6 +55,17 @@ const UserDetails = styled.div`
   }
 `;
 
+const UserRole = styled.span`
+  background: rgba(255, 255, 255, 0.25);
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-left: 0.5rem;
+`;
+
 const LogoutButton = styled.button`
   background: rgba(255, 255, 255, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -140,6 +151,11 @@ const Header: React.FC = () => {
           <UserDetails>
             <User size={16} />
             <span>{usuario?.nome}</span>
+            {usuario && (
+              <UserRole>
+                {usuario.nivelAcessoId === 1 || usuario.nivelAcesso?.id === 1 ? 'Administrador' : 'Vistoriador'}
+              </UserRole>
+            )}
           </UserDetails>
           
           <ChangePasswordButton onClick={() => setShowChangePasswordModal(true)}>

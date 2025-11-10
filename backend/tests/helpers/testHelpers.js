@@ -56,14 +56,14 @@ const createTestData = async () => {
   // Criar embarcações
   const embarcacao1 = await Embarcacao.create({
     nome: 'Barco Teste 1',
-    numero_casco: 'TEST001',
+    nr_inscricao_barco: 'TEST001',
     proprietario_nome: 'Proprietário 1',
     proprietario_email: 'proprietario1@teste.com'
   });
 
   const embarcacao2 = await Embarcacao.create({
     nome: 'Barco Teste 2',
-    numero_casco: 'TEST002',
+    nr_inscricao_barco: 'TEST002',
     proprietario_nome: 'Proprietário 2',
     proprietario_email: 'proprietario2@teste.com'
   });
@@ -262,7 +262,7 @@ const createTestUser = async (overrides = {}) => {
 const createTestEmbarcacao = async (overrides = {}) => {
   const defaultData = {
     nome: 'Barco Teste',
-    numero_casco: 'TEST001',
+    nr_inscricao_barco: 'TEST001',
     proprietario_nome: 'Proprietário Teste',
     proprietario_email: 'proprietario@teste.com'
   };
@@ -315,7 +315,7 @@ const mockRequestData = {
   },
   vistoria: {
     embarcacao_nome: 'Barco Teste',
-    embarcacao_numero_casco: 'TEST001',
+    embarcacao_nr_inscricao_barco: 'TEST001',
     local_tipo: 'MARINA',
     local_cep: '12345-678',
     vistoriador_id: 1

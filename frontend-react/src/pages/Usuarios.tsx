@@ -720,10 +720,10 @@ const Usuarios: React.FC = () => {
               <p>Tem certeza que deseja excluir o usuário <strong>{selectedUser?.nome}</strong>?</p>
               <p>Esta ação não pode ser desfeita.</p>
               <ButtonGroup>
-                <Button variant="secondary" onClick={() => setShowModal(false)}>
+                <Button variant="secondary" type="button" onClick={() => setShowModal(false)}>
                   Cancelar
                 </Button>
-                <Button variant="danger" onClick={handleDelete}>
+                <Button variant="danger" type="button" onClick={handleDelete}>
                   Excluir
                 </Button>
               </ButtonGroup>
@@ -782,7 +782,7 @@ const Usuarios: React.FC = () => {
               {modalType === 'create' && (
                 <FormGroup>
                   <InfoMessage>
-                    <InfoIcon>ℹ️</InfoIcon>
+                    <InfoIcon>i</InfoIcon>
                     <div>
                       <strong>Senha padrão:</strong> mudar123
                       <br />
@@ -816,7 +816,7 @@ const Usuarios: React.FC = () => {
               </FormGroup>
 
               <ButtonGroup>
-                <Button variant="secondary" onClick={() => setShowModal(false)}>
+                <Button variant="secondary" type="button" onClick={() => setShowModal(false)}>
                   Cancelar
                 </Button>
                 <Button variant="primary" type="submit">

@@ -8,7 +8,10 @@ import {
   ClipboardCheck, 
   FileText, 
   Camera,
-  Users
+  Users,
+  DollarSign,
+  Shield,
+  UserCheck
 } from 'lucide-react';
 import { useAccessControl } from '../../hooks/useAccessControl';
 
@@ -111,7 +114,10 @@ const Sidebar: React.FC = () => {
     ClipboardCheck,
     Camera,
     FileText,
-    Users
+    Users,
+    DollarSign,
+    Shield,
+    UserCheck
   };
 
   return (

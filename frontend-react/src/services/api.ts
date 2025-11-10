@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, LoginRequest, RegisterRequest, Usuario, Embarcacao, Local, Vistoria, ChecklistStatus } from '../types';
+import { AuthResponse, LoginRequest, RegisterRequest, Usuario, Embarcacao, Local, Vistoria, ChecklistStatus, LotePagamento, VistoriaLotePagamento, Seguradora, TipoEmbarcacaoSeguradora, Cliente, ChecklistTemplate, VistoriaChecklistItem, ChecklistProgresso, StatusChecklistItem } from '../types';
 
 import { API_CONFIG } from '../config/api';
 
@@ -220,8 +220,16 @@ export const usuarioService = {
 
 // Serviços para embarcações
 export const embarcacaoService = {
-  getAll: async (): Promise<Embarcacao[]> => {
-    const response = await api.get('/api/embarcacoes');
+  getAll: async (proprietario_cpf?: string): Promise<Embarcacao[]> => {
+    const params = proprietario_cpf ? { proprietario_cpf } : {};
+    const response = await api.get('/api/embarcacoes', { params });
+    return response.data;
+  },
+
+  getByCPF: async (cpf: string): Promise<Embarcacao[]> => {
+    const response = await api.get('/api/embarcacoes', { 
+      params: { proprietario_cpf: cpf } 
+    });
     return response.data;
   },
 
@@ -290,6 +298,11 @@ export const localService = {
 
 // Serviços para vistorias
 export const vistoriaService = {
+  getById: async (id: number): Promise<Vistoria> => {
+    const response = await api.get(`/api/vistorias/${id}`);
+    return response.data;
+  },
+
   getAll: async (): Promise<Vistoria[]> => {
     const response = await api.get('/api/vistorias');
     return response.data;
@@ -297,11 +310,6 @@ export const vistoriaService = {
 
   getByVistoriador: async (): Promise<Vistoria[]> => {
     const response = await api.get('/api/vistorias/vistoriador');
-    return response.data;
-  },
-
-  getById: async (id: number): Promise<Vistoria> => {
-    const response = await api.get(`/api/vistorias/${id}`);
     return response.data;
   },
 
@@ -400,6 +408,235 @@ export const vistoriadorService = {
 
   getTiposFotoChecklist: async (): Promise<any[]> => {
     const response = await api.get('/api/vistoriador/tipos-foto-checklist');
+    return response.data;
+  }
+};
+
+// Serviços para pagamentos de vistoriadores
+// Serviços para dashboard
+export const dashboardService = {
+  getEstatisticas: async (): Promise<any> => {
+    const response = await api.get('/api/dashboard/estatisticas');
+    return response.data;
+  }
+};
+
+export const pagamentoService = {
+  getAll: async (params?: {
+    periodo_tipo?: string;
+    status?: string;
+    vistoriador_id?: number;
+    data_inicio?: string;
+    data_fim?: string;
+  }): Promise<LotePagamento[]> => {
+    const response = await api.get('/api/pagamentos', { params });
+    return response.data;
+  },
+
+  getById: async (id: number): Promise<LotePagamento & { vistorias: VistoriaLotePagamento[] }> => {
+    const response = await api.get(`/api/pagamentos/${id}`);
+    return response.data;
+  },
+
+  gerarLote: async (data: {
+    vistoriador_id: number;
+    periodo_tipo: string;
+    data_inicio: string;
+    data_fim: string;
+  }): Promise<LotePagamento> => {
+    const response = await api.post('/api/pagamentos/gerar', data);
+    return response.data;
+  },
+
+  marcarPago: async (id: number, data: {
+    forma_pagamento?: string;
+    comprovante_url?: string;
+    observacoes?: string;
+  }): Promise<LotePagamento> => {
+    const response = await api.put(`/api/pagamentos/${id}/pagar`, data);
+    return response.data;
+  },
+
+  cancelar: async (id: number): Promise<LotePagamento> => {
+    const response = await api.put(`/api/pagamentos/${id}/cancelar`);
+    return response.data;
+  },
+
+  excluir: async (id: number): Promise<void> => {
+    await api.delete(`/api/pagamentos/${id}`);
+  },
+
+  getVistoriasDisponiveis: async (vistoriadorId: number, params?: {
+    data_inicio?: string;
+    data_fim?: string;
+  }): Promise<{ vistorias: Vistoria[]; quantidade: number; valor_total: number }> => {
+    const response = await api.get(`/api/pagamentos/vistoriador/${vistoriadorId}/disponiveis`, { params });
+    return response.data;
+  },
+
+  getResumoGeral: async (params?: {
+    periodo_inicio?: string;
+    periodo_fim?: string;
+  }): Promise<{
+    pendente: { quantidade: number; valor_total: number };
+    pago: { quantidade: number; valor_total: number };
+  }> => {
+    const response = await api.get('/api/pagamentos/resumo/geral', { params });
+    return response.data;
+  }
+};
+
+// Serviços para seguradoras
+export const seguradoraService = {
+  getAll: async (ativo?: boolean): Promise<Seguradora[]> => {
+    const params = ativo !== undefined ? { ativo } : {};
+    const response = await api.get('/api/seguradoras', { params });
+    return response.data;
+  },
+
+  getById: async (id: number): Promise<Seguradora> => {
+    const response = await api.get(`/api/seguradoras/${id}`);
+    return response.data;
+  },
+
+  getTiposPermitidos: async (id: number): Promise<TipoEmbarcacaoSeguradora[]> => {
+    const response = await api.get(`/api/seguradoras/${id}/tipos-permitidos`);
+    return response.data;
+  },
+
+  create: async (data: { 
+    nome: string; 
+    ativo?: boolean;
+    tipos_permitidos?: TipoEmbarcacaoSeguradora[];
+  }): Promise<Seguradora> => {
+    const response = await api.post('/api/seguradoras', data);
+    return response.data;
+  },
+
+  update: async (id: number, data: { 
+    nome?: string; 
+    ativo?: boolean;
+    tipos_permitidos?: TipoEmbarcacaoSeguradora[];
+  }): Promise<Seguradora> => {
+    const response = await api.put(`/api/seguradoras/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/api/seguradoras/${id}`);
+  },
+
+  toggleStatus: async (id: number): Promise<Seguradora> => {
+    const response = await api.patch(`/api/seguradoras/${id}/toggle-status`);
+    return response.data;
+  }
+};
+
+// Serviços para clientes
+export const clienteService = {
+  getAll: async (params?: {
+    ativo?: boolean;
+    tipo_pessoa?: string;
+  }): Promise<Cliente[]> => {
+    const response = await api.get('/api/clientes', { params });
+    return response.data;
+  },
+
+  getById: async (id: number): Promise<Cliente> => {
+    const response = await api.get(`/api/clientes/${id}`);
+    return response.data;
+  },
+
+  buscarPorDocumento: async (documento: string): Promise<Cliente> => {
+    const response = await api.get(`/api/clientes/buscar/${documento}`);
+    return response.data;
+  },
+
+  create: async (data: Partial<Cliente>): Promise<Cliente> => {
+    const response = await api.post('/api/clientes', data);
+    return response.data;
+  },
+
+  update: async (id: number, data: Partial<Cliente>): Promise<Cliente> => {
+    const response = await api.put(`/api/clientes/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/api/clientes/${id}`);
+  },
+
+  toggleStatus: async (id: number): Promise<Cliente> => {
+    const response = await api.patch(`/api/clientes/${id}/toggle-status`);
+    return response.data;
+  }
+};
+
+// Serviços para checklists
+export const checklistService = {
+  // Templates
+  getTemplates: async (): Promise<ChecklistTemplate[]> => {
+    const response = await api.get('/api/checklists/templates');
+    return response.data;
+  },
+
+  getTemplateByTipo: async (tipoEmbarcacao: string): Promise<ChecklistTemplate> => {
+    const response = await api.get(`/api/checklists/templates/${tipoEmbarcacao}`);
+    return response.data;
+  },
+
+  createTemplate: async (data: Partial<ChecklistTemplate>): Promise<ChecklistTemplate> => {
+    const response = await api.post('/api/checklists/templates', data);
+    return response.data;
+  },
+
+  updateTemplate: async (id: number, data: Partial<ChecklistTemplate>): Promise<ChecklistTemplate> => {
+    const response = await api.put(`/api/checklists/templates/${id}`, data);
+    return response.data;
+  },
+
+  // Itens de template
+  addItemToTemplate: async (templateId: number, item: any): Promise<any> => {
+    const response = await api.post(`/api/checklists/templates/${templateId}/itens`, item);
+    return response.data;
+  },
+
+  updateItem: async (itemId: number, data: any): Promise<any> => {
+    const response = await api.put(`/api/checklists/itens/${itemId}`, data);
+    return response.data;
+  },
+
+  deleteItem: async (itemId: number): Promise<void> => {
+    await api.delete(`/api/checklists/itens/${itemId}`);
+  },
+
+  // Checklist de vistoria
+  copiarTemplateParaVistoria: async (vistoriaId: number): Promise<any> => {
+    const response = await api.post(`/api/checklists/vistoria/${vistoriaId}/copiar-template`);
+    return response.data;
+  },
+
+  getChecklistVistoria: async (vistoriaId: number): Promise<VistoriaChecklistItem[]> => {
+    const response = await api.get(`/api/checklists/vistoria/${vistoriaId}`);
+    return response.data;
+  },
+
+  atualizarStatusItem: async (itemId: number, data: {
+    status?: StatusChecklistItem;
+    foto_id?: number | null;
+    observacao?: string;
+  }): Promise<VistoriaChecklistItem> => {
+    const response = await api.patch(`/api/checklists/vistoria/item/${itemId}/status`, data);
+    return response.data;
+  },
+
+  addItemCustomizado: async (vistoriaId: number, item: any): Promise<VistoriaChecklistItem> => {
+    const response = await api.post(`/api/checklists/vistoria/${vistoriaId}/itens`, item);
+    return response.data;
+  },
+
+  getProgresso: async (vistoriaId: number): Promise<ChecklistProgresso> => {
+    const response = await api.get(`/api/checklists/vistoria/${vistoriaId}/progresso`);
     return response.data;
   }
 };

@@ -40,7 +40,7 @@ describe('Modelo Vistoria', () => {
     // Criar embarcação
     embarcacao = await Embarcacao.create({
       nome: 'Barco Vistoria',
-      numero_casco: 'VIST001'
+      nr_inscricao_barco: 'VIST001'
     });
 
     // Criar local

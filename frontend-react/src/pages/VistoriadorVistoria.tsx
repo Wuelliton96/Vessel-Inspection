@@ -14,13 +14,18 @@ import {
   Info,
   CheckSquare,
   Square,
-  Play
+  Play,
+  Video,
+  X,
+  MessageCircle,
+  MapPin,
+  Navigation
 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { vistoriadorService } from '../services/api';
+import { vistoriadorService, checklistService } from '../services/api';
 import { API_CONFIG } from '../config/api';
-import { ChecklistStatus, ChecklistItem } from '../types';
+import { ChecklistStatus, ChecklistItem, VistoriaChecklistItem, ChecklistProgresso } from '../types';
 
 // Styled Components
 const Container = styled.div`
@@ -280,6 +285,8 @@ const VistoriadorVistoria: React.FC = () => {
   
   const [vistoria, setVistoria] = useState<any>(null);
   const [checklistStatus, setChecklistStatus] = useState<ChecklistStatus | null>(null);
+  const [checklistItens, setChecklistItens] = useState<VistoriaChecklistItem[]>([]);
+  const [progresso, setProgresso] = useState<ChecklistProgresso | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -297,9 +304,20 @@ const VistoriadorVistoria: React.FC = () => {
       const vistoriaData = await vistoriadorService.getVistoriaById(parseInt(id));
       setVistoria(vistoriaData);
       
-      // Carregar status do checklist
+      // Carregar status do checklist (antigo - ainda mantém)
       const checklistData = await vistoriadorService.getChecklistStatus(parseInt(id));
       setChecklistStatus(checklistData);
+      
+      // Carregar novo sistema de checklist
+      try {
+        const itens = await checklistService.getChecklistVistoria(parseInt(id));
+        setChecklistItens(itens);
+        
+        const prog = await checklistService.getProgresso(parseInt(id));
+        setProgresso(prog);
+      } catch (checkErr) {
+        console.log('Checklist ainda não copiado para esta vistoria');
+      }
       
     } catch (err: any) {
       console.error('Erro ao carregar vistoria:', err);
@@ -333,6 +351,28 @@ const VistoriadorVistoria: React.FC = () => {
       setError('Erro ao iniciar vistoria: ' + (err.response?.data?.error || err.message));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleMarcarConcluido = async (itemId: number) => {
+    try {
+      await checklistService.atualizarStatusItem(itemId, { status: 'CONCLUIDO' });
+      setSuccess('Item marcado como concluído!');
+      setTimeout(() => setSuccess(''), 2000);
+      loadVistoria(); // Recarregar para atualizar progresso
+    } catch (err) {
+      setError('Erro ao marcar item como concluído');
+    }
+  };
+
+  const handleMarcarPendente = async (itemId: number) => {
+    try {
+      await checklistService.atualizarStatusItem(itemId, { status: 'PENDENTE' });
+      setSuccess('Item marcado como pendente!');
+      setTimeout(() => setSuccess(''), 2000);
+      loadVistoria();
+    } catch (err) {
+      setError('Erro ao atualizar item');
     }
   };
 
@@ -496,7 +536,7 @@ const VistoriadorVistoria: React.FC = () => {
           <InfoItem>
             <InfoLabel>Embarcação</InfoLabel>
             <InfoValue>
-              {vistoria.Embarcacao?.nome || 'N/A'} - {vistoria.Embarcacao?.numero_casco || 'N/A'}
+              {vistoria.Embarcacao?.nome || 'N/A'} - {vistoria.Embarcacao?.nr_inscricao_barco || 'N/A'}
             </InfoValue>
           </InfoItem>
           <InfoItem>
@@ -528,81 +568,294 @@ const VistoriadorVistoria: React.FC = () => {
         </InfoGrid>
       </VistoriaInfo>
 
-      {checklistStatus && (
+      {/* Contato e Localização */}
+      <VistoriaInfo style={{ background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)' }}>
+        <h2 style={{ margin: '0 0 1rem 0', fontSize: '1.25rem', fontWeight: '600', color: '#0369a1' }}>
+          Contato e Localização
+        </h2>
+        
+        <div style={{ display: 'grid', gap: '1rem' }}>
+          {/* WhatsApp */}
+          {vistoria.Embarcacao?.Cliente?.telefone_e164 && (
+            <div style={{
+              background: 'white',
+              border: '2px solid #25D366',
+              borderRadius: '0.75rem',
+              padding: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '1rem'
+            }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                  <MessageCircle size={18} color="#25D366" />
+                  <strong style={{ color: '#1e293b' }}>Cliente</strong>
+                </div>
+                <div style={{ color: '#64748b', fontSize: '0.875rem' }}>
+                  {vistoria.Embarcacao?.Cliente?.nome || 'N/A'}
+                </div>
+                <div style={{ color: '#0f172a', fontSize: '0.95rem', marginTop: '0.25rem' }}>
+                  {vistoria.Embarcacao?.Cliente?.telefone_e164 || 'N/A'}
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  const telefone = vistoria.Embarcacao?.Cliente?.telefone_e164?.replace(/\D/g, '');
+                  const mensagem = `Olá! Sou o vistoriador da vistoria ${vistoria.id}. Gostaria de confirmar o agendamento da vistoria da embarcação *${vistoria.Embarcacao?.nome}*.`;
+                  window.open(`https://wa.me/55${telefone}?text=${encodeURIComponent(mensagem)}`, '_blank');
+                }}
+                style={{
+                  background: '#25D366',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  padding: '0.75rem 1.5rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 2px 4px rgba(37, 211, 102, 0.3)'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = '#20BA5A'}
+                onMouseOut={(e) => e.currentTarget.style.background = '#25D366'}
+              >
+                <MessageCircle size={18} />
+                Abrir WhatsApp
+              </button>
+            </div>
+          )}
+
+          {/* Google Maps */}
+          {vistoria.Local && (
+            <div style={{
+              background: 'white',
+              border: '2px solid #EA4335',
+              borderRadius: '0.75rem',
+              padding: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '1rem'
+            }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                  <MapPin size={18} color="#EA4335" />
+                  <strong style={{ color: '#1e293b' }}>Local da Vistoria</strong>
+                </div>
+                <div style={{ color: '#0f172a', fontSize: '0.95rem', marginTop: '0.25rem' }}>
+                  {vistoria.Local.logradouro && `${vistoria.Local.logradouro}, `}
+                  {vistoria.Local.numero && `${vistoria.Local.numero} `}
+                  {vistoria.Local.complemento && `- ${vistoria.Local.complemento}`}
+                </div>
+                <div style={{ color: '#64748b', fontSize: '0.875rem' }}>
+                  {vistoria.Local.bairro && `${vistoria.Local.bairro}, `}
+                  {vistoria.Local.cidade} - {vistoria.Local.estado}
+                  {vistoria.Local.cep && ` | CEP: ${vistoria.Local.cep}`}
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  const endereco = [
+                    vistoria.Local?.logradouro,
+                    vistoria.Local?.numero,
+                    vistoria.Local?.bairro,
+                    vistoria.Local?.cidade,
+                    vistoria.Local?.estado,
+                    vistoria.Local?.cep
+                  ].filter(Boolean).join(', ');
+                  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`, '_blank');
+                }}
+                style={{
+                  background: '#EA4335',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  padding: '0.75rem 1.5rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 2px 4px rgba(234, 67, 53, 0.3)'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = '#D33426'}
+                onMouseOut={(e) => e.currentTarget.style.background = '#EA4335'}
+              >
+                <Navigation size={18} />
+                Abrir no Maps
+              </button>
+            </div>
+          )}
+
+          {/* Dados da Corretora (se houver) */}
+          {vistoria.corretora_nome && (
+            <div style={{
+              background: 'white',
+              border: '2px solid #3b82f6',
+              borderRadius: '0.75rem',
+              padding: '1rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <Info size={18} color="#3b82f6" />
+                <strong style={{ color: '#1e293b' }}>Dados da Corretora</strong>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <div>
+                  <div style={{ color: '#64748b', fontSize: '0.75rem' }}>Nome</div>
+                  <div style={{ color: '#0f172a', fontSize: '0.9rem' }}>{vistoria.corretora_nome}</div>
+                </div>
+                {vistoria.corretora_telefone_e164 && (
+                  <div>
+                    <div style={{ color: '#64748b', fontSize: '0.75rem' }}>Telefone</div>
+                    <div style={{ color: '#0f172a', fontSize: '0.9rem' }}>{vistoria.corretora_telefone_e164}</div>
+                  </div>
+                )}
+                {vistoria.corretora_email_laudo && (
+                  <div>
+                    <div style={{ color: '#64748b', fontSize: '0.75rem' }}>E-mail para Laudo</div>
+                    <div style={{ color: '#0f172a', fontSize: '0.9rem' }}>{vistoria.corretora_email_laudo}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </VistoriaInfo>
+
+      {/* NOVO SISTEMA DE CHECKLIST */}
+      {checklistItens.length > 0 && (
         <ChecklistSection>
           <SectionTitle>
             <CheckSquare size={24} />
-            Checklist de Fotos
+            Checklist de Fotos - {vistoria.Embarcacao?.tipo_embarcacao || 'Embarcação'}
           </SectionTitle>
           
-          <ProgressBar>
-            <ProgressFill progress={checklistStatus.resumo.progresso} />
-          </ProgressBar>
-          
-          <ProgressText>
-            {checklistStatus.resumo.fotosObrigatoriasTiradas} de {checklistStatus.resumo.totalObrigatorios} fotos obrigatórias tiradas
-            ({Math.round(checklistStatus.resumo.progresso)}%)
-          </ProgressText>
+          {progresso && (
+            <>
+              <ProgressBar>
+                <ProgressFill progress={progresso.percentual} />
+              </ProgressBar>
+              
+              <ProgressText>
+                {progresso.concluidos} de {progresso.total} itens ({progresso.percentual}%)
+                {progresso.obrigatoriosPendentes > 0 && (
+                  <span style={{ color: '#ef4444', marginLeft: '0.5rem' }}>
+                    | {progresso.obrigatoriosPendentes} obrigatório(s) pendente(s)
+                  </span>
+                )}
+              </ProgressText>
+              
+              {progresso.podeAprovar && (
+                <div style={{ 
+                  background: '#dcfce7', 
+                  border: '1px solid #10b981', 
+                  borderRadius: '0.5rem', 
+                  padding: '0.75rem', 
+                  marginTop: '0.75rem',
+                  fontSize: '0.875rem',
+                  color: '#166534',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <CheckCircle size={16} />
+                  Todos os itens obrigatórios concluídos!
+                </div>
+              )}
+            </>
+          )}
 
-          {checklistStatus.checklistStatus.map((item: ChecklistItem) => (
-            <ChecklistItemStyled key={item.tipo_id} completed={item.foto_tirada}>
+          {checklistItens.map((item) => (
+            <ChecklistItemStyled key={item.id} completed={item.status === 'CONCLUIDO'}>
               <ChecklistHeader>
                 <ChecklistInfo>
                   <ChecklistTitle>
-                    {item.foto_tirada ? (
-                      <CheckCircle size={20} style={{ color: '#10b981', marginRight: '0.5rem' }} />
-                    ) : (
-                      <Square size={20} style={{ color: '#6b7280', marginRight: '0.5rem' }} />
-                    )}
-                    {item.nome_exibicao}
-                    {item.obrigatorio && (
-                      <span style={{ color: '#ef4444', marginLeft: '0.5rem' }}>*</span>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <span style={{ 
+                        background: '#667eea', 
+                        color: 'white', 
+                        width: '28px', 
+                        height: '28px', 
+                        borderRadius: '50%', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        flexShrink: 0
+                      }}>
+                        {item.ordem}
+                      </span>
+                      {item.status === 'CONCLUIDO' ? (
+                        <CheckCircle size={20} style={{ color: '#10b981' }} />
+                      ) : (
+                        <Square size={20} style={{ color: '#6b7280' }} />
+                      )}
+                      <span style={{ fontWeight: '600' }}>{item.nome}</span>
+                      {item.obrigatorio && (
+                        <span style={{
+                          background: '#fee2e2',
+                          color: '#991b1b',
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '0.25rem',
+                          fontSize: '0.7rem',
+                          fontWeight: '600'
+                        }}>
+                          Obrigatório
+                        </span>
+                      )}
+                      {item.permite_video && (
+                        <span style={{
+                          background: '#fef3c7',
+                          color: '#92400e',
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '0.25rem',
+                          fontSize: '0.7rem',
+                          fontWeight: '600',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem'
+                        }}>
+                          <Video size={12} /> Permite vídeo
+                        </span>
+                      )}
+                    </div>
                   </ChecklistTitle>
-                  <ChecklistDescription>{item.descricao}</ChecklistDescription>
+                  {item.descricao && (
+                    <ChecklistDescription>{item.descricao}</ChecklistDescription>
+                  )}
+                  {item.observacao && (
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem', fontStyle: 'italic' }}>
+                      Obs: {item.observacao}
+                    </div>
+                  )}
+                  {item.concluido_em && (
+                    <div style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '0.25rem' }}>
+                      Concluído em: {new Date(item.concluido_em).toLocaleString('pt-BR')}
+                    </div>
+                  )}
                 </ChecklistInfo>
                 
                 <ChecklistActions>
-                  {item.foto_tirada ? (
-                    <>
-                      <ActionButton variant="danger" onClick={() => handleDeletePhoto(item.tipo_id)}>
-                        <Trash2 size={16} />
-                        Excluir
-                      </ActionButton>
-                    </>
+                  {item.status === 'CONCLUIDO' ? (
+                    <ActionButton variant="danger" onClick={() => handleMarcarPendente(item.id)}>
+                      <X size={16} />
+                      Desmarcar
+                    </ActionButton>
                   ) : (
-                    <label>
-                      <FileInput
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            handlePhotoUpload(item.tipo_id, file);
-                          }
-                        }}
-                        disabled={uploading === item.tipo_id}
-                      />
-                      <ActionButton variant="primary" as="div">
-                        <Camera size={16} />
-                        {uploading === item.tipo_id ? 'Enviando...' : 'Tirar Foto'}
-                      </ActionButton>
-                    </label>
+                    <ActionButton variant="primary" onClick={() => handleMarcarConcluido(item.id)}>
+                      <CheckCircle size={16} />
+                      Concluir
+                    </ActionButton>
                   )}
                 </ChecklistActions>
               </ChecklistHeader>
-              
-              {item.foto_tirada && item.foto_url && (
-                <PhotoPreview>
-                  <PhotoImage src={`${API_CONFIG.BASE_URL}${item.foto_url}`} alt={item.nome_exibicao} />
-                  <PhotoInfo>
-                    Foto tirada em: {new Date().toLocaleDateString('pt-BR')}
-                    {item.foto_observacao && (
-                      <div>Observação: {item.foto_observacao}</div>
-                    )}
-                  </PhotoInfo>
-                </PhotoPreview>
-              )}
             </ChecklistItemStyled>
           ))}
         </ChecklistSection>

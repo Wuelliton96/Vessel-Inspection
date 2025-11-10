@@ -2,43 +2,20 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const { Foto, Vistoria, TipoFotoChecklist } = require('../models');
 const { requireAuth, requireVistoriador } = require('../middleware/auth');
+const { getUploadConfig, getFileUrl, deleteFile, getStorageInfo } = require('../services/uploadService');
 
-// Configuração do multer para upload de arquivos
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../uploads/fotos');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, `foto-${uniqueSuffix}${path.extname(file.originalname)}`);
-  }
-});
+// Configurar upload usando o service
+const upload = multer(getUploadConfig());
 
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB
-  },
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Apenas imagens são permitidas'));
-    }
-  }
-});
+// Log das configurações ao iniciar
+const storageInfo = getStorageInfo();
+console.log('📸 Configurações de Upload:');
+console.log(`   - Estratégia: ${storageInfo.strategy}`);
+console.log(`   - Tamanho máximo: ${storageInfo.maxFileSize}`);
+console.log(`   - Tipos aceitos: ${storageInfo.allowedTypes.join(', ')}`);
+console.log(`   - Localização: ${storageInfo.location}`);
 
 // Aplicar middleware de autenticação em todas as rotas
 router.use(requireAuth, requireVistoriador);
@@ -117,14 +94,18 @@ router.post('/', upload.single('foto'), async (req, res) => {
       return res.status(404).json({ error: 'Tipo de foto não encontrado' });
     }
     
+    // Obter URL da foto (funciona para local ou S3)
+    const fileUrl = getFileUrl(req.file);
+    
     const foto = await Foto.create({
-      url_arquivo: `/uploads/fotos/${req.file.filename}`,
+      url_arquivo: fileUrl,
       observacao: observacao || null,
       vistoria_id: parseInt(vistoria_id),
       tipo_foto_id: parseInt(tipo_foto_id)
     });
     
-    console.log('Foto criada com ID:', foto.id);
+    console.log('✅ Foto criada com ID:', foto.id);
+    console.log('📍 URL:', fileUrl);
     console.log('=== FIM ROTA POST /api/fotos ===\n');
     
     res.status(201).json(foto);
@@ -157,15 +138,13 @@ router.delete('/:id', async (req, res) => {
       return res.status(403).json({ error: 'Acesso negado' });
     }
     
-    // Excluir arquivo físico
-    const filePath = path.join(__dirname, '..', foto.url_arquivo);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    // Deletar arquivo (local ou S3)
+    await deleteFile(foto.url_arquivo);
     
+    // Deletar registro do banco
     await foto.destroy();
     
-    console.log('Foto excluída com sucesso');
+    console.log('✅ Foto excluída com sucesso');
     console.log('=== FIM ROTA DELETE /api/fotos/:id ===\n');
     
     res.json({ message: 'Foto excluída com sucesso' });

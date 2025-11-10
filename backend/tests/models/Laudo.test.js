@@ -19,7 +19,7 @@ describe('Modelo Laudo', () => {
 
     const embarcacao = await Embarcacao.create({
       nome: 'Barco Teste',
-      numero_casco: 'TEST001'
+      nr_inscricao_barco: 'TEST001'
     });
 
     const local = await Local.create({
@@ -211,7 +211,7 @@ describe('Modelo Laudo', () => {
 
       const embarcacao = await Embarcacao.create({
         nome: 'Barco 2',
-        numero_casco: 'TEST002'
+        nr_inscricao_barco: 'TEST002'
       });
 
       const local = await Local.create({

@@ -12,11 +12,11 @@ const bcrypt = require('bcryptjs')
 
 async function seedDatabase() {
   try {
-    console.log('🌱 Iniciando seed do banco de dados...')
+    console.log('Iniciando seed do banco de dados...')
 
     // Sincronizar banco
     await sequelize.sync({ force: true })
-    console.log('✅ Banco sincronizado')
+    console.log('[OK] Banco sincronizado')
 
     // Criar Status de Vistoria
     const statusAprovada = await StatusVistoria.create({
@@ -34,7 +34,7 @@ async function seedDatabase() {
       descricao: 'Vistoria reprovada'
     })
 
-    console.log('✅ Status de vistorias criados')
+    console.log('[OK] Status de vistorias criados')
 
     // Criar Níveis de Acesso (IDs fixos para consistência)
     const nivelAdmin = await NivelAcesso.create({
@@ -77,7 +77,7 @@ async function seedDatabase() {
       ativo: true
     })
 
-    console.log('✅ Usuários criados')
+    console.log('[OK] Usuários criados')
 
     // Criar Locais
     const portoCentral = await Local.create({
@@ -113,38 +113,38 @@ async function seedDatabase() {
       estado: 'BA'
     })
 
-    console.log('✅ Locais criados')
+    console.log('[OK] Locais criados')
 
     // Criar Embarcações
     const barcoAzul = await Embarcacao.create({
       nome: 'Barco Azul',
-      numero_casco: 'BR-2020-001',
+      nr_inscricao_barco: 'BR-2020-001',
       proprietario_nome: 'João Silva',
       proprietario_email: 'joao.silva@email.com'
     })
 
     const iateBranco = await Embarcacao.create({
       nome: 'Iate Branco',
-      numero_casco: 'BR-2018-045',
+      nr_inscricao_barco: 'BR-2018-045',
       proprietario_nome: 'Maria Santos',
       proprietario_email: 'maria.santos@email.com'
     })
 
     const lanchaVerde = await Embarcacao.create({
       nome: 'Lancha Verde',
-      numero_casco: 'BR-2021-012',
+      nr_inscricao_barco: 'BR-2021-012',
       proprietario_nome: 'Pedro Costa',
       proprietario_email: 'pedro.costa@email.com'
     })
 
     const veleiroAmarelo = await Embarcacao.create({
       nome: 'Veleiro Amarelo',
-      numero_casco: 'BR-2019-078',
+      nr_inscricao_barco: 'BR-2019-078',
       proprietario_nome: 'Ana Oliveira',
       proprietario_email: 'ana.oliveira@email.com'
     })
 
-    console.log('✅ Embarcações criadas')
+    console.log('[OK] Embarcações criadas')
 
     // Criar Vistorias
     const vistoria1 = await Vistoria.create({
@@ -183,7 +183,7 @@ async function seedDatabase() {
       status_id: statusAprovada.id
     })
 
-    console.log('✅ Vistorias criadas')
+    console.log('[OK] Vistorias criadas')
 
     // Criar Laudos
     await Laudo.create({
@@ -198,10 +198,10 @@ async function seedDatabase() {
       vistoria_id: vistoria4.id
     })
 
-    console.log('✅ Laudos criados')
+    console.log('[OK] Laudos criados')
 
-    console.log('🎉 Seed do banco de dados concluído com sucesso!')
-    console.log('\n📊 Resumo dos dados criados:')
+    console.log('Seed do banco de dados concluído com sucesso!')
+    console.log('\nResumo dos dados criados:')
     console.log(`- ${await NivelAcesso.count()} níveis de acesso`)
     console.log(`- ${await Usuario.count()} usuários`)
     console.log(`- ${await Embarcacao.count()} embarcações`)
@@ -211,7 +211,7 @@ async function seedDatabase() {
     console.log(`- ${await Laudo.count()} laudos`)
 
   } catch (error) {
-    console.error('❌ Erro durante o seed:', error)
+    console.error('[ERRO] Erro durante o seed:', error)
   } finally {
     await sequelize.close()
   }

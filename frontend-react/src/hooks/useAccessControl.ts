@@ -18,11 +18,15 @@ export const useAccessControl = () => {
       return [
         { path: '/', label: 'Dashboard', icon: 'Home' },
         { path: '/embarcacoes', label: 'Embarcações', icon: 'Ship' },
+        { path: '/seguradoras', label: 'Seguradoras', icon: 'Shield' },
+        { path: '/clientes', label: 'Clientes', icon: 'UserCheck' },
         { path: '/locais', label: 'Locais', icon: 'MapPin' },
         { path: '/vistorias', label: 'Vistorias', icon: 'ClipboardCheck' },
+        { path: '/checklists', label: 'Checklists', icon: 'FileText' },
         { path: '/fotos', label: 'Fotos', icon: 'Camera' },
         { path: '/laudos', label: 'Laudos', icon: 'FileText' },
-        { path: '/usuarios', label: 'Gerenciar Usuários', icon: 'Ship' },
+        { path: '/pagamentos', label: 'Pagamentos', icon: 'DollarSign' },
+        { path: '/usuarios', label: 'Gerenciar Usuários', icon: 'Users' },
       ];
     } else if (isVistoriador) {
       return [

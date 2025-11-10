@@ -10,6 +10,12 @@ import Embarcacoes from './pages/Embarcacoes';
 import Locais from './pages/Locais';
 import Vistorias from './pages/Vistorias';
 import VistoriadorVistoria from './pages/VistoriadorVistoria';
+import PagamentosVistoriadores from './pages/PagamentosVistoriadores';
+import Seguradoras from './pages/Seguradoras';
+import Clientes from './pages/Clientes';
+import ChecklistTemplates from './pages/ChecklistTemplates';
+import FotosVistoria from './pages/FotosVistoria';
+import Fotos from './pages/Fotos';
 import PasswordUpdateModal from './components/PasswordUpdateModal';
 
 const AppRoutes: React.FC = () => {
@@ -83,7 +89,7 @@ const AppRoutes: React.FC = () => {
             path="/fotos" 
             element={
               canAccess('admin') ? 
-                <div>Fotos (em desenvolvimento)</div> : 
+                <Fotos /> : 
                 <Navigate to="/" replace />
             } 
           />
@@ -100,6 +106,46 @@ const AppRoutes: React.FC = () => {
             element={
               canAccess('admin') ? 
                 <Usuarios /> : 
+                <Navigate to="/" replace />
+            } 
+          />
+          <Route 
+            path="/pagamentos" 
+            element={
+              canAccess('admin') ? 
+                <PagamentosVistoriadores /> : 
+                <Navigate to="/" replace />
+            } 
+          />
+          <Route 
+            path="/seguradoras" 
+            element={
+              canAccess('admin') ? 
+                <Seguradoras /> : 
+                <Navigate to="/" replace />
+            } 
+          />
+          <Route 
+            path="/clientes" 
+            element={
+              canAccess('admin') ? 
+                <Clientes /> : 
+                <Navigate to="/" replace />
+            } 
+          />
+          <Route 
+            path="/checklists" 
+            element={
+              canAccess('admin') ? 
+                <ChecklistTemplates /> : 
+                <Navigate to="/" replace />
+            } 
+          />
+          <Route 
+            path="/vistoria/:id/fotos" 
+            element={
+              canAccess('admin') ? 
+                <FotosVistoria /> : 
                 <Navigate to="/" replace />
             } 
           />

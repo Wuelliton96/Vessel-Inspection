@@ -23,6 +23,14 @@ const TipoFotoChecklist = require('./TipoFotoChecklist');
 const Vistoria = require('./Vistoria');
 const Foto = require('./Foto');
 const Laudo = require('./Laudo');
+const LotePagamento = require('./LotePagamento');
+const VistoriaLotePagamento = require('./VistoriaLotePagamento');
+const Seguradora = require('./Seguradora');
+const SeguradoraTipoEmbarcacao = require('./SeguradoraTipoEmbarcacao');
+const Cliente = require('./Cliente');
+const ChecklistTemplate = require('./ChecklistTemplate');
+const ChecklistTemplateItem = require('./ChecklistTemplateItem');
+const VistoriaChecklistItem = require('./VistoriaChecklistItem');
 
 // ---------------- Associações ----------------
 
@@ -49,12 +57,51 @@ TipoFotoChecklist.hasMany(Foto, { as: 'Fotos', foreignKey: 'tipo_foto_id' });
 Vistoria.hasOne(Laudo, { as: 'Laudo', foreignKey: 'vistoria_id' });
 Laudo.belongsTo(Vistoria, { as: 'Vistoria', foreignKey: 'vistoria_id' });
 
+// LotePagamento <-> Usuario (vistoriador e quem pagou)
+LotePagamento.belongsTo(Usuario, { as: 'vistoriador', foreignKey: 'vistoriador_id' });
+LotePagamento.belongsTo(Usuario, { as: 'pagoPor', foreignKey: 'pago_por_id' });
+Usuario.hasMany(LotePagamento, { as: 'lotesPagamento', foreignKey: 'vistoriador_id' });
+
+// VistoriaLotePagamento <-> LotePagamento
+VistoriaLotePagamento.belongsTo(LotePagamento, { as: 'lotePagamento', foreignKey: 'lote_pagamento_id' });
+LotePagamento.hasMany(VistoriaLotePagamento, { as: 'vistoriasLote', foreignKey: 'lote_pagamento_id' });
+
+// VistoriaLotePagamento <-> Vistoria
+VistoriaLotePagamento.belongsTo(Vistoria, { as: 'vistoria', foreignKey: 'vistoria_id' });
+Vistoria.hasMany(VistoriaLotePagamento, { as: 'lotesPagamento', foreignKey: 'vistoria_id' });
+
+// Seguradora <-> SeguradoraTipoEmbarcacao
+Seguradora.hasMany(SeguradoraTipoEmbarcacao, { as: 'tiposPermitidos', foreignKey: 'seguradora_id' });
+SeguradoraTipoEmbarcacao.belongsTo(Seguradora, { as: 'seguradora', foreignKey: 'seguradora_id' });
+
+// Embarcacao <-> Seguradora
+Embarcacao.belongsTo(Seguradora, { as: 'Seguradora', foreignKey: 'seguradora_id' });
+Seguradora.hasMany(Embarcacao, { as: 'embarcacoes', foreignKey: 'seguradora_id' });
+
+// Cliente <-> Embarcacao
+Cliente.hasMany(Embarcacao, { as: 'embarcacoes', foreignKey: 'cliente_id' });
+Embarcacao.belongsTo(Cliente, { as: 'Cliente', foreignKey: 'cliente_id' });
+
+// ChecklistTemplate <-> ChecklistTemplateItem
+ChecklistTemplate.hasMany(ChecklistTemplateItem, { as: 'itens', foreignKey: 'checklist_template_id' });
+ChecklistTemplateItem.belongsTo(ChecklistTemplate, { as: 'template', foreignKey: 'checklist_template_id' });
+
+// Vistoria <-> VistoriaChecklistItem
+Vistoria.hasMany(VistoriaChecklistItem, { as: 'checklistItens', foreignKey: 'vistoria_id' });
+VistoriaChecklistItem.belongsTo(Vistoria, { as: 'vistoria', foreignKey: 'vistoria_id' });
+
+// VistoriaChecklistItem <-> Foto
+VistoriaChecklistItem.belongsTo(Foto, { as: 'foto', foreignKey: 'foto_id' });
+
+// VistoriaChecklistItem <-> ChecklistTemplateItem
+VistoriaChecklistItem.belongsTo(ChecklistTemplateItem, { as: 'templateItem', foreignKey: 'template_item_id' });
+
 // ---------------- Sincronização ----------------
 // Controle por variável de ambiente DB_SYNC:
-//   "off"  -> não sincroniza
-//   "alter" (padrão) -> altera tabelas sem perder dados
+//   "off" (padrão)  -> não sincroniza (use migrations SQL)
+//   "alter" -> altera tabelas sem perder dados
 //   "force" -> recria tabelas (cuidado! apaga dados)
-const shouldSync = process.env.NODE_ENV !== 'test' && (process.env.DB_SYNC || 'alter') !== 'off';
+const shouldSync = process.env.NODE_ENV !== 'test' && (process.env.DB_SYNC || 'off') !== 'off';
 if (shouldSync) {
   const mode = process.env.DB_SYNC || 'alter';
   const syncOptions = {
@@ -83,4 +130,12 @@ module.exports = {
   Vistoria,
   Foto,
   Laudo,
+  LotePagamento,
+  VistoriaLotePagamento,
+  Seguradora,
+  SeguradoraTipoEmbarcacao,
+  Cliente,
+  ChecklistTemplate,
+  ChecklistTemplateItem,
+  VistoriaChecklistItem,
 };

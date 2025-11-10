@@ -1,7 +1,7 @@
 // backend/routes/vistoriadorRoutes.js
 const express = require('express');
 const router = express.Router();
-const { Vistoria, Embarcacao, Local, StatusVistoria, Usuario, Foto, TipoFotoChecklist } = require('../models');
+const { Vistoria, Embarcacao, Local, StatusVistoria, Usuario, Foto, TipoFotoChecklist, Cliente } = require('../models');
 const { requireAuth, requireVistoriador } = require('../middleware/auth');
 
 // Aplicar middleware de autenticação em todas as rotas
@@ -46,7 +46,13 @@ router.get('/vistorias/:id', async (req, res) => {
     
     const vistoria = await Vistoria.findByPk(req.params.id, {
       include: [
-        { model: Embarcacao, as: 'Embarcacao' },
+        { 
+          model: Embarcacao, 
+          as: 'Embarcacao',
+          include: [
+            { model: Cliente, as: 'Cliente' }
+          ]
+        },
         { model: Local, as: 'Local' },
         { model: StatusVistoria, as: 'StatusVistoria' },
         { model: Usuario, as: 'vistoriador', attributes: ['id', 'nome', 'email'] },
@@ -145,7 +151,13 @@ router.put('/vistorias/:id/iniciar', async (req, res) => {
     // Recarregar com associações
     await vistoria.reload({
       include: [
-        { model: Embarcacao, as: 'Embarcacao' },
+        { 
+          model: Embarcacao, 
+          as: 'Embarcacao',
+          include: [
+            { model: Cliente, as: 'Cliente' }
+          ]
+        },
         { model: Local, as: 'Local' },
         { model: StatusVistoria, as: 'StatusVistoria' },
         { model: Usuario, as: 'vistoriador', attributes: ['id', 'nome', 'email'] }
@@ -175,7 +187,17 @@ router.put('/vistorias/:id/status', async (req, res) => {
     console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
     console.log('Dados recebidos:', req.body);
     
-    const { status_id, dados_rascunho } = req.body;
+    const { 
+      status_id, 
+      dados_rascunho, 
+      valor_embarcacao, 
+      valor_vistoria, 
+      valor_vistoriador,
+      contato_acompanhante_tipo,
+      contato_acompanhante_nome,
+      contato_acompanhante_telefone_e164,
+      contato_acompanhante_email
+    } = req.body;
     
     const vistoria = await Vistoria.findByPk(req.params.id);
     
@@ -196,6 +218,27 @@ router.put('/vistorias/:id/status', async (req, res) => {
     if (dados_rascunho !== undefined) {
       updateData.dados_rascunho = dados_rascunho;
     }
+    if (valor_embarcacao !== undefined) {
+      updateData.valor_embarcacao = valor_embarcacao;
+    }
+    if (valor_vistoria !== undefined) {
+      updateData.valor_vistoria = valor_vistoria;
+    }
+    if (valor_vistoriador !== undefined) {
+      updateData.valor_vistoriador = valor_vistoriador;
+    }
+    if (contato_acompanhante_tipo !== undefined) {
+      updateData.contato_acompanhante_tipo = contato_acompanhante_tipo;
+    }
+    if (contato_acompanhante_nome !== undefined) {
+      updateData.contato_acompanhante_nome = contato_acompanhante_nome;
+    }
+    if (contato_acompanhante_telefone_e164 !== undefined) {
+      updateData.contato_acompanhante_telefone_e164 = contato_acompanhante_telefone_e164;
+    }
+    if (contato_acompanhante_email !== undefined) {
+      updateData.contato_acompanhante_email = contato_acompanhante_email;
+    }
     
     // Se mudando para concluída, definir data de conclusão
     if (status_id) {
@@ -210,7 +253,13 @@ router.put('/vistorias/:id/status', async (req, res) => {
     // Recarregar com associações
     await vistoria.reload({
       include: [
-        { model: Embarcacao, as: 'Embarcacao' },
+        { 
+          model: Embarcacao, 
+          as: 'Embarcacao',
+          include: [
+            { model: Cliente, as: 'Cliente' }
+          ]
+        },
         { model: Local, as: 'Local' },
         { model: StatusVistoria, as: 'StatusVistoria' },
         { model: Usuario, as: 'vistoriador', attributes: ['id', 'nome', 'email'] }

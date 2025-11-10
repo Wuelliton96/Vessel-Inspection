@@ -5,7 +5,7 @@ describe('Modelo Embarcacao', () => {
     it('deve criar uma embarcação com dados válidos', async () => {
       const embarcacaoData = {
         nome: 'Barco Teste',
-        numero_casco: 'BT001',
+        nr_inscricao_barco: 'BT001',
         proprietario_nome: 'João Silva',
         proprietario_email: 'joao@teste.com'
       };
@@ -14,7 +14,7 @@ describe('Modelo Embarcacao', () => {
 
       expect(embarcacao).toBeDefined();
       expect(embarcacao.nome).toBe(embarcacaoData.nome);
-      expect(embarcacao.numero_casco).toBe(embarcacaoData.numero_casco);
+      expect(embarcacao.nr_inscricao_barco).toBe(embarcacaoData.nr_inscricao_barco);
       expect(embarcacao.proprietario_nome).toBe(embarcacaoData.proprietario_nome);
       expect(embarcacao.proprietario_email).toBe(embarcacaoData.proprietario_email);
     });
@@ -22,21 +22,21 @@ describe('Modelo Embarcacao', () => {
     it('deve criar embarcação apenas com campos obrigatórios', async () => {
       const embarcacaoData = {
         nome: 'Barco Simples',
-        numero_casco: 'BS001'
+        nr_inscricao_barco: 'BS001'
       };
 
       const embarcacao = await Embarcacao.create(embarcacaoData);
 
       expect(embarcacao).toBeDefined();
       expect(embarcacao.nome).toBe(embarcacaoData.nome);
-      expect(embarcacao.numero_casco).toBe(embarcacaoData.numero_casco);
+      expect(embarcacao.nr_inscricao_barco).toBe(embarcacaoData.nr_inscricao_barco);
       expect(embarcacao.proprietario_nome).toBeNull();
       expect(embarcacao.proprietario_email).toBeNull();
     });
 
     it('deve falhar ao criar embarcação sem nome', async () => {
       const embarcacaoData = {
-        numero_casco: 'BT001'
+        nr_inscricao_barco: 'BT001'
       };
 
       await expect(Embarcacao.create(embarcacaoData)).rejects.toThrow();
@@ -55,12 +55,12 @@ describe('Modelo Embarcacao', () => {
     it('deve falhar ao criar embarcação com número de casco duplicado', async () => {
       const embarcacaoData1 = {
         nome: 'Barco 1',
-        numero_casco: 'DUPLICADO001'
+        nr_inscricao_barco: 'DUPLICADO001'
       };
 
       const embarcacaoData2 = {
         nome: 'Barco 2',
-        numero_casco: 'DUPLICADO001'
+        nr_inscricao_barco: 'DUPLICADO001'
       };
 
       await Embarcacao.create(embarcacaoData1);
@@ -74,7 +74,7 @@ describe('Modelo Embarcacao', () => {
     beforeEach(async () => {
       embarcacao = await Embarcacao.create({
         nome: 'Barco CRUD',
-        numero_casco: 'CRUD001',
+        nr_inscricao_barco: 'CRUD001',
         proprietario_nome: 'Proprietário CRUD',
         proprietario_email: 'crud@teste.com'
       });
@@ -88,7 +88,7 @@ describe('Modelo Embarcacao', () => {
 
     it('deve buscar embarcação por número do casco', async () => {
       const embarcacaoEncontrada = await Embarcacao.findOne({
-        where: { numero_casco: 'CRUD001' }
+        where: { nr_inscricao_barco: 'CRUD001' }
       });
       expect(embarcacaoEncontrada).toBeDefined();
       expect(embarcacaoEncontrada.id).toBe(embarcacao.id);
@@ -117,23 +117,23 @@ describe('Modelo Embarcacao', () => {
     it('deve criar nova embarcação quando não existe', async () => {
       const embarcacaoData = {
         nome: 'Barco Novo',
-        numero_casco: 'NOVO001'
+        nr_inscricao_barco: 'NOVO001'
       };
 
       const [embarcacao, criado] = await Embarcacao.findOrCreate({
-        where: { numero_casco: 'NOVO001' },
+        where: { nr_inscricao_barco: 'NOVO001' },
         defaults: embarcacaoData
       });
 
       expect(criado).toBe(true);
       expect(embarcacao.nome).toBe('Barco Novo');
-      expect(embarcacao.numero_casco).toBe('NOVO001');
+      expect(embarcacao.nr_inscricao_barco).toBe('NOVO001');
     });
 
     it('deve retornar embarcação existente quando já existe', async () => {
       const embarcacaoData = {
         nome: 'Barco Existente',
-        numero_casco: 'EXISTENTE001'
+        nr_inscricao_barco: 'EXISTENTE001'
       };
 
       // Criar primeira embarcação
@@ -141,13 +141,13 @@ describe('Modelo Embarcacao', () => {
 
       // Tentar criar novamente com findOrCreate
       const [embarcacao, criado] = await Embarcacao.findOrCreate({
-        where: { numero_casco: 'EXISTENTE001' },
+        where: { nr_inscricao_barco: 'EXISTENTE001' },
         defaults: { nome: 'Nome Diferente' }
       });
 
       expect(criado).toBe(false);
       expect(embarcacao.nome).toBe('Barco Existente');
-      expect(embarcacao.numero_casco).toBe('EXISTENTE001');
+      expect(embarcacao.nr_inscricao_barco).toBe('EXISTENTE001');
     });
   });
 });

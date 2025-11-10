@@ -19,7 +19,7 @@ describe('Modelo Foto', () => {
 
     const embarcacao = await Embarcacao.create({
       nome: 'Barco Teste',
-      numero_casco: 'TEST001'
+      nr_inscricao_barco: 'TEST001'
     });
 
     const local = await Local.create({

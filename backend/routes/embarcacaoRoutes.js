@@ -2,20 +2,42 @@
 
 const express = require('express');
 const router = express.Router();
-const { Embarcacao } = require('../models');
+const { Embarcacao, Seguradora, Cliente } = require('../models');
 const { requireAuth, requireVistoriador } = require('../middleware/auth');
 
 // Aplicar middleware de autenticação em todas as rotas
 router.use(requireAuth, requireVistoriador);
 
-// GET /api/embarcacoes - Listar todas as embarcações
+// GET /api/embarcacoes - Listar todas as embarcações (com filtro opcional por CPF)
 router.get('/', async (req, res) => {
   try {
     console.log('=== ROTA GET /api/embarcacoes ===');
     console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
     console.log('Nível de acesso:', req.user?.NivelAcesso?.nome);
+    console.log('Query params:', req.query);
+    
+    const { proprietario_cpf } = req.query;
+    
+    const whereClause = {};
+    if (proprietario_cpf) {
+      whereClause.proprietario_cpf = proprietario_cpf;
+      console.log('Filtrando por CPF:', proprietario_cpf);
+    }
     
     const embarcacoes = await Embarcacao.findAll({
+      where: whereClause,
+      include: [
+        {
+          model: Seguradora,
+          as: 'Seguradora',
+          attributes: ['id', 'nome', 'ativo']
+        },
+        {
+          model: Cliente,
+          as: 'Cliente',
+          attributes: ['id', 'tipo_pessoa', 'nome', 'cpf', 'cnpj', 'telefone_e164', 'email', 'cidade', 'estado']
+        }
+      ],
       order: [['nome', 'ASC']]
     });
     
@@ -37,7 +59,19 @@ router.get('/:id', async (req, res) => {
     console.log('ID solicitado:', req.params.id);
     console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
     
-    const embarcacao = await Embarcacao.findByPk(req.params.id);
+    const embarcacao = await Embarcacao.findByPk(req.params.id, {
+      include: [
+        {
+          model: Seguradora,
+          as: 'Seguradora',
+          attributes: ['id', 'nome', 'ativo']
+        },
+        {
+          model: Cliente,
+          as: 'Cliente'
+        }
+      ]
+    });
     
     if (!embarcacao) {
       console.log('Embarcação não encontrada para ID:', req.params.id);
@@ -61,21 +95,34 @@ router.post('/', async (req, res) => {
     console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
     console.log('Dados recebidos:', req.body);
     
-    const { nome, numero_casco, proprietario_nome, proprietario_email } = req.body;
+    const { 
+      nome, 
+      nr_inscricao_barco, 
+      cliente_id,
+      tipo_embarcacao,
+      porte,
+      seguradora_id,
+      valor_embarcacao,
+      ano_fabricacao
+    } = req.body;
     
     // Validações básicas
-    if (!nome || !numero_casco) {
+    if (!nome || !nr_inscricao_barco) {
       console.log('Validação falhou - campos obrigatórios ausentes');
       console.log('=== FIM ROTA POST /api/embarcacoes (400) ===\n');
-      return res.status(400).json({ error: 'Campos obrigatórios: nome, numero_casco' });
+      return res.status(400).json({ error: 'Campos obrigatórios: nome, nr_inscricao_barco' });
     }
     
     console.log('Criando embarcação:', nome);
     const embarcacao = await Embarcacao.create({
       nome,
-      numero_casco,
-      proprietario_nome: proprietario_nome || null,
-      proprietario_email: proprietario_email || null
+      nr_inscricao_barco,
+      cliente_id: cliente_id || null,
+      tipo_embarcacao: tipo_embarcacao || null,
+      porte: porte || null,
+      seguradora_id: seguradora_id || null,
+      valor_embarcacao: valor_embarcacao || null,
+      ano_fabricacao: ano_fabricacao || null
     });
     
     console.log('Embarcação criada com ID:', embarcacao.id);
@@ -104,36 +151,45 @@ router.put('/:id', async (req, res) => {
     }
     
     console.log('Embarcação encontrada:', embarcacao.nome);
-    console.log('Dados atuais:', {
-      nome: embarcacao.nome,
-      numero_casco: embarcacao.numero_casco,
-      proprietario_nome: embarcacao.proprietario_nome,
-      proprietario_email: embarcacao.proprietario_email
-    });
     
-    const { nome, numero_casco, proprietario_nome, proprietario_email } = req.body;
-    
-    console.log('Atualizando com dados:', {
-      nome: nome || embarcacao.nome,
-      numero_casco: numero_casco || embarcacao.numero_casco,
-      proprietario_nome: proprietario_nome !== undefined ? proprietario_nome : embarcacao.proprietario_nome,
-      proprietario_email: proprietario_email !== undefined ? proprietario_email : embarcacao.proprietario_email
-    });
+    const { 
+      nome, 
+      nr_inscricao_barco, 
+      cliente_id,
+      tipo_embarcacao,
+      porte,
+      seguradora_id,
+      valor_embarcacao,
+      ano_fabricacao
+    } = req.body;
     
     await embarcacao.update({
       nome: nome || embarcacao.nome,
-      numero_casco: numero_casco || embarcacao.numero_casco,
-      proprietario_nome: proprietario_nome !== undefined ? proprietario_nome : embarcacao.proprietario_nome,
-      proprietario_email: proprietario_email !== undefined ? proprietario_email : embarcacao.proprietario_email
+      nr_inscricao_barco: nr_inscricao_barco || embarcacao.nr_inscricao_barco,
+      cliente_id: cliente_id !== undefined ? cliente_id : embarcacao.cliente_id,
+      tipo_embarcacao: tipo_embarcacao !== undefined ? tipo_embarcacao : embarcacao.tipo_embarcacao,
+      porte: porte !== undefined ? porte : embarcacao.porte,
+      seguradora_id: seguradora_id !== undefined ? seguradora_id : embarcacao.seguradora_id,
+      valor_embarcacao: valor_embarcacao !== undefined ? valor_embarcacao : embarcacao.valor_embarcacao,
+      ano_fabricacao: ano_fabricacao !== undefined ? ano_fabricacao : embarcacao.ano_fabricacao
+    });
+    
+    // Recarregar com associações
+    await embarcacao.reload({
+      include: [
+        {
+          model: Seguradora,
+          as: 'Seguradora',
+          attributes: ['id', 'nome', 'ativo']
+        },
+        {
+          model: Cliente,
+          as: 'Cliente'
+        }
+      ]
     });
     
     console.log('Embarcação atualizada com sucesso');
-    console.log('Dados finais:', {
-      nome: embarcacao.nome,
-      numero_casco: embarcacao.numero_casco,
-      proprietario_nome: embarcacao.proprietario_nome,
-      proprietario_email: embarcacao.proprietario_email
-    });
     console.log('=== FIM ROTA PUT /api/embarcacoes/:id ===\n');
     
     res.json(embarcacao);

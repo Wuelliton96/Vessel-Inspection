@@ -441,7 +441,9 @@ const Locais: React.FC = () => {
   const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [editingLocal, setEditingLocal] = useState<Local | null>(null);
+  const [deletingLocal, setDeletingLocal] = useState<Local | null>(null);
   const [cepLoading, setCepLoading] = useState(false);
   const [camposBloqueados, setCamposBloqueados] = useState({
     logradouro: false,
@@ -521,18 +523,25 @@ const Locais: React.FC = () => {
     console.log('=== EDIÇÃO INICIADA COM SUCESSO ===');
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('Tem certeza que deseja excluir este local?')) {
-      return;
-    }
+  const handleDeleteClick = (local: Local) => {
+    setDeletingLocal(local);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingLocal) return;
 
     try {
-      await localService.delete(id);
+      await localService.delete(deletingLocal.id);
       setSuccess('Local excluído com sucesso!');
+      setShowDeleteModal(false);
+      setDeletingLocal(null);
       loadLocais();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       setError('Erro ao excluir local: ' + (err.response?.data?.error || err.message));
+      setShowDeleteModal(false);
+      setDeletingLocal(null);
     }
   };
 
@@ -676,7 +685,6 @@ const Locais: React.FC = () => {
         <Title>
           <MapPin size={32} />
           Locais
-          <AdminBadge>Admin</AdminBadge>
         </Title>
         <SearchContainer>
           <SearchInput
@@ -691,16 +699,6 @@ const Locais: React.FC = () => {
           </Button>
         </SearchContainer>
       </Header>
-
-      <AdminInfo>
-        <InfoIcon>
-          <MapPin size={16} />
-        </InfoIcon>
-        <InfoText>
-          <strong>Modo Administrador:</strong> Você tem acesso completo aos locais. 
-          Pode criar, editar e excluir qualquer local do sistema.
-        </InfoText>
-      </AdminInfo>
 
       {error && (
         <ErrorMessage>
@@ -770,7 +768,7 @@ const Locais: React.FC = () => {
                     <IconButton variant="edit" onClick={() => handleEdit(local)}>
                       <Edit size={16} />
                     </IconButton>
-                    <IconButton variant="delete" onClick={() => handleDelete(local.id)}>
+                    <IconButton variant="delete" onClick={() => handleDeleteClick(local)}>
                       <Trash2 size={16} />
                     </IconButton>
                   </ActionButtons>
@@ -986,6 +984,42 @@ const Locais: React.FC = () => {
                 </Button>
               </ModalButtons>
             </Form>
+          </ModalContent>
+        </ModalOverlay>
+      )}
+
+      {/* Modal de Confirmação de Exclusão */}
+      {showDeleteModal && (
+        <ModalOverlay onClick={() => setShowDeleteModal(false)}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <ModalHeader>
+              <h2>Excluir Local</h2>
+              <button onClick={() => setShowDeleteModal(false)}>&times;</button>
+            </ModalHeader>
+            <div style={{ padding: '1.5rem' }}>
+              <p style={{ marginBottom: '1rem', fontSize: '1.05rem' }}>
+                Tem certeza que deseja excluir o local <strong>{deletingLocal?.nome_local || 'este local'}</strong>?
+              </p>
+              <p style={{ color: '#dc2626', marginBottom: '1.5rem' }}>
+                Esta ação não pode ser desfeita.
+              </p>
+              <ModalButtons>
+                <Button
+                  type="button"
+                  onClick={() => setShowDeleteModal(false)}
+                  style={{ background: '#6b7280' }}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  style={{ background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)' }}
+                >
+                  Excluir
+                </Button>
+              </ModalButtons>
+            </div>
           </ModalContent>
         </ModalOverlay>
       )}

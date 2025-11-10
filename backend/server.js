@@ -16,6 +16,11 @@ const localRoutes = require('./routes/localRoutes');
 const fotoRoutes = require('./routes/fotoRoutes');
 const tipoFotoChecklistRoutes = require('./routes/tipoFotoChecklistRoutes');
 const vistoriadorRoutes = require('./routes/vistoriadorRoutes');
+const pagamentoRoutes = require('./routes/pagamentoRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
+const seguradoraRoutes = require('./routes/seguradoraRoutes');
+const clienteRoutes = require('./routes/clienteRoutes');
+const checklistRoutes = require('./routes/checklistRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -63,6 +68,11 @@ app.use('/api/locais', localRoutes);
 app.use('/api/fotos', fotoRoutes);
 app.use('/api/tipos-foto-checklist', tipoFotoChecklistRoutes);
 app.use('/api/vistoriador', vistoriadorRoutes);
+app.use('/api/pagamentos', pagamentoRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/seguradoras', seguradoraRoutes);
+app.use('/api/clientes', clienteRoutes);
+app.use('/api/checklists', checklistRoutes);
 
 // Sobe o servidor
 app.listen(PORT, () => {

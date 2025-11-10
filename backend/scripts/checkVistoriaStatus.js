@@ -10,12 +10,12 @@ async function checkVistoriaStatus() {
       order: [['id', 'ASC']]
     });
     
-    console.log('📊 Status disponíveis no sistema:');
+    console.log('Status disponíveis no sistema:');
     statusList.forEach(status => {
       console.log(`  ID: ${status.id} | Nome: ${status.nome} | Descrição: ${status.descricao}`);
     });
     
-    console.log('\n📋 Vistorias no sistema:');
+    console.log('\nVistorias no sistema:');
     const vistorias = await Vistoria.findAll({
       include: [
         { model: StatusVistoria, as: 'StatusVistoria' }
@@ -27,9 +27,9 @@ async function checkVistoriaStatus() {
       console.log(`  ID: ${vistoria.id} | Status ID: ${vistoria.status_id} | Status Nome: ${vistoria.StatusVistoria?.nome || 'N/A'} | Data Início: ${vistoria.data_inicio || 'Não iniciada'}`);
     });
     
-    console.log('\n✅ Verificação concluída!');
+    console.log('\n[OK] Verificação concluída!');
   } catch (error) {
-    console.error('❌ Erro ao verificar status:', error);
+    console.error('[ERRO] Erro ao verificar status:', error);
   }
 }
 
@@ -44,4 +44,7 @@ if (require.main === module) {
 }
 
 module.exports = { checkVistoriaStatus };
+
+
+
 

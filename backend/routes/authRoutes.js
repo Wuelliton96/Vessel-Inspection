@@ -113,13 +113,28 @@ router.post('/login', async (req, res) => {
     // Validações básicas
     if (!email || !senha) {
       console.log('Validação falhou: Email ou senha não fornecidos');
-      return res.status(400).json({ error: 'Email e senha são obrigatórios.' });
+      return res.status(400).json({ 
+        error: 'Campos obrigatórios',
+        message: 'Por favor, preencha o email e a senha para continuar.',
+        code: 'CAMPOS_OBRIGATORIOS'
+      });
+    }
+
+    // Validar formato do email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      console.log('Formato de email inválido:', email);
+      return res.status(400).json({ 
+        error: 'Email inválido',
+        message: 'Por favor, digite um email válido no formato: exemplo@email.com',
+        code: 'EMAIL_INVALIDO'
+      });
     }
 
     // Buscar usuário
     console.log('Buscando usuário no banco...');
     const usuario = await Usuario.findOne({
-      where: { email },
+      where: { email: email.toLowerCase() },
       include: {
         model: NivelAcesso,
         attributes: ['id', 'nome', 'descricao']
@@ -128,7 +143,11 @@ router.post('/login', async (req, res) => {
 
     if (!usuario) {
       console.log('Usuário não encontrado para email:', email);
-      return res.status(401).json({ error: 'Email não cadastrado no sistema.' });
+      return res.status(401).json({ 
+        error: 'Credenciais inválidas',
+        message: 'Email não encontrado no sistema. Verifique se digitou corretamente ou entre em contato com o administrador.',
+        code: 'EMAIL_NAO_ENCONTRADO'
+      });
     }
 
     console.log('Usuário encontrado:', {
@@ -144,7 +163,11 @@ router.post('/login', async (req, res) => {
     const senhaValida = await bcrypt.compare(senha, usuario.senha_hash);
     if (!senhaValida) {
       console.log('Senha inválida para usuário:', usuario.email);
-      return res.status(401).json({ error: 'Senha incorreta.' });
+      return res.status(401).json({ 
+        error: 'Credenciais inválidas',
+        message: 'Senha incorreta. Por favor, verifique sua senha e tente novamente.',
+        code: 'SENHA_INCORRETA'
+      });
     }
 
     console.log('Senha válida!');

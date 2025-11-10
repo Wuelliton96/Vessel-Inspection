@@ -64,7 +64,7 @@ describe('Rotas de Vistoria', () => {
     it('deve criar nova vistoria com dados válidos', async () => {
       const vistoriaData = {
         embarcacao_nome: 'Barco Teste',
-        embarcacao_numero_casco: 'BT001',
+        embarcacao_nr_inscricao_barco: 'BT001',
         local_tipo: 'MARINA',
         local_cep: '12345-678',
         vistoriador_id: usuarioVistoriador.id
@@ -84,7 +84,7 @@ describe('Rotas de Vistoria', () => {
 
       // Verificar se a embarcação foi criada
       const embarcacao = await Embarcacao.findOne({
-        where: { numero_casco: vistoriaData.embarcacao_numero_casco }
+        where: { nr_inscricao_barco: vistoriaData.embarcacao_nr_inscricao_barco }
       });
       expect(embarcacao).toBeDefined();
       expect(embarcacao.nome).toBe(vistoriaData.embarcacao_nome);
@@ -105,12 +105,12 @@ describe('Rotas de Vistoria', () => {
       // Criar embarcação existente
       const embarcacaoExistente = await Embarcacao.create({
         nome: 'Barco Existente',
-        numero_casco: 'EXISTENTE001'
+        nr_inscricao_barco: 'EXISTENTE001'
       });
 
       const vistoriaData = {
         embarcacao_nome: 'Nome Diferente',
-        embarcacao_numero_casco: 'EXISTENTE001',
+        embarcacao_nr_inscricao_barco: 'EXISTENTE001',
         local_tipo: 'MARINA',
         local_cep: '12345-678',
         vistoriador_id: usuarioVistoriador.id
@@ -132,7 +132,7 @@ describe('Rotas de Vistoria', () => {
     it('deve criar novo local para cada vistoria', async () => {
       const vistoriaData1 = {
         embarcacao_nome: 'Barco 1',
-        embarcacao_numero_casco: 'B001',
+        embarcacao_nr_inscricao_barco: 'B001',
         local_tipo: 'MARINA',
         local_cep: '11111-111',
         vistoriador_id: usuarioVistoriador.id
@@ -140,7 +140,7 @@ describe('Rotas de Vistoria', () => {
 
       const vistoriaData2 = {
         embarcacao_nome: 'Barco 2',
-        embarcacao_numero_casco: 'B002',
+        embarcacao_nr_inscricao_barco: 'B002',
         local_tipo: 'RESIDENCIA',
         local_cep: '22222-222',
         vistoriador_id: usuarioVistoriador.id
@@ -166,7 +166,7 @@ describe('Rotas de Vistoria', () => {
     it('deve definir status como PENDENTE por padrão', async () => {
       const vistoriaData = {
         embarcacao_nome: 'Barco Status',
-        embarcacao_numero_casco: 'STATUS001',
+        embarcacao_nr_inscricao_barco: 'STATUS001',
         local_tipo: 'MARINA',
         local_cep: '12345-678',
         vistoriador_id: usuarioVistoriador.id
@@ -186,7 +186,7 @@ describe('Rotas de Vistoria', () => {
     it('deve definir administrador_id como usuário logado', async () => {
       const vistoriaData = {
         embarcacao_nome: 'Barco Admin',
-        embarcacao_numero_casco: 'ADMIN001',
+        embarcacao_nr_inscricao_barco: 'ADMIN001',
         local_tipo: 'MARINA',
         local_cep: '12345-678',
         vistoriador_id: usuarioVistoriador.id
@@ -210,7 +210,7 @@ describe('Rotas de Vistoria', () => {
     it('deve falhar quando vistoriador_id não existe', async () => {
       const vistoriaData = {
         embarcacao_nome: 'Barco Erro',
-        embarcacao_numero_casco: 'ERRO001',
+        embarcacao_nr_inscricao_barco: 'ERRO001',
         local_tipo: 'MARINA',
         local_cep: '12345-678',
         vistoriador_id: 99999 // ID inexistente
@@ -230,7 +230,7 @@ describe('Rotas de Vistoria', () => {
 
       const vistoriaData = {
         embarcacao_nome: 'Barco Sem Status',
-        embarcacao_numero_casco: 'SEMSTATUS001',
+        embarcacao_nr_inscricao_barco: 'SEMSTATUS001',
         local_tipo: 'MARINA',
         local_cep: '12345-678',
         vistoriador_id: usuarioVistoriador.id
@@ -249,7 +249,7 @@ describe('Rotas de Vistoria', () => {
     it('deve aceitar local_tipo MARINA', async () => {
       const vistoriaData = {
         embarcacao_nome: 'Barco Marina',
-        embarcacao_numero_casco: 'MARINA001',
+        embarcacao_nr_inscricao_barco: 'MARINA001',
         local_tipo: 'MARINA',
         local_cep: '12345-678',
         vistoriador_id: usuarioVistoriador.id
@@ -269,7 +269,7 @@ describe('Rotas de Vistoria', () => {
     it('deve aceitar local_tipo RESIDENCIA', async () => {
       const vistoriaData = {
         embarcacao_nome: 'Barco Residência',
-        embarcacao_numero_casco: 'RESID001',
+        embarcacao_nr_inscricao_barco: 'RESID001',
         local_tipo: 'RESIDENCIA',
         local_cep: '12345-678',
         vistoriador_id: usuarioVistoriador.id
@@ -292,7 +292,7 @@ describe('Rotas de Vistoria', () => {
       for (const cep of ceps) {
         const vistoriaData = {
           embarcacao_nome: `Barco CEP ${cep}`,
-          embarcacao_numero_casco: `CEP${cep.replace(/\D/g, '')}`,
+          embarcacao_nr_inscricao_barco: `CEP${cep.replace(/\D/g, '')}`,
           local_tipo: 'MARINA',
           local_cep: cep,
           vistoriador_id: usuarioVistoriador.id
@@ -319,7 +319,7 @@ describe('Rotas de Vistoria', () => {
 
       const vistoriaData = {
         embarcacao_nome: 'Barco Erro',
-        embarcacao_numero_casco: 'ERRO001',
+        embarcacao_nr_inscricao_barco: 'ERRO001',
         local_tipo: 'MARINA',
         local_cep: '12345-678',
         vistoriador_id: usuarioVistoriador.id
@@ -354,7 +354,7 @@ describe('Rotas de Vistoria', () => {
 
       const vistoriaData = {
         embarcacao_nome: 'Barco Log',
-        embarcacao_numero_casco: 'LOG001',
+        embarcacao_nr_inscricao_barco: 'LOG001',
         local_tipo: 'MARINA',
         local_cep: '12345-678',
         vistoriador_id: usuarioVistoriador.id
@@ -377,7 +377,7 @@ describe('Rotas de Vistoria', () => {
     it('deve criar todas as entidades relacionadas corretamente', async () => {
       const vistoriaData = {
         embarcacao_nome: 'Barco Integração',
-        embarcacao_numero_casco: 'INT001',
+        embarcacao_nr_inscricao_barco: 'INT001',
         local_tipo: 'MARINA',
         local_cep: '12345-678',
         vistoriador_id: usuarioVistoriador.id
@@ -393,7 +393,7 @@ describe('Rotas de Vistoria', () => {
         include: [
           {
             model: Embarcacao,
-            attributes: ['nome', 'numero_casco']
+            attributes: ['nome', 'nr_inscricao_barco']
           },
           {
             model: Local,
@@ -418,7 +418,7 @@ describe('Rotas de Vistoria', () => {
 
       expect(vistoria).toBeDefined();
       expect(vistoria.Embarcacao.nome).toBe('Barco Integração');
-      expect(vistoria.Embarcacao.numero_casco).toBe('INT001');
+      expect(vistoria.Embarcacao.nr_inscricao_barco).toBe('INT001');
       expect(vistoria.Local.tipo).toBe('MARINA');
       expect(vistoria.Local.cep).toBe('12345-678');
       expect(vistoria.vistoriador.nome).toBe('Vistoriador Teste');

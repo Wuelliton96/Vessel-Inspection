@@ -1,282 +1,335 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Ship, MapPin, ClipboardCheck, FileText, Calendar } from 'lucide-react';
-import { embarcacaoService, localService, vistoriaService } from '../services/api';
+import { 
+  Ship, 
+  MapPin, 
+  ClipboardCheck, 
+  Users, 
+  TrendingUp, 
+  TrendingDown,
+  DollarSign,
+  ArrowUp,
+  ArrowDown,
+  Minus,
+  AlertCircle
+} from 'lucide-react';
+import { dashboardService } from '../services/api';
 import { useAccessControl } from '../hooks/useAccessControl';
+import { formatarValorMonetario } from '../utils/validators';
 import VistoriadorDashboard from './VistoriadorDashboard';
 
-const DashboardContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  padding: 1rem;
+const Container = styled.div`
+  padding: 2rem;
+  max-width: 1600px;
+  margin: 0 auto;
   
   @media (max-width: 768px) {
-    padding: 0.5rem;
-    gap: 1rem;
+    padding: 1rem;
   }
 `;
 
 const Header = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
+  margin-bottom: 2rem;
 `;
 
 const Title = styled.h1`
-  font-size: 1.8rem;
-  font-weight: bold;
+  font-size: 2rem;
+  font-weight: 700;
   color: #1f2937;
-  margin: 0;
-  
-  @media (max-width: 768px) {
-    font-size: 1.5rem;
-  }
+  margin-bottom: 0.5rem;
 `;
 
-const UserInfo = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+const Subtitle = styled.p`
   color: #6b7280;
-  font-size: 0.9rem;
-  
-  @media (max-width: 768px) {
-    font-size: 0.8rem;
-  }
+  font-size: 1rem;
 `;
 
-const StatsGrid = styled.div`
+const MetricsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-  
-  @media (max-width: 768px) {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
-  }
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
 `;
 
-const StatCard = styled.div`
-  background: white;
-  border-radius: 12px;
-  padding: 1.25rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e5e7eb;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  
-  @media (max-width: 768px) {
-    padding: 1rem;
-    gap: 0.75rem;
-  }
-`;
-
-const StatIcon = styled.div<{ color: string }>`
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: ${props => props.color};
-  display: flex;
-  align-items: center;
-  justify-content: center;
+const MetricCard = styled.div<{ variant?: 'primary' | 'success' | 'warning' | 'danger' }>`
+  background: ${props => {
+    switch(props.variant) {
+      case 'success': return 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+      case 'warning': return 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
+      case 'danger': return 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+      default: return 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+    }
+  }};
   color: white;
-  
-  @media (max-width: 768px) {
-    width: 36px;
-    height: 36px;
-  }
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  position: relative;
+  overflow: hidden;
 `;
 
-const StatContent = styled.div`
-  flex: 1;
+const MetricHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  margin-bottom: 1rem;
 `;
 
-const StatNumber = styled.div`
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #1f2937;
+const MetricIcon = styled.div`
+  opacity: 0.9;
+`;
+
+const MetricValue = styled.div`
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
   line-height: 1;
-  
-  @media (max-width: 768px) {
-    font-size: 1.25rem;
-  }
 `;
 
-const StatLabel = styled.div`
-  color: #6b7280;
-  font-size: 0.8rem;
-  margin-top: 0.25rem;
-  
-  @media (max-width: 768px) {
-    font-size: 0.75rem;
-  }
+const MetricLabel = styled.div`
+  font-size: 0.9rem;
+  opacity: 0.9;
+  margin-bottom: 0.5rem;
 `;
 
-const RecentSection = styled.div`
+const MetricComparison = styled.div<{ trend: 'up' | 'down' | 'neutral' }>`
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  opacity: 0.95;
+  padding: 0.4rem 0.8rem;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  width: fit-content;
+`;
+
+const ComparisonGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+`;
+
+const ComparisonCard = styled.div`
   background: white;
   border-radius: 12px;
-  padding: 1.25rem;
+  padding: 1.5rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   border: 1px solid #e5e7eb;
-  
-  @media (max-width: 768px) {
-    padding: 1rem;
-  }
 `;
 
-const SectionTitle = styled.h2`
+const ComparisonTitle = styled.h3`
   font-size: 1.1rem;
   font-weight: 600;
   color: #1f2937;
-  margin: 0 0 1rem 0;
-  
-  @media (max-width: 768px) {
-    font-size: 1rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const ComparisonRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+
+  &:last-child {
+    margin-bottom: 0;
   }
 `;
 
-const List = styled.div`
+const ComparisonLabel = styled.div`
+  font-weight: 500;
+  color: #374151;
+`;
+
+const ComparisonValue = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+`;
+
+const ComparisonNumber = styled.span<{ variant?: 'success' | 'danger' | 'neutral' }>`
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: ${props => {
+    switch(props.variant) {
+      case 'success': return '#10b981';
+      case 'danger': return '#ef4444';
+      default: return '#6b7280';
+    }
+  }};
+`;
+
+const ProgressBar = styled.div`
+  width: 100%;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 0.5rem;
+`;
+
+const ProgressFill = styled.div<{ width: number; color: string }>`
+  height: 100%;
+  width: ${props => Math.min(props.width, 100)}%;
+  background: ${props => props.color};
+  transition: width 0.3s ease;
+`;
+
+const RankingCard = styled.div`
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+`;
+
+const RankingTitle = styled.h3`
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const RankingList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 `;
 
-const ListItem = styled.div`
+const RankingItem = styled.div`
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 0.75rem;
-  background: #f9fafb;
+  gap: 1rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
   border-radius: 8px;
   border: 1px solid #e5e7eb;
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
 `;
 
-const ListItemText = styled.div`
+const RankingPosition = styled.div<{ position: number }>`
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  background: ${props => {
+    if (props.position === 1) return 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)';
+    if (props.position === 2) return 'linear-gradient(135deg, #94a3b8 0%, #64748b 100%)';
+    if (props.position === 3) return 'linear-gradient(135deg, #fb923c 0%, #ea580c 100%)';
+    return '#e5e7eb';
+  }};
+  color: ${props => props.position <= 3 ? 'white' : '#6b7280'};
+`;
+
+const RankingInfo = styled.div`
+  flex: 1;
+`;
+
+const RankingName = styled.div`
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+`;
+
+const RankingStats = styled.div`
+  font-size: 0.875rem;
+  color: #6b7280;
+`;
+
+const RankingValue = styled.div`
+  font-weight: 700;
+  color: #10b981;
+  font-size: 1.1rem;
+`;
+
+const StatusGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+`;
+
+const StatusCard = styled.div<{ color: string }>`
+  background: white;
+  border-left: 4px solid ${props => props.color};
+  border-radius: 8px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+`;
+
+const StatusNumber = styled.div`
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+`;
+
+const StatusLabel = styled.div`
+  font-size: 0.875rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const LoadingState = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-`;
-
-const ListItemTitle = styled.div`
-  font-weight: 500;
-  color: #1f2937;
-  font-size: 0.9rem;
-  
-  @media (max-width: 768px) {
-    font-size: 0.85rem;
-  }
-`;
-
-const ListItemSubtitle = styled.div`
-  font-size: 0.8rem;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
   color: #6b7280;
-  
-  @media (max-width: 768px) {
-    font-size: 0.75rem;
-  }
-`;
-
-const ListItemDate = styled.div`
-  font-size: 0.8rem;
-  color: #6b7280;
-  
-  @media (max-width: 768px) {
-    font-size: 0.75rem;
-  }
-`;
-
-const LoadingMessage = styled.div`
-  text-align: center;
-  color: #6b7280;
-  padding: 2rem;
-`;
-
-const EmptyMessage = styled.div`
-  text-align: center;
-  color: #6b7280;
-  padding: 2rem;
-  font-style: italic;
+  gap: 1rem;
 `;
 
 const ErrorMessage = styled.div`
   background: #fef2f2;
   border: 1px solid #fecaca;
   color: #dc2626;
-  padding: 1rem;
-  border-radius: 8px;
-  margin-bottom: 1rem;
-  text-align: center;
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 `;
-
-interface DashboardStats {
-  embarcacoes: number;
-  locais: number;
-  vistorias: number;
-  laudos: number;
-}
 
 const Dashboard: React.FC = () => {
   const { isAdmin, isVistoriador } = useAccessControl();
-  const [stats, setStats] = useState<DashboardStats>({
-    embarcacoes: 0,
-    locais: 0,
-    vistorias: 0,
-    laudos: 0,
-  });
+  const [estatisticas, setEstatisticas] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [recentVistorias, setRecentVistorias] = useState<any[]>([]);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const loadDashboardData = async () => {
+    const loadEstatisticas = async () => {
+      if (!isAdmin) return;
+      
       try {
-        setError(null);
-        if (isAdmin) {
-          const [embarcacoes, locais, vistorias] = await Promise.all([
-            embarcacaoService.getAll(),
-            localService.getAll(),
-            vistoriaService.getAll(),
-          ]);
-
-          setStats({
-            embarcacoes: embarcacoes.length,
-            locais: locais.length,
-            vistorias: vistorias.length,
-            laudos: vistorias.filter(v => v.data_conclusao).length, // Vistorias concluídas têm laudos
-          });
-
-          // Pegar as 5 vistorias mais recentes
-          const sortedVistorias = vistorias
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-            .slice(0, 5);
-          
-          setRecentVistorias(sortedVistorias);
-        }
-      } catch (error: any) {
-        console.error('Erro ao carregar dados do dashboard:', error);
-        setError('Erro ao carregar dados do dashboard: ' + (error.response?.data?.error || error.message));
+        setLoading(true);
+        setError('');
+        const data = await dashboardService.getEstatisticas();
+        setEstatisticas(data);
+      } catch (err: any) {
+        console.error('Erro ao carregar estatísticas:', err);
+        setError('Erro ao carregar estatísticas: ' + (err.response?.data?.error || err.message));
       } finally {
         setLoading(false);
       }
     };
 
-    loadDashboardData();
+    loadEstatisticas();
   }, [isAdmin]);
 
   // Se for vistoriador, mostrar dashboard personalizado
@@ -287,97 +340,295 @@ const Dashboard: React.FC = () => {
   // Dashboard para administrador
   if (loading) {
     return (
-      <DashboardContainer>
-        <LoadingMessage>Carregando dados do dashboard...</LoadingMessage>
-      </DashboardContainer>
+      <Container>
+        <LoadingState>
+          <ClipboardCheck size={48} />
+          <p>Carregando estatísticas do dashboard...</p>
+        </LoadingState>
+      </Container>
     );
   }
 
-  return (
-    <DashboardContainer>
-      <Header>
-        <Title>Dashboard Administrativo</Title>
-        <UserInfo>
-          <Calendar size={16} />
-          Administrador - Acesso Completo
-        </UserInfo>
-      </Header>
-
-      {error && (
+  if (error) {
+    return (
+      <Container>
+        <Header>
+          <Title>Dashboard Administrativo</Title>
+        </Header>
         <ErrorMessage>
+          <AlertCircle size={20} />
           {error}
         </ErrorMessage>
+      </Container>
+    );
+  }
+
+  if (!estatisticas) {
+    return (
+      <Container>
+        <Header>
+          <Title>Dashboard Administrativo</Title>
+        </Header>
+        <p>Nenhum dado disponível</p>
+      </Container>
+    );
+  }
+
+  const getTrendIcon = (percentual: number) => {
+    if (percentual > 0) return <ArrowUp size={16} />;
+    if (percentual < 0) return <ArrowDown size={16} />;
+    return <Minus size={16} />;
+  };
+
+  const getTrendColor = (percentual: number, inverso = false) => {
+    if (inverso) {
+      if (percentual > 0) return '#ef4444'; // Vermelho se aumentou despesa
+      if (percentual < 0) return '#10b981'; // Verde se diminuiu despesa
+    } else {
+      if (percentual > 0) return '#10b981'; // Verde se aumentou
+      if (percentual < 0) return '#ef4444'; // Vermelho se diminuiu
+    }
+    return '#6b7280'; // Neutro
+  };
+
+  return (
+    <Container>
+      <Header>
+        <Title>Dashboard Administrativo</Title>
+        <Subtitle>
+          Visão geral do sistema - {estatisticas.mes_atual.nome_mes}
+        </Subtitle>
+      </Header>
+
+      {/* Cards Principais - Métricas do Mês Atual */}
+      <MetricsGrid>
+        <MetricCard variant="primary">
+          <MetricHeader>
+            <MetricIcon>
+              <ClipboardCheck size={32} />
+            </MetricIcon>
+          </MetricHeader>
+          <MetricValue>{estatisticas.mes_atual.vistorias.total}</MetricValue>
+          <MetricLabel>Vistorias este Mês</MetricLabel>
+          <MetricComparison trend={estatisticas.comparacao.vistorias.variacao >= 0 ? 'up' : 'down'}>
+            {getTrendIcon(estatisticas.comparacao.vistorias.variacao)}
+            {Math.abs(estatisticas.comparacao.vistorias.percentual)}% vs mês anterior
+          </MetricComparison>
+        </MetricCard>
+
+        <MetricCard variant="success">
+          <MetricHeader>
+            <MetricIcon>
+              <DollarSign size={32} />
+            </MetricIcon>
+          </MetricHeader>
+          <MetricValue>{formatarValorMonetario(estatisticas.mes_atual.financeiro.receita)}</MetricValue>
+          <MetricLabel>Receita Total</MetricLabel>
+          <MetricComparison trend={estatisticas.comparacao.receita.variacao >= 0 ? 'up' : 'down'}>
+            {getTrendIcon(estatisticas.comparacao.receita.variacao)}
+            {Math.abs(estatisticas.comparacao.receita.percentual)}% vs mês anterior
+          </MetricComparison>
+        </MetricCard>
+
+        <MetricCard variant="warning">
+          <MetricHeader>
+            <MetricIcon>
+              <Users size={32} />
+            </MetricIcon>
+          </MetricHeader>
+          <MetricValue>{formatarValorMonetario(estatisticas.mes_atual.financeiro.despesa)}</MetricValue>
+          <MetricLabel>Custo com Vistoriadores</MetricLabel>
+          <MetricComparison trend={estatisticas.comparacao.lucro.variacao >= 0 ? 'up' : 'down'}>
+            {estatisticas.mes_atual.vistorias.concluidas} vistorias concluídas
+          </MetricComparison>
+        </MetricCard>
+
+        <MetricCard variant={estatisticas.mes_atual.financeiro.lucro >= 0 ? 'success' : 'danger'}>
+          <MetricHeader>
+            <MetricIcon>
+              {estatisticas.mes_atual.financeiro.lucro >= 0 ? <TrendingUp size={32} /> : <TrendingDown size={32} />}
+            </MetricIcon>
+          </MetricHeader>
+          <MetricValue>{formatarValorMonetario(estatisticas.mes_atual.financeiro.lucro)}</MetricValue>
+          <MetricLabel>Lucro Líquido</MetricLabel>
+          <MetricComparison trend={estatisticas.comparacao.lucro.variacao >= 0 ? 'up' : 'down'}>
+            {getTrendIcon(estatisticas.comparacao.lucro.variacao)}
+            {Math.abs(estatisticas.comparacao.lucro.percentual)}% vs mês anterior
+          </MetricComparison>
+        </MetricCard>
+      </MetricsGrid>
+
+      {/* Comparação Detalhada: Mês Atual vs Anterior */}
+      <ComparisonGrid>
+        <ComparisonCard>
+          <ComparisonTitle>
+            <ClipboardCheck size={20} color="#3b82f6" />
+            Comparativo de Vistorias
+          </ComparisonTitle>
+          
+          <ComparisonRow>
+            <ComparisonLabel>{estatisticas.mes_atual.nome_mes}</ComparisonLabel>
+            <ComparisonValue>
+              <ComparisonNumber variant="neutral">
+                {estatisticas.mes_atual.vistorias.total}
+              </ComparisonNumber>
+              <span style={{ 
+                color: getTrendColor(estatisticas.comparacao.vistorias.variacao),
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                fontSize: '0.875rem',
+                fontWeight: 600
+              }}>
+                {getTrendIcon(estatisticas.comparacao.vistorias.variacao)}
+                {estatisticas.comparacao.vistorias.percentual}%
+              </span>
+            </ComparisonValue>
+          </ComparisonRow>
+
+          <ComparisonRow>
+            <ComparisonLabel>{estatisticas.mes_anterior.nome_mes}</ComparisonLabel>
+            <ComparisonValue>
+              <ComparisonNumber variant="neutral">
+                {estatisticas.mes_anterior.vistorias.total}
+              </ComparisonNumber>
+            </ComparisonValue>
+          </ComparisonRow>
+
+          <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#dbeafe', borderRadius: '6px' }}>
+            <div style={{ fontSize: '0.875rem', color: '#1e40af' }}>
+              <strong>Concluídas:</strong> {estatisticas.mes_atual.vistorias.concluidas} | 
+              <strong> Em andamento:</strong> {estatisticas.mes_atual.vistorias.em_andamento}
+            </div>
+          </div>
+        </ComparisonCard>
+
+        <ComparisonCard>
+          <ComparisonTitle>
+            <DollarSign size={20} color="#10b981" />
+            Desempenho Financeiro
+          </ComparisonTitle>
+          
+          <ComparisonRow>
+            <ComparisonLabel>Receita ({estatisticas.mes_atual.nome_mes.split(' ')[0]})</ComparisonLabel>
+            <ComparisonValue>
+              <ComparisonNumber variant="success">
+                {formatarValorMonetario(estatisticas.mes_atual.financeiro.receita)}
+              </ComparisonNumber>
+            </ComparisonValue>
+          </ComparisonRow>
+
+          <ComparisonRow>
+            <ComparisonLabel>Despesas ({estatisticas.mes_atual.nome_mes.split(' ')[0]})</ComparisonLabel>
+            <ComparisonValue>
+              <ComparisonNumber variant="danger">
+                {formatarValorMonetario(estatisticas.mes_atual.financeiro.despesa)}
+              </ComparisonNumber>
+            </ComparisonValue>
+          </ComparisonRow>
+
+          <ComparisonRow style={{ background: '#f0fdf4', border: '1px solid #86efac' }}>
+            <ComparisonLabel><strong>Lucro Líquido</strong></ComparisonLabel>
+            <ComparisonValue>
+              <ComparisonNumber variant={estatisticas.mes_atual.financeiro.lucro >= 0 ? 'success' : 'danger'}>
+                {formatarValorMonetario(estatisticas.mes_atual.financeiro.lucro)}
+              </ComparisonNumber>
+              <span style={{ 
+                color: getTrendColor(estatisticas.comparacao.lucro.variacao),
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                fontSize: '0.875rem',
+                fontWeight: 600
+              }}>
+                {getTrendIcon(estatisticas.comparacao.lucro.variacao)}
+                {estatisticas.comparacao.lucro.percentual}%
+              </span>
+            </ComparisonValue>
+          </ComparisonRow>
+        </ComparisonCard>
+      </ComparisonGrid>
+
+      {/* Status das Vistorias */}
+      <StatusGrid>
+        {estatisticas.vistorias_por_status.map((status: any, index: number) => {
+          const cores = [
+            '#f59e0b', // Amarelo
+            '#3b82f6', // Azul
+            '#10b981', // Verde
+            '#ef4444', // Vermelho
+          ];
+          return (
+            <StatusCard key={index} color={cores[index % cores.length]}>
+              <StatusNumber>{status.quantidade}</StatusNumber>
+              <StatusLabel>{status.status}</StatusLabel>
+            </StatusCard>
+          );
+        })}
+      </StatusGrid>
+
+      {/* Ranking de Vistoriadores */}
+      {estatisticas.ranking_vistoriadores.length > 0 && (
+        <RankingCard>
+          <RankingTitle>
+            <Users size={20} color="#3b82f6" />
+            Top Vistoriadores do Mês
+          </RankingTitle>
+          <RankingList>
+            {estatisticas.ranking_vistoriadores.map((v: any, index: number) => (
+              <RankingItem key={v.id}>
+                <RankingPosition position={index + 1}>
+                  {index + 1}
+                </RankingPosition>
+                <RankingInfo>
+                  <RankingName>{v.nome}</RankingName>
+                  <RankingStats>
+                    {v.total_vistorias} vistoria(s) concluída(s)
+                  </RankingStats>
+                </RankingInfo>
+                <RankingValue>
+                  {formatarValorMonetario(v.total_ganho)}
+                </RankingValue>
+              </RankingItem>
+            ))}
+          </RankingList>
+        </RankingCard>
       )}
 
-      <StatsGrid>
-        <StatCard>
-          <StatIcon color="#3b82f6">
-            <Ship size={20} />
-          </StatIcon>
-          <StatContent>
-            <StatNumber>{stats.embarcacoes}</StatNumber>
-            <StatLabel>Embarcações</StatLabel>
-          </StatContent>
-        </StatCard>
-
-        <StatCard>
-          <StatIcon color="#10b981">
-            <MapPin size={20} />
-          </StatIcon>
-          <StatContent>
-            <StatNumber>{stats.locais}</StatNumber>
-            <StatLabel>Locais</StatLabel>
-          </StatContent>
-        </StatCard>
-
-        <StatCard>
-          <StatIcon color="#f59e0b">
-            <ClipboardCheck size={20} />
-          </StatIcon>
-          <StatContent>
-            <StatNumber>{stats.vistorias}</StatNumber>
-            <StatLabel>Vistorias</StatLabel>
-          </StatContent>
-        </StatCard>
-
-        <StatCard>
-          <StatIcon color="#8b5cf6">
-            <FileText size={20} />
-          </StatIcon>
-          <StatContent>
-            <StatNumber>{stats.laudos}</StatNumber>
-            <StatLabel>Laudos</StatLabel>
-          </StatContent>
-        </StatCard>
-      </StatsGrid>
-
-      <RecentSection>
-        <SectionTitle>Vistorias Recentes</SectionTitle>
-        <List>
-          {recentVistorias.length > 0 ? (
-            recentVistorias.map((vistoria) => (
-              <ListItem key={vistoria.id}>
-                <ListItemText>
-                  <ListItemTitle>
-                    {vistoria.embarcacao?.nome || 'Vistoria sem embarcação'}
-                  </ListItemTitle>
-                  <ListItemSubtitle>
-                    {vistoria.local?.nome_local || 'Local não informado'}
-                  </ListItemSubtitle>
-                </ListItemText>
-                <ListItemDate>
-                  {new Date(vistoria.createdAt).toLocaleDateString('pt-BR')}
-                </ListItemDate>
-              </ListItem>
-            ))
-          ) : (
-            <EmptyMessage>
-              Nenhuma vistoria encontrada
-            </EmptyMessage>
-          )}
-        </List>
-      </RecentSection>
-    </DashboardContainer>
+      {/* Totais Gerais do Sistema */}
+      <ComparisonCard style={{ marginTop: '1.5rem' }}>
+        <ComparisonTitle>
+          <Ship size={20} color="#6b7280" />
+          Resumo Geral do Sistema
+        </ComparisonTitle>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
+          <div style={{ textAlign: 'center', padding: '1rem', background: '#f9fafb', borderRadius: '8px' }}>
+            <div style={{ fontSize: '2rem', fontWeight: 700, color: '#3b82f6' }}>
+              {estatisticas.totais_gerais.total_vistorias}
+            </div>
+            <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+              Total de Vistorias
+            </div>
+          </div>
+          <div style={{ textAlign: 'center', padding: '1rem', background: '#f9fafb', borderRadius: '8px' }}>
+            <div style={{ fontSize: '2rem', fontWeight: 700, color: '#10b981' }}>
+              {estatisticas.totais_gerais.total_embarcacoes}
+            </div>
+            <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+              Embarcações Cadastradas
+            </div>
+          </div>
+          <div style={{ textAlign: 'center', padding: '1rem', background: '#f9fafb', borderRadius: '8px' }}>
+            <div style={{ fontSize: '2rem', fontWeight: 700, color: '#f59e0b' }}>
+              {estatisticas.totais_gerais.total_vistoriadores}
+            </div>
+            <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+              Vistoriadores Ativos
+            </div>
+          </div>
+        </div>
+      </ComparisonCard>
+    </Container>
   );
 };
 
