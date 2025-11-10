@@ -7,7 +7,7 @@ const Laudo = sequelize.define('Laudo', {
     autoIncrement: true,
     primaryKey: true
   },
-  url_pdf: { // Campo para os requisitos RF06 e RF07 [cite: 66, 67]
+  url_pdf: {
     type: DataTypes.STRING(512),
     allowNull: false
   },
@@ -25,7 +25,6 @@ const Laudo = sequelize.define('Laudo', {
   hooks: {
     beforeUpdate: (laudo) => {
       if (laudo.changed('data_geracao')) {
-        // Reverter qualquer tentativa de alteração do campo imutável
         laudo.set('data_geracao', laudo.previous('data_geracao'));
       }
     }

@@ -1,4 +1,3 @@
-// backend/models/LotePagamento.js
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 

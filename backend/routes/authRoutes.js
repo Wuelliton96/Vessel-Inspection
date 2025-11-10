@@ -1,5 +1,3 @@
-// backend/routes/authRoutes.js
-
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
@@ -7,42 +5,30 @@ const jwt = require('jsonwebtoken');
 const { Usuario, NivelAcesso } = require('../models');
 const { requireAuth, requireAdmin, requireAuthAllowPasswordUpdate } = require('../middleware/auth');
 
-// Rota para registro de usuário
 router.post('/register', async (req, res) => {
   try {
     const { nome, email, senha, nivelAcessoId } = req.body;
-    
-    // Debug: Log do que está sendo recebido
-    console.log('Dados recebidos no registro:', { nome, email, nivelAcessoId });
-    console.log('Body completo:', req.body);
 
-    // Validações básicas
     if (!nome || !email || !senha) {
       return res.status(400).json({ error: 'Nome, email e senha são obrigatórios.' });
     }
 
-    // Verificar se ID está sendo enviado (não deve ser)
     if (req.body.id !== undefined) {
       return res.status(400).json({ error: 'Campo ID não deve ser enviado. O ID é gerado automaticamente.' });
     }
 
-    // Verificar se o email já existe
     const usuarioExistente = await Usuario.findOne({ where: { email: email.toLowerCase() } });
     if (usuarioExistente) {
       return res.status(400).json({ error: 'Email já cadastrado.' });
     }
 
-    // Hash da senha
     const senhaHash = await bcrypt.hash(senha, 10);
 
-    // Determinar nível de acesso (padrão: VISTORIADOR = ID 2)
     let nivelAcessoFinal = nivelAcessoId;
     if (!nivelAcessoFinal) {
-      // ID 2 = VISTORIADOR (padrão para novos usuários)
       nivelAcessoFinal = 2;
     }
 
-    // Criar usuário
     const usuario = await Usuario.create({
       nome,
       email: email.toLowerCase(),
@@ -50,7 +36,6 @@ router.post('/register', async (req, res) => {
       nivel_acesso_id: nivelAcessoFinal
     });
 
-    // Buscar usuário com associações
     const usuarioCompleto = await Usuario.findByPk(usuario.id, {
       include: {
         model: NivelAcesso,
@@ -58,7 +43,6 @@ router.post('/register', async (req, res) => {
       }
     });
 
-    // Gerar token JWT
     const tokenPayload = {
       userId: usuarioCompleto.id,
       email: usuarioCompleto.email,
@@ -101,18 +85,11 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Rota para login
 router.post('/login', async (req, res) => {
   try {
     const { email, senha } = req.body;
-    
-    console.log('=== INÍCIO DO LOGIN ===');
-    console.log('Email recebido:', email);
-    console.log('Senha recebida:', senha ? '[OCULTA]' : 'undefined');
 
-    // Validações básicas
     if (!email || !senha) {
-      console.log('Validação falhou: Email ou senha não fornecidos');
       return res.status(400).json({ 
         error: 'Campos obrigatórios',
         message: 'Por favor, preencha o email e a senha para continuar.',
@@ -120,10 +97,8 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Validar formato do email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      console.log('Formato de email inválido:', email);
       return res.status(400).json({ 
         error: 'Email inválido',
         message: 'Por favor, digite um email válido no formato: exemplo@email.com',
@@ -131,8 +106,6 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Buscar usuário
-    console.log('Buscando usuário no banco...');
     const usuario = await Usuario.findOne({
       where: { email: email.toLowerCase() },
       include: {
@@ -142,7 +115,6 @@ router.post('/login', async (req, res) => {
     });
 
     if (!usuario) {
-      console.log('Usuário não encontrado para email:', email);
       return res.status(401).json({ 
         error: 'Credenciais inválidas',
         message: 'Email não encontrado no sistema. Verifique se digitou corretamente ou entre em contato com o administrador.',
@@ -150,19 +122,8 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    console.log('Usuário encontrado:', {
-      id: usuario.id,
-      nome: usuario.nome,
-      email: usuario.email,
-      nivelAcesso: usuario.NivelAcesso?.nome,
-      nivelAcessoId: usuario.NivelAcesso?.id
-    });
-
-    // Verificar senha
-    console.log('Verificando senha...');
     const senhaValida = await bcrypt.compare(senha, usuario.senha_hash);
     if (!senhaValida) {
-      console.log('Senha inválida para usuário:', usuario.email);
       return res.status(401).json({ 
         error: 'Credenciais inválidas',
         message: 'Senha incorreta. Por favor, verifique sua senha e tente novamente.',
@@ -170,10 +131,6 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    console.log('Senha válida!');
-
-    // Gerar token JWT
-    console.log('Gerando token JWT...');
     const tokenPayload = {
       userId: usuario.id,
       email: usuario.email,
@@ -182,14 +139,9 @@ router.post('/login', async (req, res) => {
       nivelAcessoId: usuario.NivelAcesso.id
     };
 
-    console.log('Payload do token:', tokenPayload);
-
     const token = jwt.sign(tokenPayload, process.env.JWT_SECRET || 'sua-chave-secreta-jwt', {
       expiresIn: '24h'
     });
-
-    console.log('Token gerado com sucesso!');
-    console.log('=== LOGIN CONCLUÍDO COM SUCESSO ===');
 
     res.json({
       success: true,
@@ -205,14 +157,11 @@ router.post('/login', async (req, res) => {
       }
     });
   } catch (error) {
-    console.log('=== ERRO NO LOGIN ===');
     console.error('Erro no login:', error);
-    console.log('=== FIM DO ERRO ===');
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
-// Rota para obter informações do usuário atual
 router.get('/me', requireAuth, async (req, res) => {
   try {
     res.json({

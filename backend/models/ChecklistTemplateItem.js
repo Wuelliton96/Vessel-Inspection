@@ -1,4 +1,3 @@
-// backend/models/ChecklistTemplateItem.js
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 

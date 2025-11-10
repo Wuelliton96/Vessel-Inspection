@@ -7,7 +7,7 @@ const Foto = sequelize.define('Foto', {
     autoIncrement: true,
     primaryKey: true
   },
-  url_arquivo: { // Campo para o requisito RF04
+  url_arquivo: {
     type: DataTypes.STRING(512),
     allowNull: false
   },

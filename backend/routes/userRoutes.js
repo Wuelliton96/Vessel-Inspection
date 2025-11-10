@@ -1,30 +1,23 @@
-// backend/routes/userRoutes.js
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
-const { Usuario, NivelAcesso } = require('../models'); // Importamos os models
+const { Usuario, NivelAcesso } = require('../models');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 
-// Rota: POST /api/usuarios/sync
-// Sincroniza um novo usuário do Clerk com o banco de dados local.
 router.post('/sync', async (req, res) => {
   try {
-    // Garante que o corpo é um objeto antes de desestruturar (evita erro com corpo malformado)
     const safeBody = (req && req.body && typeof req.body === 'object') ? req.body : {};
     const { id: clerk_user_id, email, nome } = safeBody;
 
-    // Validação básica
     if (!clerk_user_id || !email || !nome) {
       return res.status(400).json({ error: 'Dados do usuário incompletos.' });
     }
 
-    // Busca o Nível de Acesso padrão para 'VISTORIADOR'
     const vistoriadorRole = await NivelAcesso.findOne({ where: { nome: 'VISTORIADOR' } });
     if (!vistoriadorRole) {
       return res.status(500).json({ error: 'Nível de acesso "VISTORIADOR" não encontrado.' });
     }
 
-    // Procura por um usuário com o clerk_id. Se não encontrar, cria um novo.
     const [usuario, criado] = await Usuario.findOrCreate({
       where: { clerk_user_id: clerk_user_id },
       defaults: {
@@ -48,9 +41,6 @@ router.post('/sync', async (req, res) => {
   }
 });
 
-// ===== ROTAS CRUD PARA USUÁRIOS =====
-
-// GET /api/usuarios - Listar todos os usuários (apenas admin)
 router.get('/', requireAuth, requireAdmin, async (req, res) => {
   try {
     const usuarios = await Usuario.findAll({
@@ -77,7 +67,6 @@ router.get('/', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-// GET /api/usuarios/:id - Obter usuário por ID (apenas admin)
 router.get('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const usuario = await Usuario.findByPk(req.params.id, {
@@ -108,49 +97,41 @@ router.get('/:id', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-// POST /api/usuarios - Criar novo usuário (apenas admin)
 router.post('/', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { nome, email, nivelAcessoId } = req.body;
 
-    // Validações básicas
     if (!nome || !email) {
       return res.status(400).json({ error: 'Nome e email são obrigatórios.' });
     }
 
-    // Validação de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ error: 'Formato de email inválido.' });
     }
 
-    // Verificar se o email já existe
     const usuarioExistente = await Usuario.findOne({ where: { email: email.toLowerCase() } });
     if (usuarioExistente) {
       return res.status(400).json({ error: 'Email já cadastrado.' });
     }
 
-    // Verificar se o nível de acesso existe
     const nivelAcesso = await NivelAcesso.findByPk(nivelAcessoId);
     if (!nivelAcesso) {
       return res.status(400).json({ error: 'Nível de acesso não encontrado.' });
     }
 
-    // Senha padrão para todos os usuários
     const senhaPadrao = 'mudar123';
     const senhaHash = await bcrypt.hash(senhaPadrao, 10);
 
-    // Criar usuário
     const usuario = await Usuario.create({
       nome,
       email: email.toLowerCase(),
       senha_hash: senhaHash,
       nivel_acesso_id: nivelAcessoId,
       ativo: true,
-      deve_atualizar_senha: true // Usuário deve alterar senha no primeiro login
+      deve_atualizar_senha: true
     });
 
-    // Buscar usuário com associações
     const usuarioCompleto = await Usuario.findByPk(usuario.id, {
       include: {
         model: NivelAcesso,

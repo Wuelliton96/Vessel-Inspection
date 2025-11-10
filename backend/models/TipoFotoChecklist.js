@@ -19,7 +19,7 @@ const TipoFotoChecklist = sequelize.define('TipoFotoChecklist', {
   descricao: {
     type: DataTypes.TEXT
   },
-  obrigatorio: { // Essencial para o requisito RF05 [cite: 64]
+  obrigatorio: {
     type: DataTypes.BOOLEAN,
     allowNull: false,
     defaultValue: true

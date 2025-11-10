@@ -7,7 +7,6 @@ const Usuario = sequelize.define('Usuario', {
     autoIncrement: true,
     primaryKey: true
   },
-  // As colunas são definidas aqui
   nome: {
     type: DataTypes.STRING,
     allowNull: false
@@ -23,8 +22,7 @@ const Usuario = sequelize.define('Usuario', {
   },
   nivel_acesso_id: {
     type: DataTypes.INTEGER,
-    allowNull: false,
-    // Futuramente, adicionaremos a referência (foreign key) aqui
+    allowNull: false
   },
   ativo: {
     type: DataTypes.BOOLEAN,
@@ -37,8 +35,7 @@ const Usuario = sequelize.define('Usuario', {
     allowNull: false
   }
 }, {
-  // Opções do modelo
-  tableName: 'usuarios' // Força o nome da tabela a ser exatamente 'usuarios'
+  tableName: 'usuarios'
 });
 
 module.exports = Usuario;
