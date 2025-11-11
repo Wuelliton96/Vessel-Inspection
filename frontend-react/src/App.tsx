@@ -25,21 +25,11 @@ const AppRoutes: React.FC = () => {
   const [passwordUpdateLoading, setPasswordUpdateLoading] = useState(false);
 
   useEffect(() => {
-    // Verificar se o usuário precisa atualizar a senha
-    console.log('=== DEBUG MODAL SENHA ===');
-    console.log('isAuthenticated:', isAuthenticated);
-    console.log('usuario:', usuario);
-    console.log('deveAtualizarSenha:', usuario?.deveAtualizarSenha);
-    console.log('Tipo do campo:', typeof usuario?.deveAtualizarSenha);
-    
     if (isAuthenticated && usuario && usuario.deveAtualizarSenha === true) {
-      console.log('Usuário deve atualizar senha, mostrando modal');
       setShowPasswordModal(true);
     } else {
-      console.log('Usuário NÃO precisa atualizar senha');
       setShowPasswordModal(false);
     }
-    console.log('=== FIM DEBUG ===');
   }, [isAuthenticated, usuario]);
 
   const handlePasswordUpdate = async (novaSenha: string) => {
@@ -58,7 +48,6 @@ const AppRoutes: React.FC = () => {
   };
 
   const handleCloseModal = () => {
-    // Quando o usuário clica em "Sair", faz logout
     logout();
   };
 

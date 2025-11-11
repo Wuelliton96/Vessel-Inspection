@@ -45,34 +45,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, senha: string) => {
     try {
-      console.log('AuthContext: Iniciando login...');
-      console.log('Email recebido:', email);
-      console.log('Senha recebida:', senha ? '***' : 'vazia');
-      
-      console.log('Chamando authService.login...');
       const response = await authService.login({ email, senha });
-      console.log('Response recebida:', response);
-      
       const { token: newToken, usuario: newUsuario } = response;
-      console.log('Token:', newToken ? 'presente' : 'ausente');
-      console.log('Usuario:', newUsuario);
       
-      console.log('Salvando no estado...');
       setToken(newToken);
       setUsuario(newUsuario);
       
-      console.log('Salvando no localStorage...');
       localStorage.setItem('token', newToken);
       localStorage.setItem('usuario', JSON.stringify(newUsuario));
-      
-      console.log('Login concluído com sucesso!');
     } catch (error: any) {
-      console.error('AuthContext: Erro no login:', error);
-      console.error('AuthContext: Erro completo:', JSON.stringify(error, null, 2));
-      console.error('AuthContext: Error response:', error.response);
-      console.error('AuthContext: Error message:', error.message);
-      
-      // Re-throw o erro para que o componente Login possa tratá-lo
+      console.error('Erro no login:', error);
       throw error;
     }
   };

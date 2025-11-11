@@ -1,5 +1,3 @@
-// frontend-react/src/utils/validators.ts
-
 /**
  * Valida um CPF brasileiro (11 dígitos)
  * @param cpf - CPF com ou sem formatação
@@ -8,20 +6,14 @@
 export const validarCPF = (cpf: string): boolean => {
   if (!cpf) return false;
   
-  // Remove caracteres não numéricos
   const cpfLimpo = cpf.replace(/\D/g, '');
   
-  // Verifica se tem 11 dígitos
   if (cpfLimpo.length !== 11) return false;
-  
-  // Verifica se todos os dígitos são iguais (CPF inválido)
   if (/^(\d)\1{10}$/.test(cpfLimpo)) return false;
   
-  // Validação dos dígitos verificadores
   let soma = 0;
   let resto: number;
   
-  // Valida primeiro dígito
   for (let i = 1; i <= 9; i++) {
     soma += parseInt(cpfLimpo.substring(i - 1, i)) * (11 - i);
   }
@@ -29,7 +21,6 @@ export const validarCPF = (cpf: string): boolean => {
   if (resto === 10 || resto === 11) resto = 0;
   if (resto !== parseInt(cpfLimpo.substring(9, 10))) return false;
   
-  // Valida segundo dígito
   soma = 0;
   for (let i = 1; i <= 10; i++) {
     soma += parseInt(cpfLimpo.substring(i - 1, i)) * (12 - i);
@@ -89,9 +80,6 @@ export const mascaraCPF = (value: string): string => {
  */
 export const validarTelefoneE164 = (telefone: string): boolean => {
   if (!telefone) return false;
-  
-  // Formato E.164: +[código do país][código de área][número]
-  // Exemplo: +5511999998888
   const regexE164 = /^\+[1-9]\d{1,14}$/;
   return regexE164.test(telefone);
 };
@@ -104,20 +92,17 @@ export const validarTelefoneE164 = (telefone: string): boolean => {
 export const converterParaE164 = (telefone: string): string => {
   if (!telefone) return '';
   
-  // Remove caracteres não numéricos
   const telefoneLimpo = telefone.replace(/\D/g, '');
   
-  // Se já começa com o código do país (55), adiciona apenas o +
   if (telefoneLimpo.startsWith('55') && telefoneLimpo.length >= 12) {
     return '+' + telefoneLimpo;
   }
   
-  // Se não tem código do país, adiciona +55 (Brasil)
   if (telefoneLimpo.length >= 10) {
     return '+55' + telefoneLimpo;
   }
   
-  return telefone; // Retorna original se não conseguir converter
+  return telefone;
 };
 
 /**
@@ -128,10 +113,8 @@ export const converterParaE164 = (telefone: string): string => {
 export const formatarTelefone = (telefone: string): string => {
   if (!telefone) return '';
   
-  // Remove o +55
   const telefoneLimpo = telefone.replace(/^\+55/, '').replace(/\D/g, '');
   
-  // Formata: (11) 99999-8888 ou (11) 9999-8888
   if (telefoneLimpo.length === 11) {
     return telefoneLimpo.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
   } else if (telefoneLimpo.length === 10) {
@@ -152,11 +135,8 @@ export const validarCNPJ = (cnpj: string): boolean => {
   const cnpjLimpo = cnpj.replace(/\D/g, '');
   
   if (cnpjLimpo.length !== 14) return false;
-  
-  // Verifica se todos os dígitos são iguais
   if (/^(\d)\1{13}$/.test(cnpjLimpo)) return false;
   
-  // Validação dos dígitos verificadores
   let tamanho = cnpjLimpo.length - 2;
   let numeros = cnpjLimpo.substring(0, tamanho);
   const digitos = cnpjLimpo.substring(tamanho);
@@ -283,9 +263,6 @@ export const validarEstado = (estado: string): boolean => {
 };
 
 /**
- * Lista de todos os estados brasileiros
- */
-/**
  * Lista de tipos de embarcação (LEGADO - mantido para compatibilidade)
  */
 export const TIPOS_EMBARCACAO = [
@@ -309,10 +286,6 @@ export const TIPOS_EMBARCACAO_SEGURADORA = [
   { value: 'EMBARCACAO_COMERCIAL', label: 'Embarcação Comercial' }
 ];
 
-/**
- * Mapeia tipos de embarcação por seguradora (configuração inicial)
- * Na prática, isso virá do backend dinamicamente
- */
 export const TIPOS_POR_SEGURADORA: Record<string, string[]> = {
   'Essor': ['LANCHA', 'JET_SKI'],
   'Mapfre': ['LANCHA', 'EMBARCACAO_COMERCIAL'],
@@ -377,12 +350,11 @@ export const ESTADOS_BRASILEIROS = [
  * @returns true se válido
  */
 export const validarValorMonetario = (valor: number | string | null | undefined): boolean => {
-  if (valor === null || valor === undefined || valor === '') return true; // Aceita null (opcional)
+  if (valor === null || valor === undefined || valor === '') return true;
   
   const valorNum = typeof valor === 'string' ? parseFloat(valor) : valor;
   
-  // Verifica se é um número válido e positivo
-  return !isNaN(valorNum) && valorNum >= 0 && valorNum < 100000000; // Máximo: 99.999.999,99
+  return !isNaN(valorNum) && valorNum >= 0 && valorNum < 100000000;
 };
 
 /**
@@ -393,7 +365,6 @@ export const validarValorMonetario = (valor: number | string | null | undefined)
 export const limparValorMonetario = (valor: string | number | null | undefined): number | null => {
   if (!valor || valor === '') return null;
   
-  // Remove R$, pontos (milhares) e converte vírgula em ponto
   const valorLimpo = String(valor)
     .replace(/R\$\s?/g, '')
     .replace(/\./g, '')
@@ -430,16 +401,13 @@ export const formatarValorMonetario = (valor: number | string | null | undefined
 export const mascaraValorMonetario = (value: string): string => {
   if (!value) return '';
   
-  // Remove tudo exceto números
   const apenasNumeros = value.replace(/\D/g, '');
   
   if (!apenasNumeros) return '';
   
-  // Converte para número (centavos)
   const valorEmCentavos = parseInt(apenasNumeros);
   const valorEmReais = valorEmCentavos / 100;
   
-  // Formata
   return new Intl.NumberFormat('pt-BR', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2

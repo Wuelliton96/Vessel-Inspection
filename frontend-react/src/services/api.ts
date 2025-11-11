@@ -12,39 +12,18 @@ const api = axios.create({
   },
 });
 
-// Interceptor para adicionar token automaticamente
 api.interceptors.request.use((config) => {
-  console.log('Interceptor Request:', config.method?.toUpperCase(), config.url);
-  console.log('Headers:', config.headers);
-  console.log('Data:', config.data);
-  
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-    console.log('Token adicionado ao header');
-  } else {
-    console.log('Nenhum token encontrado no localStorage');
   }
   return config;
 });
 
-// Interceptor para lidar com respostas de erro
 api.interceptors.response.use(
-  (response) => {
-    console.log('Interceptor Response Success:', response.status, response.config.url);
-    console.log('Response Data:', response.data);
-    return response;
-  },
+  (response) => response,
   (error) => {
-    console.error('Interceptor Response Error:', error);
-    console.error('Error Status:', error.response?.status);
-    console.error('Error Data:', error.response?.data);
-    console.error('Error Config:', error.config);
-    
-    // Só redirecionar para login se não estivermos já na página de login
-    // Isso evita interferir com o tratamento de erros de login
     if (error.response?.status === 401 && !window.location.pathname.includes('/login')) {
-      console.log('Status 401 - Removendo tokens e redirecionando...');
       localStorage.removeItem('token');
       localStorage.removeItem('usuario');
       window.location.href = '/login';
@@ -53,24 +32,11 @@ api.interceptors.response.use(
   }
 );
 
-// Serviços de autenticação
 export const authService = {
   login: async (credentials: LoginRequest): Promise<AuthResponse> => {
     try {
-      console.log('API Service: Iniciando chamada de login...');
-      console.log('Credentials:', { email: credentials.email, senha: '***' });
-      console.log('URL:', `${API_BASE_URL}/api/auth/login`);
-      
-      console.log('Enviando requisição...');
       const response = await api.post('/api/auth/login', credentials);
-      console.log('Response recebida:', response);
-      console.log('Status:', response.status);
-      console.log('Data:', response.data);
-      
       const data = response.data;
-      console.log('Analisando dados da resposta...');
-      console.log('Token presente:', !!data.token);
-      console.log('User presente:', !!data.user);
       
       if (!data.token) {
         throw new Error('Token não encontrado na resposta');
@@ -80,7 +46,6 @@ export const authService = {
         throw new Error('Dados do usuário não encontrados na resposta');
       }
       
-      console.log('Formatando dados para o frontend...');
       const formattedResponse = {
         token: data.token,
         usuario: {
@@ -93,28 +58,16 @@ export const authService = {
             nome: data.user.nivelAcesso,
             descricao: data.user.nivelAcessoDescricao || ''
           },
-          ativo: true, // Default para usuários ativos
-          deveAtualizarSenha: data.user.deveAtualizarSenha || false, // Campo do backend
+          ativo: true,
+          deveAtualizarSenha: data.user.deveAtualizarSenha || false,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         }
       };
       
-      console.log('=== DEBUG AUTH SERVICE ===');
-      console.log('data.user.deveAtualizarSenha:', data.user.deveAtualizarSenha);
-      console.log('Tipo:', typeof data.user.deveAtualizarSenha);
-      console.log('Valor final:', formattedResponse.usuario.deveAtualizarSenha);
-      console.log('=== FIM DEBUG AUTH SERVICE ===');
-      
-      console.log('Dados formatados:', formattedResponse);
       return formattedResponse;
     } catch (error: any) {
-      console.error('API Service: Erro no login:', error);
-      console.error('API Service: Erro completo:', JSON.stringify(error, null, 2));
-      console.error('API Service: Error response:', error.response);
-      console.error('API Service: Error message:', error.message);
-      
-      // Re-throw o erro para que seja tratado pelo componente Login
+      console.error('Erro no login:', error);
       throw error;
     }
   },
@@ -135,8 +88,8 @@ export const authService = {
           nome: data.user.nivelAcesso,
           descricao: data.user.nivelAcessoDescricao || ''
         },
-        ativo: true, // Default para usuários ativos
-        deveAtualizarSenha: false, // Default para usuários já autenticados
+        ativo: true,
+        deveAtualizarSenha: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
