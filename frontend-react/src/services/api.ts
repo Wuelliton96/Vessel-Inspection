@@ -35,7 +35,13 @@ api.interceptors.response.use(
 export const authService = {
   login: async (credentials: LoginRequest): Promise<AuthResponse> => {
     try {
+      console.log('[authService] Iniciando login...');
+      console.log('[authService] API Base URL:', API_BASE_URL);
+      console.log('[authService] Credentials:', { email: credentials.email, senha: '***' });
+      
       const response = await api.post('/api/auth/login', credentials);
+      console.log('[authService] Resposta recebida:', response.status);
+      
       const data = response.data;
       
       if (!data.token) {
@@ -45,6 +51,8 @@ export const authService = {
       if (!data.user) {
         throw new Error('Dados do usuário não encontrados na resposta');
       }
+      
+      console.log('[authService] Login bem-sucedido!');
       
       const formattedResponse = {
         token: data.token,
@@ -590,6 +598,114 @@ export const checklistService = {
 
   getProgresso: async (vistoriaId: number): Promise<ChecklistProgresso> => {
     const response = await api.get(`/api/checklists/vistoria/${vistoriaId}/progresso`);
+    return response.data;
+  }
+};
+
+export const laudoService = {
+  listar: async () => {
+    const response = await api.get('/api/laudos');
+    return response.data;
+  },
+
+  buscarPorId: async (id: number) => {
+    const response = await api.get(`/api/laudos/${id}`);
+    return response.data;
+  },
+
+  buscarPorVistoria: async (vistoriaId: number) => {
+    const response = await api.get(`/api/laudos/vistoria/${vistoriaId}`);
+    return response.data;
+  },
+
+  criar: async (vistoriaId: number, dados: any) => {
+    const response = await api.post(`/api/laudos/vistoria/${vistoriaId}`, dados);
+    return response.data;
+  },
+
+  atualizar: async (id: number, dados: any) => {
+    const response = await api.put(`/api/laudos/${id}`, dados);
+    return response.data;
+  },
+
+  gerarPDF: async (id: number) => {
+    const response = await api.post(`/api/laudos/${id}/gerar-pdf`);
+    return response.data;
+  },
+
+  download: async (id: number) => {
+    const response = await api.get(`/api/laudos/${id}/download`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  },
+
+  excluir: async (id: number) => {
+    const response = await api.delete(`/api/laudos/${id}`);
+    return response.data;
+  }
+};
+
+export const auditoriaService = {
+  listar: async (params?: {
+    page?: number;
+    limit?: number;
+    acao?: string;
+    entidade?: string;
+    usuarioId?: number;
+    nivelCritico?: string;
+    dataInicio?: string;
+    dataFim?: string;
+  }) => {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value) queryParams.append(key, value.toString());
+      });
+    }
+    const response = await api.get(`/api/auditoria?${queryParams.toString()}`);
+    return response.data;
+  },
+
+  estatisticas: async (params?: {
+    dataInicio?: string;
+    dataFim?: string;
+  }) => {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value) queryParams.append(key, value.toString());
+      });
+    }
+    const response = await api.get(`/api/auditoria/estatisticas?${queryParams.toString()}`);
+    return response.data;
+  },
+
+  porUsuario: async (usuarioId: number, params?: {
+    page?: number;
+    limit?: number;
+  }) => {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value) queryParams.append(key, value.toString());
+      });
+    }
+    const response = await api.get(`/api/auditoria/usuario/${usuarioId}?${queryParams.toString()}`);
+    return response.data;
+  },
+
+  criticos: async (params?: {
+    page?: number;
+    limit?: number;
+  }) => {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value) queryParams.append(key, value.toString());
+      });
+    }
+    const response = await api.get(`/api/auditoria/criticos?${queryParams.toString()}`);
     return response.data;
   }
 };
