@@ -185,20 +185,7 @@ async function seedDatabase() {
 
     console.log('[OK] Vistorias criadas')
 
-    // Criar Laudos
-    await Laudo.create({
-      url_pdf: '/laudos/LAU-2024-001.pdf',
-      data_geracao: new Date('2024-01-15'),
-      vistoria_id: vistoria1.id
-    })
-
-    await Laudo.create({
-      url_pdf: '/laudos/LAU-2024-002.pdf',
-      data_geracao: new Date('2024-01-12'),
-      vistoria_id: vistoria4.id
-    })
-
-    console.log('[OK] Laudos criados')
+    console.log('[INFO] Laudos não são criados no seed - devem ser criados via API após vistoria concluída')
 
     console.log('Seed do banco de dados concluído com sucesso!')
     console.log('\nResumo dos dados criados:')
@@ -208,7 +195,6 @@ async function seedDatabase() {
     console.log(`- ${await Local.count()} locais`)
     console.log(`- ${await StatusVistoria.count()} status de vistoria`)
     console.log(`- ${await Vistoria.count()} vistorias`)
-    console.log(`- ${await Laudo.count()} laudos`)
 
   } catch (error) {
     console.error('[ERRO] Erro durante o seed:', error)
