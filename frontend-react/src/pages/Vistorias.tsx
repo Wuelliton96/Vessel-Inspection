@@ -32,8 +32,6 @@ import {
   mascaraValorMonetario, 
   limparValorMonetario, 
   formatarValorMonetario, 
-  TIPOS_EMBARCACAO, 
-  PORTES_EMBARCACAO,
   limparCPF,
   converterParaE164,
   mascaraCPF,
@@ -497,6 +495,8 @@ const Vistorias: React.FC = () => {
   const { isAdmin } = useAccessControl();
   const [vistorias, setVistorias] = useState<Vistoria[]>([]);
   const [vistoriadores, setVistoriadores] = useState<Usuario[]>([]);
+  const [seguradoras, setSeguradoras] = useState<any[]>([]);
+  const [tiposPermitidos, setTiposPermitidos] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -550,8 +550,8 @@ const Vistorias: React.FC = () => {
     embarcacao_proprietario_cpf: '',
     embarcacao_proprietario_telefone_e164: '',
     embarcacao_proprietario_email: '',
-    embarcacao_tipo: '',
-    embarcacao_porte: '',
+    embarcacao_tipo: '', // JET_SKI, LANCHA, EMBARCACAO_COMERCIAL
+    seguradora_id: 0,
     embarcacao_valor: '',
     embarcacao_ano_fabricacao: '',
     
@@ -597,6 +597,16 @@ const Vistorias: React.FC = () => {
     try {
       setLoading(true);
       console.log('=== CARREGANDO DADOS DE VISTORIAS ===');
+      
+      // Carregar seguradoras
+      try {
+        const { seguradoraService } = await import('../services/api');
+        const segs = await seguradoraService.getAll();
+        setSeguradoras(segs || []);
+        console.log('Seguradoras carregadas:', segs?.length || 0);
+      } catch (err) {
+        console.error('Erro ao carregar seguradoras:', err);
+      }
       console.log('isAdmin:', isAdmin);
       
       // Carregar vistorias baseado no nível de acesso
@@ -803,7 +813,7 @@ const Vistorias: React.FC = () => {
       embarcacao_valor: embarcacao.valor_embarcacao ? formatarValorMonetario(embarcacao.valor_embarcacao) : '',
       embarcacao_ano_fabricacao: embarcacao.ano_fabricacao?.toString() || '',
       embarcacao_tipo: embarcacao.tipo_embarcacao || '',
-      embarcacao_porte: embarcacao.porte || '',
+      seguradora_id: embarcacao.seguradora_id || 0,
       
       // Dados do cliente para exibição
       cliente_nome: cliente?.nome || '',
@@ -833,7 +843,7 @@ const Vistorias: React.FC = () => {
       embarcacao_proprietario_telefone_e164: '',
       embarcacao_proprietario_email: '',
       embarcacao_tipo: '',
-      embarcacao_porte: '',
+      seguradora_id: 0,
       embarcacao_valor: '',
       embarcacao_ano_fabricacao: '',
       
@@ -893,7 +903,7 @@ const Vistorias: React.FC = () => {
       embarcacao_proprietario_telefone_e164: vistoria.Embarcacao?.proprietario_telefone_e164 || vistoria.embarcacao?.proprietario_telefone_e164 || '',
       embarcacao_proprietario_email: vistoria.Embarcacao?.proprietario_email || vistoria.embarcacao?.proprietario_email || '',
       embarcacao_tipo: vistoria.Embarcacao?.tipo_embarcacao || vistoria.embarcacao?.tipo_embarcacao || '',
-      embarcacao_porte: vistoria.Embarcacao?.porte || vistoria.embarcacao?.porte || '',
+      seguradora_id: vistoria.Embarcacao?.seguradora_id || vistoria.embarcacao?.seguradora_id || 0,
       embarcacao_valor: vistoria.Embarcacao?.valor_embarcacao ? formatarValorMonetario(vistoria.Embarcacao.valor_embarcacao) : '',
       embarcacao_ano_fabricacao: vistoria.Embarcacao?.ano_fabricacao?.toString() || '',
       
@@ -943,6 +953,13 @@ const Vistorias: React.FC = () => {
   };
 
   const handleDeleteClick = (vistoria: Vistoria) => {
+    // Verificar se vistoria está PENDENTE
+    if (vistoria.StatusVistoria?.nome !== 'PENDENTE') {
+      setError(`Apenas vistorias com status PENDENTE podem ser excluídas. Status atual: ${vistoria.StatusVistoria?.nome}`);
+      setTimeout(() => setError(''), 5000);
+      return;
+    }
+    
     setDeletingVistoria(vistoria);
     setShowDeleteModal(true);
   };
@@ -1027,6 +1044,8 @@ const Vistorias: React.FC = () => {
       // Preparar dados com valores monetários convertidos e tipos corretos
       const dataToSend: any = {
         ...formData,
+        seguradora_id: formData.seguradora_id || null,
+        tipo_embarcacao: formData.embarcacao_tipo || null,
         valor_vistoria: limparValorMonetario(formData.valor_vistoria),
         valor_vistoriador: limparValorMonetario(formData.valor_vistoriador),
         contato_acompanhante_tipo: formData.contato_acompanhante_tipo || null,
@@ -1371,6 +1390,16 @@ const Vistorias: React.FC = () => {
                       >
                         <Camera size={16} />
                       </IconButton>
+                      {vistoria.StatusVistoria?.nome === 'CONCLUIDA' && (
+                        <IconButton 
+                          variant="edit"
+                          onClick={() => navigate(`/vistorias/${vistoria.id}/laudo/novo`)}
+                          title="Criar/Editar Laudo"
+                          style={{ background: '#dcfce7', color: '#166534' }}
+                        >
+                          <FileText size={16} />
+                        </IconButton>
+                      )}
                       <IconButton 
                         variant="edit" 
                         onClick={() => handleEdit(vistoria)}
@@ -1378,13 +1407,15 @@ const Vistorias: React.FC = () => {
                       >
                         <Edit size={16} />
                       </IconButton>
-                      <IconButton 
-                        variant="delete" 
-                        onClick={() => handleDeleteClick(vistoria)}
-                        title="Excluir vistoria (Admin)"
-                      >
-                        <Trash2 size={16} />
-                      </IconButton>
+                      {vistoria.StatusVistoria?.nome === 'PENDENTE' && (
+                        <IconButton 
+                          variant="delete" 
+                          onClick={() => handleDeleteClick(vistoria)}
+                          title="Excluir vistoria (apenas se PENDENTE)"
+                        >
+                          <Trash2 size={16} />
+                        </IconButton>
+                      )}
                     </ActionButtons>
                   </TableCell>
                 )}
@@ -1483,7 +1514,7 @@ const Vistorias: React.FC = () => {
                             embarcacao_ano_fabricacao: '',
                             embarcacao_proprietario_email: '',
                             embarcacao_tipo: '',
-                            embarcacao_porte: ''
+                            seguradora_id: 0
                           });
                         }}
                         style={{ background: '#dc2626', minWidth: '100px' }}
@@ -1625,7 +1656,7 @@ const Vistorias: React.FC = () => {
                               embarcacao_ano_fabricacao: '',
                               embarcacao_proprietario_email: clienteEncontrado?.email || '',
                               embarcacao_tipo: '',
-                              embarcacao_porte: ''
+                              seguradora_id: 0
                             });
                             setSuccess(`Cadastre uma nova embarcação para: ${clienteEncontrado?.nome}`);
                             setTimeout(() => setSuccess(''), 3000);
@@ -1704,7 +1735,7 @@ const Vistorias: React.FC = () => {
                                   embarcacao_ano_fabricacao: '',
                                   embarcacao_proprietario_email: clienteEncontrado?.email || '',
                                   embarcacao_tipo: '',
-                                  embarcacao_porte: ''
+                                  seguradora_id: 0
                                 });
                               }}
                               style={{ 
@@ -1737,7 +1768,7 @@ const Vistorias: React.FC = () => {
               </FormGroup>
 
               <FormGroup>
-                <Label htmlFor="embarcacao_nr_inscricao_barco">NF de Inscrição *</Label>
+                <Label htmlFor="embarcacao_nr_inscricao_barco">Número de Inscrição *</Label>
                 <Input
                   id="embarcacao_nr_inscricao_barco"
                   type="text"
@@ -1818,41 +1849,65 @@ const Vistorias: React.FC = () => {
               </FormGroup>
 
               <FormGroup>
-                <Label htmlFor="embarcacao_tipo">Tipo de Embarcação</Label>
+                <Label htmlFor="seguradora_id">Seguradora *</Label>
+                <Select
+                  id="seguradora_id"
+                  value={formData.seguradora_id}
+                  onChange={async (e) => {
+                    const segId = parseInt(e.target.value);
+                    setFormData({ ...formData, seguradora_id: segId, embarcacao_tipo: '' });
+                    
+                    // Carregar tipos permitidos da seguradora
+                    if (segId > 0) {
+                      try {
+                        const { seguradoraService } = await import('../services/api');
+                        const seg = seguradoras.find((s: any) => s.id === segId);
+                        if (seg && seg.tiposPermitidos) {
+                          const tipos = seg.tiposPermitidos.map((t: any) => t.tipo_embarcacao);
+                          setTiposPermitidos(tipos);
+                          console.log('Tipos permitidos:', tipos);
+                        }
+                      } catch (err) {
+                        console.error('Erro ao carregar tipos:', err);
+                      }
+                    } else {
+                      setTiposPermitidos([]);
+                    }
+                  }}
+                  required
+                >
+                  <option value="0">Selecione a seguradora</option>
+                  {seguradoras.map((seg: any) => (
+                    <option key={seg.id} value={seg.id}>
+                      {seg.nome}
+                    </option>
+                  ))}
+                </Select>
+              </FormGroup>
+
+              <FormGroup>
+                <Label htmlFor="embarcacao_tipo">Tipo de Embarcação *</Label>
                 <Select
                   id="embarcacao_tipo"
                   value={formData.embarcacao_tipo}
                   onChange={(e) => setFormData({ ...formData, embarcacao_tipo: e.target.value })}
+                  required
+                  disabled={!formData.seguradora_id || formData.seguradora_id === 0}
                 >
-                  <option value="">Selecione o tipo</option>
-                  {TIPOS_EMBARCACAO.map((tipo) => (
-                    <option key={tipo.value} value={tipo.value}>
-                      {tipo.label}
+                  <option value="">
+                    {formData.seguradora_id === 0 ? 'Selecione a seguradora primeiro' : 'Selecione o tipo'}
+                  </option>
+                  {tiposPermitidos.map((tipo: string) => (
+                    <option key={tipo} value={tipo}>
+                      {tipo === 'JET_SKI' ? 'Jet Ski' : tipo === 'LANCHA' ? 'Lancha' : 'Embarcação Comercial'}
                     </option>
                   ))}
                 </Select>
-                <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
-                  Categoria da embarcação (opcional)
-                </small>
-              </FormGroup>
-
-              <FormGroup>
-                <Label htmlFor="embarcacao_porte">Porte da Embarcação</Label>
-                <Select
-                  id="embarcacao_porte"
-                  value={formData.embarcacao_porte}
-                  onChange={(e) => setFormData({ ...formData, embarcacao_porte: e.target.value })}
-                >
-                  <option value="">Selecione o porte</option>
-                  {PORTES_EMBARCACAO.map((porte) => (
-                    <option key={porte.value} value={porte.value}>
-                      {porte.label}
-                    </option>
-                  ))}
-                </Select>
-                <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
-                  Tamanho da embarcação (opcional)
-                </small>
+                {formData.seguradora_id > 0 && tiposPermitidos.length > 0 && (
+                  <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                    Tipos permitidos para esta seguradora: {tiposPermitidos.length}
+                  </small>
+                )}
               </FormGroup>
 
               {/* Valor da embarcação agora está cadastrado na própria embarcação */}

@@ -16,6 +16,9 @@ import Clientes from './pages/Clientes';
 import ChecklistTemplates from './pages/ChecklistTemplates';
 import FotosVistoria from './pages/FotosVistoria';
 import Fotos from './pages/Fotos';
+import Laudos from './pages/Laudos';
+import LaudoForm from './pages/LaudoForm';
+import AuditoriaLogs from './pages/AuditoriaLogs';
 import PasswordUpdateModal from './components/PasswordUpdateModal';
 
 const AppRoutes: React.FC = () => {
@@ -86,7 +89,23 @@ const AppRoutes: React.FC = () => {
             path="/laudos" 
             element={
               canAccess('admin') ? 
-                <div>Laudos (em desenvolvimento)</div> : 
+                <Laudos /> : 
+                <Navigate to="/" replace />
+            } 
+          />
+          <Route 
+            path="/laudos/:id/editar" 
+            element={
+              canAccess('admin') ? 
+                <LaudoForm /> : 
+                <Navigate to="/" replace />
+            } 
+          />
+          <Route 
+            path="/vistorias/:vistoriaId/laudo/novo" 
+            element={
+              canAccess('admin') ? 
+                <LaudoForm /> : 
                 <Navigate to="/" replace />
             } 
           />
@@ -135,6 +154,14 @@ const AppRoutes: React.FC = () => {
             element={
               canAccess('admin') ? 
                 <FotosVistoria /> : 
+                <Navigate to="/" replace />
+            } 
+          />
+          <Route 
+            path="/auditoria" 
+            element={
+              usuario?.id === 1 ? 
+                <AuditoriaLogs /> : 
                 <Navigate to="/" replace />
             } 
           />

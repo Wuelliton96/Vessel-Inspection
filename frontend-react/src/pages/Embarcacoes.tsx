@@ -786,7 +786,7 @@ const Embarcacoes: React.FC = () => {
               </FormGroup>
 
               <FormGroup>
-                <Label htmlFor="nr_inscricao_barco">NF de Inscrição *</Label>
+                <Label htmlFor="nr_inscricao_barco">Número de Inscrição *</Label>
                 <Input
                   id="nr_inscricao_barco"
                   type="text"
