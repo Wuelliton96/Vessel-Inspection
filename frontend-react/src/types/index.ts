@@ -210,12 +210,147 @@ export interface TipoFotoChecklist {
   updatedAt: string;
 }
 
+export interface ChecklistEletrica {
+  terminais_estanhados?: string;
+  circuitos_protegidos?: string;
+  chave_geral?: string;
+  terminais_baterias?: string;
+  baterias_fixadas?: string;
+  passagem_chicotes?: string;
+  cabo_arranque?: string;
+}
+
+export interface ChecklistHidraulica {
+  material_tanques?: string;
+  abracadeiras_inox?: string;
+}
+
+export interface ChecklistGeral {
+  carreta_condicoes?: string;
+}
+
 export interface Laudo {
   id: number;
-  conteudo: string;
-  vistoriaId: number;
+  vistoria_id: number;
+  numero_laudo: string;
+  versao?: string;
+  
+  nome_moto_aquatica?: string;
+  local_guarda?: string;
+  proprietario?: string;
+  cpf_cnpj?: string;
+  endereco_proprietario?: string;
+  responsavel?: string;
+  data_inspecao?: string;
+  local_vistoria?: string;
+  empresa_prestadora?: string;
+  responsavel_inspecao?: string;
+  participantes_inspecao?: string;
+  
+  inscricao_capitania?: string;
+  estaleiro_construtor?: string;
+  tipo_embarcacao?: string;
+  modelo_embarcacao?: string;
+  ano_fabricacao?: number;
+  capacidade?: string;
+  classificacao_embarcacao?: string;
+  area_navegacao?: string;
+  situacao_capitania?: string;
+  valor_risco?: number | string;
+  
+  material_casco?: string;
+  observacoes_casco?: string;
+  
+  quantidade_motores?: number;
+  tipo_motor?: string;
+  fabricante_motor?: string;
+  modelo_motor?: string;
+  numero_serie_motor?: string;
+  potencia_motor?: string;
+  combustivel_utilizado?: string;
+  capacidade_tanque?: string;
+  ano_fabricacao_motor?: number;
+  numero_helices?: string;
+  rabeta_reversora?: string;
+  blower?: string;
+  
+  quantidade_baterias?: number;
+  marca_baterias?: string;
+  capacidade_baterias?: string;
+  carregador_bateria?: string;
+  transformador?: string;
+  quantidade_geradores?: number;
+  fabricante_geradores?: string;
+  tipo_modelo_geradores?: string;
+  capacidade_geracao?: string;
+  quantidade_bombas_porao?: number;
+  fabricante_bombas_porao?: string;
+  modelo_bombas_porao?: string;
+  quantidade_bombas_agua_doce?: number;
+  fabricante_bombas_agua_doce?: string;
+  modelo_bombas_agua_doce?: string;
+  observacoes_eletricos?: string;
+  
+  guincho_eletrico?: string;
+  ancora?: string;
+  cabos?: string;
+  
+  agulha_giroscopica?: string;
+  agulha_magnetica?: string;
+  antena?: string;
+  bidata?: string;
+  barometro?: string;
+  buzina?: string;
+  conta_giros?: string;
+  farol_milha?: string;
+  gps?: string;
+  higrometro?: string;
+  horimetro?: string;
+  limpador_parabrisa?: string;
+  manometros?: string;
+  odometro_fundo?: string;
+  passarela_embarque?: string;
+  piloto_automatico?: string;
+  psi?: string;
+  radar?: string;
+  radio_ssb?: string;
+  radio_vhf?: string;
+  radiogoniometro?: string;
+  sonda?: string;
+  speed_log?: string;
+  strobow?: string;
+  termometro?: string;
+  voltimetro?: string;
+  outros_equipamentos?: string;
+  
+  extintores_automaticos?: string;
+  extintores_portateis?: string;
+  outros_incendio?: string;
+  atendimento_normas?: string;
+  
+  acumulo_agua?: string;
+  avarias_casco?: string;
+  estado_geral_limpeza?: string;
+  teste_funcionamento_motor?: string;
+  funcionamento_bombas_porao?: string;
+  manutencao?: string;
+  observacoes_vistoria?: string;
+  
+  checklist_eletrica?: ChecklistEletrica;
+  checklist_hidraulica?: ChecklistHidraulica;
+  checklist_geral?: ChecklistGeral;
+  
+  logo_empresa_url?: string;
+  nome_empresa?: string;
+  nota_rodape?: string;
+  
+  url_pdf?: string;
+  data_geracao?: string;
+  
   createdAt: string;
   updatedAt: string;
+  
+  Vistoria?: Vistoria;
 }
 
 export interface LotePagamento {

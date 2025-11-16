@@ -15,7 +15,7 @@ export const useAccessControl = () => {
 
   const getVisibleMenuItems = () => {
     if (isAdmin) {
-      return [
+      const menuItems = [
         { path: '/', label: 'Dashboard', icon: 'Home' },
         { path: '/embarcacoes', label: 'Embarcações', icon: 'Ship' },
         { path: '/seguradoras', label: 'Seguradoras', icon: 'Shield' },
@@ -28,6 +28,13 @@ export const useAccessControl = () => {
         { path: '/pagamentos', label: 'Pagamentos', icon: 'DollarSign' },
         { path: '/usuarios', label: 'Gerenciar Usuários', icon: 'Users' },
       ];
+
+      // Apenas o admin principal (ID=1) vê a auditoria
+      if (usuario?.id === 1) {
+        menuItems.push({ path: '/auditoria', label: 'Auditoria', icon: 'Shield' });
+      }
+
+      return menuItems;
     } else if (isVistoriador) {
       return [
         { path: '/', label: 'Dashboard', icon: 'Home' },
