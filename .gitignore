@@ -21,3 +21,5 @@ frontend-react/.env*
 frontend-react/dist/
 node_modules/
 INTRUCOES.TXT
+pdf/
+migrations/
