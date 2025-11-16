@@ -33,9 +33,18 @@ const Usuario = sequelize.define('Usuario', {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
     allowNull: false
+  },
+  deleted_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Data e hora em que o usuário foi marcado como deletado (soft delete)'
   }
 }, {
-  tableName: 'usuarios'
+  tableName: 'usuarios',
+  // Habilitar paranoid para soft delete automático
+  paranoid: true,
+  deletedAt: 'deleted_at'
 });
 
 module.exports = Usuario;
