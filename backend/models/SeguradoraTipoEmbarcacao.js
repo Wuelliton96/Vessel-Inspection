@@ -24,8 +24,9 @@ const SeguradoraTipoEmbarcacao = sequelize.define('SeguradoraTipoEmbarcacao', {
 }, {
   tableName: 'seguradora_tipo_embarcacao',
   timestamps: true,
-  createdAt: 'created_at',
-  updatedAt: false, // Não tem updated_at
+  underscored: false,
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
   indexes: [
     {
       unique: true,

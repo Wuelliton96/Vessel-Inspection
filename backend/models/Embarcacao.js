@@ -41,7 +41,7 @@ const Embarcacao = sequelize.define('Embarcacao', {
     type: DataTypes.STRING
   },
   tipo_embarcacao: {
-    type: DataTypes.ENUM('JET_SKI', 'BALSA', 'IATE', 'VELEIRO', 'REBOCADOR', 'EMPURRADOR', 'LANCHA', 'BARCO', 'OUTRO'),
+    type: DataTypes.ENUM('JET_SKI', 'BALSA', 'IATE', 'VELEIRO', 'REBOCADOR', 'EMPURRADOR', 'LANCHA', 'BARCO', 'OUTRO', 'EMBARCACAO_COMERCIAL'),
     allowNull: true,
     comment: 'Tipo/categoria da embarcação'
   },
