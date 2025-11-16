@@ -631,6 +631,163 @@ SELECT id, 24, 'Documentos (TIE)', 'Documentos, principalmente TIE', TRUE, FALSE
 ON CONFLICT DO NOTHING;
 
 -- ============================================
+-- MIGRATION: Tabela de Laudos
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS laudos (
+    id SERIAL PRIMARY KEY,
+    vistoria_id INTEGER NOT NULL UNIQUE,
+    numero_laudo VARCHAR(50) NOT NULL UNIQUE,
+    versao VARCHAR(20) DEFAULT 'BS 2021-01',
+    
+    nome_moto_aquatica VARCHAR(255),
+    local_guarda TEXT,
+    proprietario VARCHAR(255),
+    cpf_cnpj VARCHAR(18),
+    endereco_proprietario TEXT,
+    responsavel VARCHAR(255),
+    data_inspecao DATE,
+    local_vistoria TEXT,
+    empresa_prestadora VARCHAR(255),
+    responsavel_inspecao VARCHAR(255),
+    participantes_inspecao TEXT,
+    
+    inscricao_capitania VARCHAR(100),
+    estaleiro_construtor VARCHAR(255),
+    tipo_embarcacao VARCHAR(100),
+    modelo_embarcacao VARCHAR(255),
+    ano_fabricacao INTEGER,
+    capacidade VARCHAR(100),
+    classificacao_embarcacao VARCHAR(100),
+    area_navegacao VARCHAR(100),
+    situacao_capitania TEXT,
+    valor_risco DECIMAL(12, 2),
+    
+    material_casco VARCHAR(100),
+    observacoes_casco TEXT,
+    
+    quantidade_motores INTEGER,
+    tipo_motor VARCHAR(100),
+    fabricante_motor VARCHAR(255),
+    modelo_motor VARCHAR(255),
+    numero_serie_motor VARCHAR(255),
+    potencia_motor VARCHAR(100),
+    combustivel_utilizado VARCHAR(50),
+    capacidade_tanque VARCHAR(50),
+    ano_fabricacao_motor INTEGER,
+    numero_helices VARCHAR(100),
+    rabeta_reversora VARCHAR(100),
+    blower VARCHAR(100),
+    
+    quantidade_baterias INTEGER,
+    marca_baterias VARCHAR(100),
+    capacidade_baterias VARCHAR(50),
+    carregador_bateria VARCHAR(100),
+    transformador VARCHAR(100),
+    quantidade_geradores INTEGER,
+    fabricante_geradores VARCHAR(255),
+    tipo_modelo_geradores VARCHAR(255),
+    capacidade_geracao VARCHAR(100),
+    quantidade_bombas_porao INTEGER,
+    fabricante_bombas_porao VARCHAR(255),
+    modelo_bombas_porao VARCHAR(255),
+    quantidade_bombas_agua_doce INTEGER,
+    fabricante_bombas_agua_doce VARCHAR(255),
+    modelo_bombas_agua_doce VARCHAR(255),
+    observacoes_eletricos TEXT,
+    
+    guincho_eletrico VARCHAR(100),
+    ancora VARCHAR(100),
+    cabos VARCHAR(255),
+    
+    agulha_giroscopica VARCHAR(100),
+    agulha_magnetica VARCHAR(100),
+    antena VARCHAR(100),
+    bidata VARCHAR(100),
+    barometro VARCHAR(100),
+    buzina VARCHAR(100),
+    conta_giros VARCHAR(100),
+    farol_milha VARCHAR(100),
+    gps VARCHAR(100),
+    higrometro VARCHAR(100),
+    horimetro VARCHAR(100),
+    limpador_parabrisa VARCHAR(100),
+    manometros VARCHAR(100),
+    odometro_fundo VARCHAR(100),
+    passarela_embarque VARCHAR(100),
+    piloto_automatico VARCHAR(100),
+    psi VARCHAR(100),
+    radar VARCHAR(100),
+    radio_ssb VARCHAR(100),
+    radio_vhf VARCHAR(100),
+    radiogoniometro VARCHAR(100),
+    sonda VARCHAR(100),
+    speed_log VARCHAR(100),
+    strobow VARCHAR(100),
+    termometro VARCHAR(100),
+    voltimetro VARCHAR(100),
+    outros_equipamentos TEXT,
+    
+    extintores_automaticos VARCHAR(100),
+    extintores_portateis VARCHAR(100),
+    outros_incendio TEXT,
+    atendimento_normas VARCHAR(100),
+    
+    acumulo_agua VARCHAR(100),
+    avarias_casco VARCHAR(100),
+    estado_geral_limpeza TEXT,
+    teste_funcionamento_motor TEXT,
+    funcionamento_bombas_porao TEXT,
+    manutencao VARCHAR(100),
+    observacoes_vistoria TEXT,
+    
+    checklist_eletrica JSONB,
+    checklist_hidraulica JSONB,
+    checklist_geral JSONB,
+    
+    logo_empresa_url VARCHAR(512),
+    nome_empresa VARCHAR(255),
+    nota_rodape TEXT,
+    
+    url_pdf VARCHAR(512),
+    data_geracao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_laudos_vistoria FOREIGN KEY (vistoria_id) REFERENCES vistorias(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_laudos_vistoria_id ON laudos(vistoria_id);
+CREATE INDEX IF NOT EXISTS idx_laudos_numero_laudo ON laudos(numero_laudo);
+CREATE INDEX IF NOT EXISTS idx_laudos_data_geracao ON laudos(data_geracao);
+
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_proc 
+        WHERE proname = 'update_laudos_updated_at'
+    ) THEN
+        CREATE FUNCTION update_laudos_updated_at()
+        RETURNS TRIGGER AS $func$
+        BEGIN
+            NEW.updated_at = CURRENT_TIMESTAMP;
+            RETURN NEW;
+        END;
+        $func$ LANGUAGE plpgsql;
+    END IF;
+END $$;
+
+DROP TRIGGER IF EXISTS trigger_laudos_updated_at ON laudos;
+CREATE TRIGGER trigger_laudos_updated_at
+    BEFORE UPDATE ON laudos
+    FOR EACH ROW
+    EXECUTE FUNCTION update_laudos_updated_at();
+
+COMMENT ON TABLE laudos IS 'Armazena dados completos dos laudos de vistoria náutica';
+COMMENT ON COLUMN laudos.numero_laudo IS 'Número único do laudo no formato AAMMDDX';
+
+-- ============================================
 -- VERIFICAÇÃO FINAL
 -- ============================================
 SELECT 
@@ -638,5 +795,6 @@ SELECT
     (SELECT COUNT(*) FROM clientes) as total_clientes,
     (SELECT COUNT(*) FROM embarcacoes WHERE cliente_id IS NOT NULL) as embarcacoes_vinculadas,
     (SELECT COUNT(*) FROM checklist_templates) as total_checklists,
-    (SELECT COUNT(*) FROM checklist_template_itens) as total_itens_checklist;
+    (SELECT COUNT(*) FROM checklist_template_itens) as total_itens_checklist,
+    (SELECT COUNT(*) FROM laudos) as total_laudos;
 

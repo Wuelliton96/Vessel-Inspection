@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS seguradoras (
     id                  SERIAL PRIMARY KEY,
     nome                VARCHAR(100) NOT NULL UNIQUE,
     ativo               BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    "createdAt"         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt"         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 COMMENT ON TABLE seguradoras IS 'Cadastro de seguradoras';
@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS seguradora_tipo_embarcacao (
     id                  SERIAL PRIMARY KEY,
     seguradora_id       INTEGER NOT NULL REFERENCES seguradoras(id) ON DELETE CASCADE,
     tipo_embarcacao     tipo_embarcacao_seguradora NOT NULL,
-    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "createdAt"         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt"         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     UNIQUE(seguradora_id, tipo_embarcacao)
 );
@@ -104,11 +105,11 @@ ON CONFLICT (seguradora_id, tipo_embarcacao) DO NOTHING;
 -- TRIGGERS
 -- ============================================
 
--- Trigger para atualizar updated_at automaticamente
+-- Trigger para atualizar updatedAt automaticamente
 CREATE OR REPLACE FUNCTION update_seguradoras_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
+    NEW."updatedAt" = CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
 $$ language 'plpgsql';
