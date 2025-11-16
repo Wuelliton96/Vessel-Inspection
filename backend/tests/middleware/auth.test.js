@@ -1,281 +1,149 @@
-const request = require('supertest');
-const express = require('express');
-const { requireAuth, requireAdmin } = require('../../middleware/auth');
-const { Usuario, NivelAcesso } = require('../../models');
-const skipDb = process.env.SKIP_DB === 'true';
+const jwt = require('jsonwebtoken');
+const { authenticateToken, requireAdmin, requireAdminOrVistoriador } = require('../../middleware/auth');
+const { Usuario, NivelAcesso, sequelize } = require('../../models');
 
-// Mock do Clerk
-jest.mock('@clerk/clerk-sdk-node', () => ({
-  ClerkExpressRequireAuth: () => (req, res, next) => {
-    // Simular usuário autenticado
-    req.auth = {
-      userId: 'test-clerk-user-id'
+describe('Auth Middleware', () => {
+  let mockReq, mockRes, mockNext;
+  let testUser;
+
+  beforeAll(async () => {
+    await sequelize.sync({ force: true });
+    await NivelAcesso.create({ id: 1, nome: 'ADMINISTRADOR', descricao: 'Admin' });
+    await NivelAcesso.create({ id: 2, nome: 'VISTORIADOR', descricao: 'Vistoriador' });
+    
+    testUser = await Usuario.create({
+      nome: 'Test User',
+      email: 'test@auth.middleware',
+      senha_hash: 'hash',
+      nivel_acesso_id: 1
+    });
+  });
+
+  afterAll(async () => {
+    await sequelize.close();
+  });
+
+  beforeEach(() => {
+    mockReq = {
+      headers: {},
+      header: jest.fn()
     };
-    next();
-  }
-}));
+    mockRes = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn()
+    };
+    mockNext = jest.fn();
+  });
 
-describe('Middleware de Autenticação', () => {
-  let app;
-  let nivelAcesso, usuarioAdmin, usuarioVistoriador;
+  describe('authenticateToken', () => {
+    it('deve passar com token válido', async () => {
+      const token = jwt.sign(
+        { userId: testUser.id, email: testUser.email },
+        process.env.JWT_SECRET || 'test-secret'
+      );
 
-  beforeEach(async () => {
-    app = express();
-    app.use(express.json());
+      mockReq.header.mockReturnValue(`Bearer ${token}`);
 
-    if (process.env.SKIP_DB === 'true') {
-      // Pular preparação de banco quando testando apenas requireAuth
-      return;
-    }
+      await authenticateToken(mockReq, mockRes, mockNext);
 
-    // Criar níveis de acesso
-    const nivelAdmin = await NivelAcesso.create({
-      nome: 'ADMINISTRADOR',
-      descricao: 'Administrador do sistema'
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockReq.user).toBeDefined();
+      expect(mockReq.user.id).toBe(testUser.id);
     });
 
-    const nivelVistoriador = await NivelAcesso.create({
-      nome: 'VISTORIADOR',
-      descricao: 'Vistoriador'
+    it('deve retornar 401 sem token', async () => {
+      mockReq.header.mockReturnValue(null);
+
+      await authenticateToken(mockReq, mockRes, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockRes.json).toHaveBeenCalledWith({ 
+        error: 'Token não fornecido' 
+      });
     });
 
-    // Criar usuários
-    usuarioAdmin = await Usuario.create({
-      clerk_user_id: 'test-clerk-user-id',
-      nome: 'Admin Teste',
-      email: 'admin@teste.com',
-      nivel_acesso_id: nivelAdmin.id
+    it('deve retornar 401 com token inválido', async () => {
+      mockReq.header.mockReturnValue('Bearer token-invalido');
+
+      await authenticateToken(mockReq, mockRes, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(401);
     });
 
-    usuarioVistoriador = await Usuario.create({
-      clerk_user_id: 'clerk-vistoriador',
-      nome: 'Vistoriador Teste',
-      email: 'vistoriador@teste.com',
-      nivel_acesso_id: nivelVistoriador.id
+    it('deve retornar 404 se usuário não existir', async () => {
+      const token = jwt.sign(
+        { userId: 99999, email: 'fake@test.com' },
+        process.env.JWT_SECRET || 'test-secret'
+      );
+
+      mockReq.header.mockReturnValue(`Bearer ${token}`);
+
+      await authenticateToken(mockReq, mockRes, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(404);
     });
   });
 
-  describe('requireAuth', () => {
-    it('deve permitir acesso quando usuário está autenticado', async () => {
-      app.get('/test-auth', requireAuth, (req, res) => {
-        res.json({ message: 'Acesso permitido', userId: req.auth.userId });
-      });
+  describe('requireAdmin', () => {
+    it('deve passar para admin', () => {
+      mockReq.user = { nivelAcessoId: 1 };
 
-      const response = await request(app)
-        .get('/test-auth')
-        .expect(200);
+      requireAdmin(mockReq, mockRes, mockNext);
 
-      expect(response.body.message).toBe('Acesso permitido');
-      expect(response.body.userId).toBe('test-clerk-user-id');
+      expect(mockNext).toHaveBeenCalled();
     });
 
-    it('deve negar acesso quando usuário não está autenticado', async () => {
-      // Não definir req.auth e chamar requireAdmin que valida autenticação
-      const noAuth = () => (req, res, next) => next();
+    it('deve retornar 403 para não-admin', () => {
+      mockReq.user = { nivelAcessoId: 2 };
 
-      app.get('/test-no-auth', [noAuth(), requireAdmin], (req, res) => {
-        res.json({ message: 'Acesso permitido' });
+      requireAdmin(mockReq, mockRes, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(403);
+      expect(mockRes.json).toHaveBeenCalledWith({ 
+        error: 'Acesso negado. Apenas administradores.' 
       });
-
-      const response = await request(app)
-        .get('/test-no-auth')
-        .expect(401);
-
-      expect(response.body.error).toBe('Autenticação necessária.');
-    });
-  });
-
-  (skipDb ? describe.skip : describe)('requireAdmin', () => {
-    it('deve permitir acesso quando usuário é administrador', async () => {
-      app.get('/test-admin', [requireAuth, requireAdmin], (req, res) => {
-        res.json({ 
-          message: 'Acesso de admin permitido',
-          user: req.user
-        });
-      });
-
-      const response = await request(app)
-        .get('/test-admin')
-        .expect(200);
-
-      expect(response.body.message).toBe('Acesso de admin permitido');
-      expect(response.body.user.id).toBe(usuarioAdmin.id);
-      expect(response.body.user.nome).toBe('Admin Teste');
     });
 
-    it('deve negar acesso quando usuário não é administrador', async () => {
-      // Mock com usuário vistoriador
-      const mockRequireAuthVistoriador = () => (req, res, next) => {
-        req.auth = {
-          userId: 'clerk-vistoriador'
-        };
-        next();
-      };
+    it('deve retornar 403 sem usuário', () => {
+      mockReq.user = null;
 
-      app.get('/test-admin-vistoriador', [mockRequireAuthVistoriador(), requireAdmin], (req, res) => {
-        res.json({ message: 'Acesso de admin permitido' });
-      });
+      requireAdmin(mockReq, mockRes, mockNext);
 
-      const response = await request(app)
-        .get('/test-admin-vistoriador')
-        .expect(403);
-
-      expect(response.body.error).toBe('Acesso negado. Permissão de administrador necessária.');
-    });
-
-    it('deve negar acesso quando usuário não existe no banco', async () => {
-      // Mock com usuário inexistente
-      const mockRequireAuthInexistente = () => (req, res, next) => {
-        req.auth = {
-          userId: 'clerk-usuario-inexistente'
-        };
-        next();
-      };
-
-      app.get('/test-admin-inexistente', [mockRequireAuthInexistente(), requireAdmin], (req, res) => {
-        res.json({ message: 'Acesso de admin permitido' });
-      });
-
-      const response = await request(app)
-        .get('/test-admin-inexistente')
-        .expect(403);
-
-      expect(response.body.error).toBe('Acesso negado. Permissão de administrador necessária.');
-    });
-
-    it('deve negar acesso quando req.auth não existe', async () => {
-      const mockRequireAuthSemAuth = () => (req, res, next) => {
-        // Não definir req.auth
-        next();
-      };
-
-      app.get('/test-admin-sem-auth', [mockRequireAuthSemAuth(), requireAdmin], (req, res) => {
-        res.json({ message: 'Acesso de admin permitido' });
-      });
-
-      const response = await request(app)
-        .get('/test-admin-sem-auth')
-        .expect(401);
-
-      expect(response.body.error).toBe('Autenticação necessária.');
-    });
-
-    it('deve negar acesso quando req.auth.userId não existe', async () => {
-      const mockRequireAuthSemUserId = () => (req, res, next) => {
-        req.auth = {}; // Sem userId
-        next();
-      };
-
-      app.get('/test-admin-sem-userid', [mockRequireAuthSemUserId(), requireAdmin], (req, res) => {
-        res.json({ message: 'Acesso de admin permitido' });
-      });
-
-      const response = await request(app)
-        .get('/test-admin-sem-userid')
-        .expect(401);
-
-      expect(response.body.error).toBe('Autenticação necessária.');
+      expect(mockRes.status).toHaveBeenCalledWith(403);
     });
   });
 
-  (skipDb ? describe.skip : describe)('Integração dos middlewares', () => {
-    it('deve executar requireAuth antes de requireAdmin', async () => {
-      let middlewareOrder = [];
+  describe('requireAdminOrVistoriador', () => {
+    it('deve passar para admin', () => {
+      mockReq.user = { nivelAcessoId: 1 };
 
-      const mockRequireAuth = () => (req, res, next) => {
-        middlewareOrder.push('requireAuth');
-        req.auth = { userId: 'test-clerk-user-id' };
-        next();
-      };
+      requireAdminOrVistoriador(mockReq, mockRes, mockNext);
 
-      const mockRequireAdmin = async (req, res, next) => {
-        middlewareOrder.push('requireAdmin');
-        try {
-          if (!req.auth || !req.auth.userId) {
-            return res.status(401).json({ error: 'Autenticação necessária.' });
-          }
-
-          const clerkUserId = req.auth.userId;
-          const usuario = await Usuario.findOne({
-            where: { clerk_user_id: clerkUserId },
-            include: {
-              model: NivelAcesso,
-              attributes: ['nome']
-            }
-          });
-
-          if (!usuario || usuario.NivelAcesso.nome !== 'ADMINISTRADOR') {
-            return res.status(403).json({ error: 'Acesso negado. Permissão de administrador necessária.' });
-          }
-
-          req.user = usuario;
-          next();
-        } catch (error) {
-          res.status(500).json({ error: 'Erro interno do servidor.' });
-        }
-      };
-
-      app.get('/test-order', [mockRequireAuth(), mockRequireAdmin], (req, res) => {
-        middlewareOrder.push('handler');
-        res.json({ message: 'Sucesso', order: middlewareOrder });
-      });
-
-      const response = await request(app)
-        .get('/test-order')
-        .expect(200);
-
-      expect(response.body.order).toEqual(['requireAuth', 'requireAdmin', 'handler']);
+      expect(mockNext).toHaveBeenCalled();
     });
 
-    it('deve retornar erro 500 em caso de erro interno', async () => {
-      // Mock que simula erro no banco de dados
-      const mockRequireAuth = () => (req, res, next) => {
-        req.auth = { userId: 'test-clerk-user-id' };
-        next();
-      };
+    it('deve passar para vistoriador', () => {
+      mockReq.user = { nivelAcessoId: 2 };
 
-      const mockRequireAdminComErro = async (req, res, next) => {
-        try {
-          // Simular erro
-          throw new Error('Erro de conexão com banco');
-        } catch (error) {
-          res.status(500).json({ error: 'Erro interno do servidor.' });
-        }
-      };
+      requireAdminOrVistoriador(mockReq, mockRes, mockNext);
 
-      app.get('/test-error', [mockRequireAuth(), mockRequireAdminComErro], (req, res) => {
-        res.json({ message: 'Sucesso' });
-      });
-
-      const response = await request(app)
-        .get('/test-error')
-        .expect(500);
-
-      expect(response.body.error).toBe('Erro interno do servidor.');
+      expect(mockNext).toHaveBeenCalled();
     });
-  });
 
-  (skipDb ? describe.skip : describe)('Dados do usuário anexados à requisição', () => {
-    it('deve anexar dados completos do usuário admin à requisição', async () => {
-      app.get('/test-user-data', [requireAuth, requireAdmin], (req, res) => {
-        res.json({
-          user: {
-            id: req.user.id,
-            nome: req.user.nome,
-            email: req.user.email,
-            nivel_acesso: req.user.NivelAcesso.nome
-          }
-        });
-      });
+    it('deve retornar 403 para outros níveis', () => {
+      mockReq.user = { nivelAcessoId: 3 };
 
-      const response = await request(app)
-        .get('/test-user-data')
-        .expect(200);
+      requireAdminOrVistoriador(mockReq, mockRes, mockNext);
 
-      expect(response.body.user.id).toBe(usuarioAdmin.id);
-      expect(response.body.user.nome).toBe('Admin Teste');
-      expect(response.body.user.email).toBe('admin@teste.com');
-      expect(response.body.user.nivel_acesso).toBe('ADMINISTRADOR');
+      expect(mockRes.status).toHaveBeenCalledWith(403);
+    });
+
+    it('deve retornar 403 sem usuário', () => {
+      mockReq.user = null;
+
+      requireAdminOrVistoriador(mockReq, mockRes, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(403);
     });
   });
 });
