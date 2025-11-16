@@ -4,8 +4,11 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Usuario, NivelAcesso } = require('../models');
 const { requireAuth, requireAdmin, requireAuthAllowPasswordUpdate } = require('../middleware/auth');
+const { loginValidation, registerValidation } = require('../middleware/validator');
+const { loginRateLimiter } = require('../middleware/rateLimiting');
+const { registrarAuditoria } = require('../middleware/auditoria');
 
-router.post('/register', async (req, res) => {
+router.post('/register', registerValidation, async (req, res) => {
   try {
     const { nome, email, senha, nivelAcessoId } = req.body;
 
@@ -85,11 +88,16 @@ router.post('/register', async (req, res) => {
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginRateLimiter, loginValidation, async (req, res) => {
   try {
+    console.log('[AUTH] Requisição de login recebida');
+    console.log('[AUTH] Origin:', req.headers.origin);
+    console.log('[AUTH] Body:', { email: req.body.email, senha: req.body.senha ? '***' : 'vazio' });
+    
     const { email, senha } = req.body;
 
     if (!email || !senha) {
+      console.log('[AUTH] Campos obrigatórios faltando');
       return res.status(400).json({ 
         error: 'Campos obrigatórios',
         message: 'Por favor, preencha o email e a senha para continuar.',
@@ -106,6 +114,7 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    console.log('[AUTH] Buscando usuário no banco...');
     const usuario = await Usuario.findOne({
       where: { email: email.toLowerCase() },
       include: {
@@ -115,6 +124,17 @@ router.post('/login', async (req, res) => {
     });
 
     if (!usuario) {
+      console.log('[AUTH] ERRO - Usuário não encontrado:', email.toLowerCase());
+      
+      // Registrar tentativa de login falhada
+      await registrarAuditoria({
+        req,
+        acao: 'LOGIN_FAILED',
+        entidade: 'Usuario',
+        nivelCritico: true,
+        detalhes: `Tentativa de login com email não cadastrado: ${email.toLowerCase()}`
+      });
+      
       return res.status(401).json({ 
         error: 'Credenciais inválidas',
         message: 'Email não encontrado no sistema. Verifique se digitou corretamente ou entre em contato com o administrador.',
@@ -122,8 +142,25 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    console.log('[AUTH] OK - Usuário encontrado:', usuario.email);
+    console.log('[AUTH] Verificando senha...');
+    
     const senhaValida = await bcrypt.compare(senha, usuario.senha_hash);
+    console.log('[AUTH] Senha válida?', senhaValida ? 'SIM' : 'NAO');
+    
     if (!senhaValida) {
+      console.log('[AUTH] ERRO - Senha incorreta para:', usuario.email);
+      
+      // Registrar tentativa de login falhada
+      await registrarAuditoria({
+        req,
+        acao: 'LOGIN_FAILED',
+        entidade: 'Usuario',
+        entidadeId: usuario.id,
+        nivelCritico: true,
+        detalhes: `Tentativa de login com senha incorreta para: ${usuario.email}`
+      });
+      
       return res.status(401).json({ 
         error: 'Credenciais inválidas',
         message: 'Senha incorreta. Por favor, verifique sua senha e tente novamente.',
@@ -143,6 +180,18 @@ router.post('/login', async (req, res) => {
       expiresIn: '24h'
     });
 
+    console.log('[AUTH] Login bem-sucedido para:', usuario.email);
+
+    // Registrar login bem-sucedido
+    await registrarAuditoria({
+      req,
+      acao: 'LOGIN_SUCCESS',
+      entidade: 'Usuario',
+      entidadeId: usuario.id,
+      nivelCritico: false,
+      detalhes: `Login bem-sucedido: ${usuario.nome} (${usuario.email})`
+    });
+
     res.json({
       success: true,
       message: 'Login realizado com sucesso',
@@ -157,7 +206,7 @@ router.post('/login', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Erro no login:', error);
+    console.error('[AUTH] Erro no login:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });

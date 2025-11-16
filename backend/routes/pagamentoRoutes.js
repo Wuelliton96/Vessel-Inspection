@@ -31,7 +31,7 @@ router.get('/', async (req, res) => {
         {
           model: Usuario,
           as: 'vistoriador',
-          attributes: ['id', 'nome', 'email', 'telefone_e164']
+          attributes: ['id', 'nome', 'email']
         },
         {
           model: Usuario,

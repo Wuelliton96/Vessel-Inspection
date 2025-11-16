@@ -11,11 +11,11 @@ const upload = multer(getUploadConfig());
 
 // Log das configurações ao iniciar
 const storageInfo = getStorageInfo();
-console.log('📸 Configurações de Upload:');
-console.log(`   - Estratégia: ${storageInfo.strategy}`);
-console.log(`   - Tamanho máximo: ${storageInfo.maxFileSize}`);
-console.log(`   - Tipos aceitos: ${storageInfo.allowedTypes.join(', ')}`);
-console.log(`   - Localização: ${storageInfo.location}`);
+console.log('[FOTO] Configuracoes de Upload:');
+console.log(`[FOTO]   - Estrategia: ${storageInfo.strategy}`);
+console.log(`[FOTO]   - Tamanho maximo: ${storageInfo.maxFileSize}`);
+console.log(`[FOTO]   - Tipos aceitos: ${storageInfo.allowedTypes.join(', ')}`);
+console.log(`[FOTO]   - Localizacao: ${storageInfo.location}`);
 
 // Aplicar middleware de autenticação em todas as rotas
 router.use(requireAuth, requireVistoriador);

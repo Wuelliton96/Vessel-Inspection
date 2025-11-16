@@ -69,6 +69,31 @@ router.post('/', [requireAuth, requireAdmin], async (req, res) => {
         proprietario_email: req.body.embarcacao_proprietario_email
       });
 
+      // Validar tipo de embarcação com seguradora
+      const seguradoraId = req.body.seguradora_id;
+      const tipoEmbarcacao = req.body.embarcacao_tipo || req.body.tipo_embarcacao;
+      
+      if (seguradoraId && tipoEmbarcacao) {
+        const { Seguradora, SeguradoraTipoEmbarcacao } = require('../models');
+        
+        const tipoPermitido = await SeguradoraTipoEmbarcacao.findOne({
+          where: {
+            seguradora_id: seguradoraId,
+            tipo_embarcacao: tipoEmbarcacao
+          }
+        });
+        
+        if (!tipoPermitido) {
+          const seguradora = await Seguradora.findByPk(seguradoraId);
+          console.log(`VALIDACAO FALHOU: Seguradora ${seguradora?.nome} nao permite tipo ${tipoEmbarcacao}`);
+          return res.status(400).json({ 
+            error: "Tipo de embarcação não permitido",
+            message: `A seguradora ${seguradora?.nome} não aceita vistorias de ${tipoEmbarcacao}`
+          });
+        }
+        console.log('Validacao OK: Seguradora permite este tipo');
+      }
+
       const [embarcacao] = await Embarcacao.findOrCreate({
         where: { nr_inscricao_barco: embarcacao_nr_inscricao_barco },
         defaults: { 
@@ -77,14 +102,16 @@ router.post('/', [requireAuth, requireAdmin], async (req, res) => {
           proprietario_cpf: req.body.embarcacao_proprietario_cpf || null,
           proprietario_telefone_e164: req.body.embarcacao_proprietario_telefone_e164 || null,
           proprietario_email: req.body.embarcacao_proprietario_email || null,
-          tipo_embarcacao: req.body.embarcacao_tipo || null,
-          porte: req.body.embarcacao_porte || null,
+          tipo_embarcacao: tipoEmbarcacao,
+          seguradora_id: seguradoraId,
           valor_embarcacao: req.body.embarcacao_valor || null,
-          ano_fabricacao: req.body.embarcacao_ano_fabricacao || null
+          ano_fabricacao: req.body.embarcacao_ano_fabricacao || null,
+          cliente_id: req.body.cliente_id || null
         }
       });
       embarcacaoId = embarcacao.id;
       console.log('Embarcação criada/encontrada com ID:', embarcacaoId);
+      console.log('Tipo:', embarcacao.tipo_embarcacao, 'Seguradora:', embarcacao.seguradora_id);
     }
 
     // Se não foi fornecido local_id, buscar ou criar local
@@ -365,7 +392,7 @@ router.put('/:id', requireAuth, async (req, res) => {
   }
 });
 
-// Rota: DELETE /api/vistorias/:id - Excluir vistoria
+// Rota: DELETE /api/vistorias/:id - Excluir vistoria (apenas se PENDENTE)
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
     console.log('=== ROTA DELETE /api/vistorias/:id ===');
@@ -375,7 +402,10 @@ router.delete('/:id', requireAuth, async (req, res) => {
     
     const { id } = req.params;
 
-    const vistoria = await Vistoria.findByPk(id);
+    const vistoria = await Vistoria.findByPk(id, {
+      include: [{ model: StatusVistoria, as: 'StatusVistoria' }]
+    });
+    
     if (!vistoria) {
       console.log('Vistoria não encontrada para ID:', id);
       console.log('=== FIM ROTA DELETE /api/vistorias/:id (404) ===\n');
@@ -383,6 +413,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
     }
 
     console.log('Vistoria encontrada:', vistoria.id);
+    console.log('Status atual:', vistoria.StatusVistoria?.nome);
 
     // Apenas admin pode excluir vistorias
     const isAdmin = req.user.NivelAcesso?.id === 1;
@@ -392,6 +423,16 @@ router.delete('/:id', requireAuth, async (req, res) => {
       console.log('Acesso negado - apenas administradores podem excluir vistorias');
       console.log('=== FIM ROTA DELETE /api/vistorias/:id (403) ===\n');
       return res.status(403).json({ error: "Apenas administradores podem excluir vistorias" });
+    }
+
+    // NOVA VALIDACAO: Apenas permitir deletar se status for PENDENTE
+    if (vistoria.StatusVistoria?.nome !== 'PENDENTE') {
+      console.log(`Tentativa bloqueada - Status: ${vistoria.StatusVistoria?.nome}`);
+      console.log('=== FIM ROTA DELETE /api/vistorias/:id (403) ===\n');
+      return res.status(403).json({ 
+        error: "Operação não permitida",
+        message: `Apenas vistorias com status PENDENTE podem ser excluídas. Status atual: ${vistoria.StatusVistoria?.nome}` 
+      });
     }
 
     console.log('Excluindo vistoria:', vistoria.id);

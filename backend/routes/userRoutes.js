@@ -3,6 +3,8 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { Usuario, NivelAcesso } = require('../models');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { registrarAuditoria, auditoriaMiddleware, salvarDadosOriginais } = require('../middleware/auditoria');
+const { strictRateLimiter, moderateRateLimiter } = require('../middleware/rateLimiting');
 
 router.post('/sync', async (req, res) => {
   try {
@@ -97,7 +99,7 @@ router.get('/:id', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-router.post('/', requireAuth, requireAdmin, async (req, res) => {
+router.post('/', requireAuth, requireAdmin, moderateRateLimiter, async (req, res) => {
   try {
     const { nome, email, nivelAcessoId } = req.body;
 
@@ -140,6 +142,21 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
       attributes: ['id', 'nome', 'email', 'ativo', 'createdAt', 'updatedAt']
     });
 
+    // Registrar auditoria de criação de usuário
+    await registrarAuditoria({
+      req,
+      acao: 'CREATE',
+      entidade: 'Usuario',
+      entidadeId: usuarioCompleto.id,
+      dadosNovos: {
+        nome: usuarioCompleto.nome,
+        email: usuarioCompleto.email,
+        nivelAcessoId: usuarioCompleto.nivel_acesso_id
+      },
+      nivelCritico: true,
+      detalhes: `Novo usuário criado: ${usuarioCompleto.nome} (${usuarioCompleto.email})`
+    });
+
     res.status(201).json({
       id: usuarioCompleto.id,
       nome: usuarioCompleto.nome,
@@ -167,7 +184,7 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // PUT /api/usuarios/:id - Atualizar usuário (apenas admin)
-router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
+router.put('/:id', requireAuth, requireAdmin, moderateRateLimiter, salvarDadosOriginais(Usuario), async (req, res) => {
   try {
     const { nome, email, nivelAcessoId, ativo } = req.body;
     const userId = req.params.id;
@@ -221,6 +238,23 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
       attributes: ['id', 'nome', 'email', 'ativo', 'createdAt', 'updatedAt']
     });
 
+    // Registrar auditoria de atualização
+    await registrarAuditoria({
+      req,
+      acao: 'UPDATE',
+      entidade: 'Usuario',
+      entidadeId: userId,
+      dadosAnteriores: req.originalData,
+      dadosNovos: {
+        nome: usuarioAtualizado.nome,
+        email: usuarioAtualizado.email,
+        nivelAcessoId: usuarioAtualizado.nivel_acesso_id,
+        ativo: usuarioAtualizado.ativo
+      },
+      nivelCritico: true,
+      detalhes: `Usuário atualizado: ${usuarioAtualizado.nome} (${usuarioAtualizado.email})`
+    });
+
     res.json({
       id: usuarioAtualizado.id,
       nome: usuarioAtualizado.nome,
@@ -247,21 +281,105 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-// DELETE /api/usuarios/:id - Excluir usuário (apenas admin)
-router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
+// DELETE /api/usuarios/:id - Excluir usuário (soft delete - apenas admin)
+router.delete(
+  '/:id', 
+  requireAuth, 
+  requireAdmin, 
+  strictRateLimiter, // Rate limiting rigoroso para deleções
+  salvarDadosOriginais(Usuario),
+  async (req, res) => {
   try {
-    const usuario = await Usuario.findByPk(req.params.id);
+      const usuarioId = parseInt(req.params.id);
+      
+      // Proteção 1: Não permitir que o usuário delete a si mesmo
+      if (req.user.id === usuarioId) {
+        console.warn(`[SEGURANÇA] Usuário ${req.user.email} tentou deletar a si mesmo`);
+        return res.status(403).json({ 
+          error: 'Operação não permitida',
+          message: 'Você não pode deletar sua própria conta. Solicite a outro administrador.' 
+        });
+      }
+
+      const usuario = await Usuario.findByPk(usuarioId, {
+        include: {
+          model: NivelAcesso,
+          attributes: ['id', 'nome']
+        }
+      });
+
     if (!usuario) {
       return res.status(404).json({ error: 'Usuário não encontrado.' });
     }
 
+      // Proteção 2: Não permitir deletar o primeiro admin do sistema (ID 1)
+      if (usuarioId === 1) {
+        console.error(`[SEGURANÇA] Tentativa de deletar o admin principal (ID: 1) por ${req.user.email}`);
+        await registrarAuditoria({
+          req,
+          acao: 'DELETE_BLOCKED',
+          entidade: 'Usuario',
+          entidadeId: usuarioId,
+          nivelCritico: true,
+          detalhes: 'Tentativa bloqueada de deletar o usuário admin principal'
+        });
+        
+        return res.status(403).json({ 
+          error: 'Operação bloqueada',
+          message: 'O usuário administrador principal não pode ser deletado por segurança do sistema.' 
+        });
+      }
+
+      // Proteção 3: Verificar se é o último admin do sistema
+      if (usuario.NivelAcesso.id === 1) {
+        const totalAdmins = await Usuario.count({
+          where: { nivel_acesso_id: 1 }
+        });
+
+        if (totalAdmins <= 1) {
+          console.error(`[SEGURANÇA] Tentativa de deletar o último admin do sistema por ${req.user.email}`);
+          await registrarAuditoria({
+            req,
+            acao: 'DELETE_BLOCKED',
+            entidade: 'Usuario',
+            entidadeId: usuarioId,
+            nivelCritico: true,
+            detalhes: 'Tentativa bloqueada de deletar o último administrador do sistema'
+          });
+
+          return res.status(403).json({ 
+            error: 'Operação bloqueada',
+            message: 'Não é possível deletar o último administrador do sistema. Crie outro administrador primeiro.' 
+          });
+        }
+      }
+
+      // Soft delete - apenas marca como deletado, não remove do banco
     await usuario.destroy();
-    res.status(204).send();
+
+      // Registrar auditoria de deleção
+      await registrarAuditoria({
+        req,
+        acao: 'DELETE',
+        entidade: 'Usuario',
+        entidadeId: usuarioId,
+        dadosAnteriores: req.originalData,
+        nivelCritico: true,
+        detalhes: `Usuário ${usuario.nome} (${usuario.email}) marcado como deletado`
+      });
+
+      console.log(`[SEGURANÇA] Usuário deletado (soft delete): ${usuario.email} por ${req.user.email}`);
+      
+      res.json({ 
+        success: true,
+        message: 'Usuário excluído com sucesso.' 
+      });
   } catch (error) {
     console.error('Erro ao excluir usuário:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
-});
+  }
+);
 
 // Função para validar critérios de senha
 const validatePassword = (senha) => {
@@ -294,7 +412,7 @@ const validatePassword = (senha) => {
 };
 
 // POST /api/usuarios/:id/reset-password - Redefinir senha (apenas admin)
-router.post('/:id/reset-password', requireAuth, requireAdmin, async (req, res) => {
+router.post('/:id/reset-password', requireAuth, requireAdmin, strictRateLimiter, async (req, res) => {
   try {
     const { novaSenha } = req.body;
     const userId = req.params.id;
@@ -323,6 +441,16 @@ router.post('/:id/reset-password', requireAuth, requireAdmin, async (req, res) =
       deve_atualizar_senha: true
     });
 
+    // Registrar auditoria de reset de senha
+    await registrarAuditoria({
+      req,
+      acao: 'RESET_PASSWORD',
+      entidade: 'Usuario',
+      entidadeId: userId,
+      nivelCritico: true,
+      detalhes: `Senha redefinida para usuário: ${usuario.nome} (${usuario.email})`
+    });
+
     res.json({ message: 'Senha redefinida com sucesso.' });
   } catch (error) {
     console.error('Erro ao redefinir senha:', error);
@@ -331,14 +459,15 @@ router.post('/:id/reset-password', requireAuth, requireAdmin, async (req, res) =
 });
 
 // PATCH /api/usuarios/:id/toggle-status - Ativar/Desativar usuário (apenas admin)
-router.patch('/:id/toggle-status', requireAuth, requireAdmin, async (req, res) => {
+router.patch('/:id/toggle-status', requireAuth, requireAdmin, strictRateLimiter, salvarDadosOriginais(Usuario), async (req, res) => {
   try {
     const usuario = await Usuario.findByPk(req.params.id);
     if (!usuario) {
       return res.status(404).json({ error: 'Usuário não encontrado.' });
     }
 
-    await usuario.update({ ativo: !usuario.ativo });
+    const novoStatus = !usuario.ativo;
+    await usuario.update({ ativo: novoStatus });
 
     // Buscar usuário atualizado com associações
     const usuarioAtualizado = await Usuario.findByPk(req.params.id, {
@@ -347,6 +476,18 @@ router.patch('/:id/toggle-status', requireAuth, requireAdmin, async (req, res) =
         attributes: ['id', 'nome', 'descricao']
       },
       attributes: ['id', 'nome', 'email', 'ativo', 'createdAt', 'updatedAt']
+    });
+
+    // Registrar auditoria de mudança de status
+    await registrarAuditoria({
+      req,
+      acao: 'TOGGLE_STATUS',
+      entidade: 'Usuario',
+      entidadeId: req.params.id,
+      dadosAnteriores: req.originalData,
+      dadosNovos: { ativo: novoStatus },
+      nivelCritico: true,
+      detalhes: `Status do usuário ${usuario.nome} alterado para: ${novoStatus ? 'ATIVO' : 'INATIVO'}`
     });
 
     res.json({
