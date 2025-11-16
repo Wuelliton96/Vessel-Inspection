@@ -8,7 +8,7 @@ const fs = require('fs');
 // 's3' = Salvar na AWS S3 (futuro)
 const UPLOAD_STRATEGY = process.env.UPLOAD_STRATEGY || 'local';
 
-console.log(`📸 Estratégia de upload: ${UPLOAD_STRATEGY.toUpperCase()}`);
+console.log(`[UPLOAD] Estrategia: ${UPLOAD_STRATEGY.toUpperCase()}`);
 
 // ========== CONFIGURAÇÃO STORAGE LOCAL ==========
 const localStorage = multer.diskStorage({
@@ -20,7 +20,7 @@ const localStorage = multer.diskStorage({
     // Criar pasta automaticamente se não existir
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
-      console.log(`📁 Pasta criada: ${uploadDir}`);
+      console.log(`[UPLOAD] Pasta criada: ${uploadDir}`);
     }
     
     cb(null, uploadDir);
@@ -33,7 +33,7 @@ const localStorage = multer.diskStorage({
     const extension = path.extname(file.originalname);
     const filename = `foto-${timestamp}-${randomNum}${extension}`;
     
-    console.log(`📷 Salvando foto: ${filename}`);
+    console.log(`[UPLOAD] Salvando foto: ${filename}`);
     cb(null, filename);
   }
 });
