@@ -5,7 +5,7 @@ import { authService } from '../services/api';
 interface AuthContextType {
   usuario: Usuario | null;
   token: string | null;
-  login: (email: string, senha: string) => Promise<void>;
+  login: (cpf: string, senha: string) => Promise<void>;
   register: (nome: string, email: string, senha: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
@@ -43,9 +43,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(false);
   }, []);
 
-  const login = async (email: string, senha: string) => {
+  const login = async (cpf: string, senha: string) => {
     try {
-      const response = await authService.login({ email, senha });
+      const response = await authService.login({ cpf, senha });
       const { token: newToken, usuario: newUsuario } = response;
       
       setToken(newToken);
@@ -53,6 +53,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       localStorage.setItem('token', newToken);
       localStorage.setItem('usuario', JSON.stringify(newUsuario));
+      
+      // Marcar que o usuário acabou de fazer login (para mostrar alertas de novas vistorias)
+      sessionStorage.setItem('justLoggedIn', 'true');
+      // Limpar flag de alerta fechado ao fazer novo login
+      sessionStorage.removeItem('newVistoriaAlertDismissed');
     } catch (error: any) {
       console.error('Erro no login:', error);
       throw error;
@@ -80,6 +85,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUsuario(null);
     localStorage.removeItem('token');
     localStorage.removeItem('usuario');
+    // Limpar flags de sessão ao fazer logout
+    sessionStorage.removeItem('justLoggedIn');
+    sessionStorage.removeItem('newVistoriaAlertDismissed');
   };
 
   const isAuthenticated = !!token && !!usuario;

@@ -23,7 +23,7 @@ import {
   Phone,
   FileText
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Vistoria, Usuario, Embarcacao, Cliente, TipoPessoa } from '../types';
 import { vistoriaService, usuarioService, embarcacaoService, clienteService } from '../services/api';
 import { useAccessControl } from '../hooks/useAccessControl';
@@ -492,6 +492,7 @@ const LoadingIcon = styled.span`
 
 const Vistorias: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isAdmin } = useAccessControl();
   const [vistorias, setVistorias] = useState<Vistoria[]>([]);
   const [vistoriadores, setVistoriadores] = useState<Usuario[]>([]);
@@ -592,6 +593,22 @@ const Vistorias: React.FC = () => {
     corretora_telefone_e164: '',
     corretora_email_laudo: ''
   });
+
+  // Verificar se há parâmetro de vistoria criada
+  useEffect(() => {
+    const createdId = searchParams.get('created');
+    if (createdId) {
+      const vistoriaId = parseInt(createdId, 10);
+      if (!isNaN(vistoriaId)) {
+        setSuccess(`Vistoria criada com sucesso! ID: #${vistoriaId}`);
+        // Remover o parâmetro da URL após mostrar a mensagem
+        setTimeout(() => {
+          setSearchParams({});
+          setSuccess('');
+        }, 8000);
+      }
+    }
+  }, [searchParams, setSearchParams]);
 
   const loadData = useCallback(async () => {
     try {
@@ -1158,7 +1175,7 @@ const Vistorias: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           {isAdmin && (
-            <Button variant="primary" onClick={handleCreate} title="Criar nova vistoria (Admin)">
+            <Button variant="primary" onClick={() => navigate('/vistorias/nova')} title="Criar nova vistoria (Admin)">
               <Plus size={20} />
               Nova Vistoria
             </Button>
@@ -1307,6 +1324,7 @@ const Vistorias: React.FC = () => {
         <Table>
           <TableHeader>
             <tr>
+              <TableHeaderCell style={{ width: '80px' }}>ID</TableHeaderCell>
               <TableHeaderCell>Embarcação</TableHeaderCell>
               <TableHeaderCell>Local</TableHeaderCell>
               <TableHeaderCell>Vistoriador</TableHeaderCell>
@@ -1319,6 +1337,23 @@ const Vistorias: React.FC = () => {
           <TableBody>
             {filteredVistorias.map((vistoria) => (
               <TableRow key={vistoria.id} isAdmin={isAdmin}>
+                <TableCell>
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                    color: 'white',
+                    fontWeight: '700',
+                    fontSize: '0.875rem',
+                    padding: '0.375rem 0.75rem',
+                    borderRadius: '6px',
+                    minWidth: '60px',
+                    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
+                  }}>
+                    #{vistoria.id}
+                  </div>
+                </TableCell>
                 <TableCell>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <Ship size={20} color="#3b82f6" />
@@ -1579,7 +1614,7 @@ const Vistorias: React.FC = () => {
                         textAlign: 'left'
                       }}>
                         <p style={{ color: '#92400e', fontSize: '0.85rem', margin: '0 0 0.5rem 0', fontWeight: '600' }}>
-                          📋 Como proceder:
+                          Como proceder:
                         </p>
                         <ol style={{ color: '#92400e', fontSize: '0.85rem', margin: '0', paddingLeft: '1.5rem' }}>
                           <li>Clique em "Cadastrar Novo Cliente" (abrirá um formulário)</li>

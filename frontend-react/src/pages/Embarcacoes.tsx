@@ -10,7 +10,7 @@ import {
   AlertCircle,
   CheckCircle
 } from 'lucide-react';
-import { Embarcacao, TipoEmbarcacao, Seguradora, TipoEmbarcacaoSeguradora, Cliente } from '../types';
+import { Embarcacao, TipoEmbarcacao, Seguradora, TipoEmbarcacaoSeguradora, SeguradoraTipoEmbarcacao, Cliente } from '../types';
 import { embarcacaoService, seguradoraService, clienteService } from '../services/api';
 import { useAccessControl } from '../hooks/useAccessControl';
 import { 
@@ -388,7 +388,7 @@ const Embarcacoes: React.FC = () => {
   const { isAdmin } = useAccessControl();
   const [embarcacoes, setEmbarcacoes] = useState<Embarcacao[]>([]);
   const [seguradoras, setSeguradoras] = useState<Seguradora[]>([]);
-  const [tiposPermitidos, setTiposPermitidos] = useState<TipoEmbarcacaoSeguradora[]>([]);
+  const [tiposPermitidos, setTiposPermitidos] = useState<SeguradoraTipoEmbarcacao[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
   const [buscaCliente, setBuscaCliente] = useState('');
@@ -454,9 +454,10 @@ const Embarcacoes: React.FC = () => {
       const tipos = await seguradoraService.getTiposPermitidos(seguradoraId);
       setTiposPermitidos(tipos);
       // Limpar tipo selecionado se não estiver nos tipos permitidos
+      const tiposValores = tipos.map(t => t.tipo_embarcacao);
       setFormData(prev => ({
         ...prev,
-        tipo_embarcacao: tipos.includes(prev.tipo_embarcacao as any) ? prev.tipo_embarcacao : ''
+        tipo_embarcacao: tiposValores.includes(prev.tipo_embarcacao as TipoEmbarcacaoSeguradora) ? prev.tipo_embarcacao : ''
       }));
     } catch (err: any) {
       console.error('Erro ao carregar tipos permitidos:', err);
@@ -933,8 +934,8 @@ const Embarcacoes: React.FC = () => {
                         : 'Selecione o tipo'}
                   </option>
                   {tiposPermitidos.map((tipo) => (
-                    <option key={tipo} value={tipo}>
-                      {getLabelTipoEmbarcacaoSeguradora(tipo)}
+                    <option key={tipo.tipo_embarcacao} value={tipo.tipo_embarcacao}>
+                      {getLabelTipoEmbarcacaoSeguradora(tipo.tipo_embarcacao)}
                     </option>
                   ))}
                 </Select>

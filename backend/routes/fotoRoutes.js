@@ -444,6 +444,33 @@ router.post('/', upload.single('foto'), async (req, res) => {
             console.log(`[CHECKLIST]   - Status atual: ${checklistItem.status}`);
             console.log(`[CHECKLIST]   - Vistoria ID: ${checklistItem.vistoria_id}`);
             console.log(`[CHECKLIST]   - Foto ID atual: ${checklistItem.foto_id || 'null'}`);
+            
+            // Se já existe uma foto vinculada, deletar a foto antiga antes de vincular a nova
+            if (checklistItem.foto_id) {
+              console.log(`[CHECKLIST] ATENCAO: Item já possui foto vinculada (ID: ${checklistItem.foto_id})`);
+              console.log(`[CHECKLIST] Deletando foto antiga antes de vincular a nova...`);
+              
+              try {
+                const fotoAntiga = await Foto.findByPk(checklistItem.foto_id);
+                if (fotoAntiga) {
+                  console.log(`[CHECKLIST] Foto antiga encontrada: ID ${fotoAntiga.id}, URL: ${fotoAntiga.url_arquivo}`);
+                  
+                  // Deletar arquivo (S3 ou local)
+                  await deleteFile(fotoAntiga.url_arquivo);
+                  console.log(`[CHECKLIST] OK: Arquivo da foto antiga deletado`);
+                  
+                  // Deletar registro do banco
+                  await fotoAntiga.destroy();
+                  console.log(`[CHECKLIST] OK: Registro da foto antiga deletado do banco`);
+                } else {
+                  console.log(`[CHECKLIST] ATENCAO: Foto antiga (ID: ${checklistItem.foto_id}) não encontrada no banco`);
+                }
+              } catch (deleteError) {
+                console.error(`[CHECKLIST] ERRO ao deletar foto antiga:`, deleteError.message);
+                console.error(`[CHECKLIST] Continuando com o upload da nova foto...`);
+                // Continuar mesmo se falhar ao deletar a foto antiga
+              }
+            }
           } else {
             console.log(`[CHECKLIST] ATENCAO: Item do checklist ID ${itemIdInt} NÃO encontrado para vistoria ${vistoria_id}`);
             

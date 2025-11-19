@@ -263,19 +263,39 @@ router.post('/vistoria/:vistoria_id/copiar-template', requireAuth, requireVistor
 // GET /api/checklists/vistoria/:vistoria_id - Listar checklist da vistoria
 router.get('/vistoria/:vistoria_id', requireAuth, requireVistoriador, async (req, res) => {
   try {
+    console.log(`=== ROTA GET /api/checklists/vistoria/${req.params.vistoria_id} ===`);
+    console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
+    
     const itens = await VistoriaChecklistItem.findAll({
       where: { vistoria_id: req.params.vistoria_id },
       include: [{
         model: Foto,
         as: 'foto',
         required: false,
-        attributes: ['id', 'url_arquivo', 'observacao', 'created_at']
+        attributes: ['id', 'url_arquivo', 'observacao', 'created_at', 'vistoria_id']
       }],
       order: [['ordem', 'ASC']]
     });
     
     console.log(`Checklist da vistoria ${req.params.vistoria_id}: ${itens.length} itens`);
-    res.json(itens);
+    
+    // Adicionar url_completa para cada foto
+    const { getFullPath } = require('../services/uploadService');
+    const itensComUrlCompleta = itens.map(item => {
+      const itemObj = item.toJSON();
+      if (itemObj.foto) {
+        itemObj.foto.url_completa = getFullPath(itemObj.foto.url_arquivo, parseInt(req.params.vistoria_id));
+        console.log(`  Item "${itemObj.nome}" - Foto ID: ${itemObj.foto.id}, URL: ${itemObj.foto.url_completa}`);
+      }
+      return itemObj;
+    });
+    
+    const itensComFoto = itensComUrlCompleta.filter(item => item.foto);
+    console.log(`  Itens com foto: ${itensComFoto.length}`);
+    console.log(`  Itens concluídos: ${itensComUrlCompleta.filter(i => i.status === 'CONCLUIDO').length}`);
+    console.log(`=== FIM ROTA GET /api/checklists/vistoria/${req.params.vistoria_id} ===\n`);
+    
+    res.json(itensComUrlCompleta);
   } catch (error) {
     console.error('Erro ao listar checklist:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });

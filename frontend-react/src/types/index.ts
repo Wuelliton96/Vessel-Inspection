@@ -2,12 +2,12 @@
 export interface Usuario {
   id: number;
   nome: string;
-  email: string;
+  email: string | null;
+  cpf: string;
   nivelAcessoId: number;
   nivelAcesso?: NivelAcesso;
   ativo: boolean;
   deveAtualizarSenha?: boolean;
-  cpf?: string | null;
   telefone_e164?: string | null;
   estado?: string | null;
   createdAt: string;
@@ -412,7 +412,7 @@ export interface AuthResponse {
 }
 
 export interface LoginRequest {
-  email: string;
+  cpf: string;
   senha: string;
 }
 

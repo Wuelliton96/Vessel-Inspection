@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, LoginRequest, RegisterRequest, Usuario, Embarcacao, Local, Vistoria, ChecklistStatus, LotePagamento, VistoriaLotePagamento, Seguradora, TipoEmbarcacaoSeguradora, Cliente, ChecklistTemplate, VistoriaChecklistItem, ChecklistProgresso, StatusChecklistItem } from '../types';
+import { AuthResponse, LoginRequest, RegisterRequest, Usuario, Embarcacao, Local, Vistoria, ChecklistStatus, LotePagamento, VistoriaLotePagamento, Seguradora, TipoEmbarcacaoSeguradora, SeguradoraTipoEmbarcacao, Cliente, ChecklistTemplate, VistoriaChecklistItem, ChecklistProgresso, StatusChecklistItem } from '../types';
 
 import { API_CONFIG } from '../config/api';
 
@@ -23,7 +23,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 && !window.location.pathname.includes('/login')) {
+    // Não fazer logout em erros 401 específicos que são erros de validação (como senha incorreta)
+    const isChangePasswordError = error.config?.url?.includes('/change-password');
+    
+    if (error.response?.status === 401 && !window.location.pathname.includes('/login') && !isChangePasswordError) {
       localStorage.removeItem('token');
       localStorage.removeItem('usuario');
       window.location.href = '/login';
@@ -37,7 +40,7 @@ export const authService = {
     try {
       console.log('[authService] Iniciando login...');
       console.log('[authService] API Base URL:', API_BASE_URL);
-      console.log('[authService] Credentials:', { email: credentials.email, senha: '***' });
+      console.log('[authService] Credentials:', { cpf: credentials.cpf ? '***' : 'vazio', senha: '***' });
       
       const response = await api.post('/api/auth/login', credentials);
       console.log('[authService] Resposta recebida:', response.status);
@@ -59,7 +62,8 @@ export const authService = {
         usuario: {
           id: data.user.id,
           nome: data.user.nome,
-          email: data.user.email,
+          email: data.user.email || null,
+          cpf: data.user.cpf,
           nivelAcessoId: data.user.nivelAcessoId,
           nivelAcesso: {
             id: data.user.nivelAcessoId,
@@ -89,7 +93,8 @@ export const authService = {
       usuario: {
         id: data.user.id,
         nome: data.user.nome,
-        email: data.user.email,
+        email: data.user.email || null,
+        cpf: data.user.cpf || '',
         nivelAcessoId: data.user.nivelAcessoId,
         nivelAcesso: {
           id: data.user.nivelAcessoId,
@@ -111,7 +116,8 @@ export const authService = {
     return {
       id: data.user.id,
       nome: data.user.nome,
-      email: data.user.email,
+      email: data.user.email || null,
+      cpf: data.user.cpf || '',
       nivelAcessoId: data.user.nivelAcessoId,
       nivelAcesso: {
         id: data.user.nivelAcessoId,
@@ -129,7 +135,28 @@ export const authService = {
       token,
       novaSenha
     });
-    return response.data;
+    const data = response.data;
+    
+    // Converter a resposta do backend para o formato esperado pelo AuthContext
+    return {
+      token: data.token,
+      usuario: {
+        id: data.user.id,
+        nome: data.user.nome,
+        email: data.user.email || null,
+        cpf: data.user.cpf || '',
+        nivelAcessoId: data.user.nivelAcessoId,
+        nivelAcesso: {
+          id: data.user.nivelAcessoId,
+          nome: data.user.nivelAcesso,
+          descricao: ''
+        },
+        ativo: true,
+        deveAtualizarSenha: data.user.deveAtualizarSenha || false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    };
   },
 
   changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {
@@ -270,7 +297,7 @@ export const vistoriaService = {
   },
 
   getByVistoriador: async (): Promise<Vistoria[]> => {
-    const response = await api.get('/api/vistorias/vistoriador');
+    const response = await api.get('/api/vistoriador/vistorias');
     return response.data;
   },
 
@@ -444,6 +471,28 @@ export const pagamentoService = {
   }> => {
     const response = await api.get('/api/pagamentos/resumo/geral', { params });
     return response.data;
+  },
+
+  getResumoFinanceiro: async (): Promise<{
+    recebido: {
+      total: number;
+      quantidade: number;
+      mes: {
+        total: number;
+        quantidade: number;
+      };
+    };
+    pendente: {
+      total: number;
+      quantidade: number;
+      mes: {
+        total: number;
+        quantidade: number;
+      };
+    };
+  }> => {
+    const response = await api.get('/api/vistoriador/financeiro');
+    return response.data;
   }
 };
 
@@ -460,9 +509,26 @@ export const seguradoraService = {
     return response.data;
   },
 
-  getTiposPermitidos: async (id: number): Promise<TipoEmbarcacaoSeguradora[]> => {
+  getTiposPermitidos: async (id: number): Promise<SeguradoraTipoEmbarcacao[]> => {
     const response = await api.get(`/api/seguradoras/${id}/tipos-permitidos`);
-    return response.data;
+    const data = response.data;
+    
+    // O backend retorna um array de strings, precisamos converter para objetos
+    if (Array.isArray(data) && data.length > 0) {
+      // Se for array de strings
+      if (typeof data[0] === 'string') {
+        return data.map((tipo: string) => ({
+          id: 0, // Não temos o ID do relacionamento
+          seguradora_id: id,
+          tipo_embarcacao: tipo as TipoEmbarcacaoSeguradora,
+          createdAt: new Date().toISOString()
+        }));
+      }
+      // Se já for array de objetos, retornar como está
+      return data;
+    }
+    
+    return [];
   },
 
   create: async (data: { 

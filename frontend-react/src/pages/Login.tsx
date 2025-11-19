@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useAuth } from '../contexts/AuthContext';
 import { Ship, Eye, EyeOff, LogIn, AlertCircle, CheckCircle, Info } from 'lucide-react';
+import { validarCPF, limparCPF, mascaraCPF } from '../utils/validators';
 
 const LoginContainer = styled.div`
   min-height: 100vh;
@@ -250,14 +252,15 @@ const InfoMessage = styled.div`
 `;
 
 const Login: React.FC = () => {
-  const [email, setEmail] = useState('');
+  const [cpf, setCpf] = useState('');
   const [senha, setSenha] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [messageType, setMessageType] = useState<'error' | 'success' | 'info' | null>(null);
 
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, usuario } = useAuth();
+  const navigate = useNavigate();
 
   const clearErrorMessages = () => {
     setError('');
@@ -273,18 +276,26 @@ const Login: React.FC = () => {
     }
   }, [isAuthenticated, error, messageType]);
 
+  // Verificar se o usuário precisa atualizar senha após login
+  useEffect(() => {
+    if (isAuthenticated && usuario && usuario.deveAtualizarSenha === true) {
+      // Redirecionar para página de atualização de senha
+      navigate('/password-update');
+    }
+  }, [isAuthenticated, usuario, navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log('Iniciando processo de login...');
-    console.log('Email:', email);
+    console.log('CPF:', cpf ? '***' : 'vazio');
     console.log('Senha:', senha ? '***' : 'vazia');
     
     setLoading(true);
     clearErrorMessages();
 
     // Validações básicas no frontend
-    if (!email.trim()) {
-      setError('Por favor, digite seu email');
+    if (!cpf.trim()) {
+      setError('Por favor, digite seu CPF');
       setMessageType('error');
       setLoading(false);
       return;
@@ -297,10 +308,10 @@ const Login: React.FC = () => {
       return;
     }
 
-    // Validar formato do email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setError('Por favor, digite um email válido');
+    // Validar CPF
+    const cpfLimpo = limparCPF(cpf);
+    if (!validarCPF(cpfLimpo)) {
+      setError('Por favor, digite um CPF válido');
       setMessageType('error');
       setLoading(false);
       return;
@@ -308,14 +319,17 @@ const Login: React.FC = () => {
 
     try {
       console.log('Chamando função login...');
-      await login(email, senha);
+      await login(cpfLimpo, senha);
       console.log('Login realizado com sucesso!');
       
-      // Mostrar mensagem de sucesso brevemente antes do redirecionamento
+      // O useEffect vai verificar se precisa atualizar senha
+      // Se não precisar, continuar normalmente
+      const usuarioAtual = JSON.parse(localStorage.getItem('usuario') || '{}');
+      if (!usuarioAtual.deveAtualizarSenha) {
       setError('Login realizado com sucesso! Redirecionando...');
       setMessageType('success');
-      
-      // Não fazer mais nada aqui - deixar o sistema redirecionar automaticamente
+      }
+      // Se precisar atualizar, o modal será aberto pelo useEffect
       
     } catch (err: any) {
       console.error('Erro no login:', err);
@@ -340,18 +354,31 @@ const Login: React.FC = () => {
         }
 
         // Tratar códigos específicos
-        if (backendError.code === 'EMAIL_NAO_ENCONTRADO') {
-          errorMessage = 'Email não encontrado no sistema. Verifique se digitou corretamente ou entre em contato com o administrador.';
+        if (backendError.code === 'CPF_NAO_ENCONTRADO' || backendError.code === 'EMAIL_NAO_ENCONTRADO') {
+          errorMessage = 'CPF não encontrado no sistema. Verifique se digitou corretamente ou entre em contato com o administrador.';
           messageType = 'error';
         } else if (backendError.code === 'SENHA_INCORRETA') {
           errorMessage = 'Senha incorreta. Por favor, verifique sua senha e tente novamente. Se esqueceu sua senha, entre em contato com o administrador.';
           messageType = 'error';
-        } else if (backendError.code === 'CAMPOS_OBRIGATORIOS') {
-          errorMessage = 'Por favor, preencha o email e a senha para continuar.';
+        } else if (backendError.code === 'CAMPOS_OBRIGATORIOS' || backendError.code === 'VALIDACAO_FALHOU') {
+          // Pegar a mensagem específica dos detalhes
+          if (backendError.details && backendError.details.length > 0) {
+            errorMessage = backendError.details[0].msg || backendError.message || 'Por favor, verifique os dados informados.';
+          } else {
+            errorMessage = backendError.message || 'Por favor, preencha o CPF e a senha para continuar.';
+          }
           messageType = 'error';
-        } else if (backendError.code === 'EMAIL_INVALIDO') {
-          errorMessage = 'Por favor, digite um email válido no formato: exemplo@email.com';
+        } else if (backendError.code === 'CPF_INVALIDO' || backendError.code === 'EMAIL_INVALIDO') {
+          errorMessage = 'Por favor, digite um CPF válido.';
           messageType = 'error';
+        }
+        
+        // Verificar se é erro de validação (cpf deve ter 11 dígitos, etc)
+        if (backendError.details && Array.isArray(backendError.details)) {
+          const cpfError = backendError.details.find((d: any) => d.param === 'cpf');
+          if (cpfError) {
+            errorMessage = cpfError.msg || 'CPF inválido. Verifique se digitou corretamente.';
+          }
         }
       } else if (err.message) {
         if (err.message.includes('Network Error') || err.message.includes('fetch')) {
@@ -391,10 +418,10 @@ const Login: React.FC = () => {
               <AlertCircle size={20} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: '700', marginBottom: '0.5rem', fontSize: '1rem' }}>
-                  {error.includes('Email não encontrado') ? 'Email não encontrado' : 
+                  {error.includes('CPF não encontrado') || error.includes('Email não encontrado') ? 'CPF não encontrado' : 
                    error.includes('Senha incorreta') ? 'Senha incorreta' : 
                    error.includes('preencha') ? 'Campos obrigatórios' :
-                   error.includes('email válido') ? 'Email inválido' :
+                   error.includes('CPF válido') || error.includes('email válido') ? 'CPF inválido' :
                    'Erro no login'}
                 </div>
                 <div style={{ fontSize: '0.875rem', lineHeight: '1.5' }}>
@@ -419,17 +446,19 @@ const Login: React.FC = () => {
           )}
           
           <FormGroup>
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="cpf">CPF</Label>
             <Input
-              id="email"
-              type="email"
-              value={email}
+              id="cpf"
+              type="text"
+              value={cpf}
               onChange={(e) => {
-                setEmail(e.target.value);
+                const valor = mascaraCPF(e.target.value);
+                setCpf(valor);
                 clearErrorMessages();
               }}
               required
-              placeholder="seu@email.com"
+              placeholder="000.000.000-00"
+              maxLength={14}
             />
           </FormGroup>
 
@@ -477,7 +506,7 @@ const Login: React.FC = () => {
               Problemas para entrar?
             </div>
             <div style={{ fontSize: '0.8rem' }}>
-              <div style={{ marginBottom: '0.25rem' }}>• Verifique se o email está digitado corretamente</div>
+              <div style={{ marginBottom: '0.25rem' }}>• Verifique se o CPF está digitado corretamente</div>
               <div style={{ marginBottom: '0.25rem' }}>• Confirme se a senha está correta (diferencia maiúsculas/minúsculas)</div>
               <div style={{ marginBottom: '0.25rem' }}>• Se esqueceu sua senha, entre em contato com o administrador</div>
               <div>• Caso o problema persista, solicite suporte ao administrador do sistema</div>

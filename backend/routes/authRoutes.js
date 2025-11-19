@@ -7,6 +7,7 @@ const { requireAuth, requireAdmin, requireAuthAllowPasswordUpdate } = require('.
 const { loginValidation, registerValidation } = require('../middleware/validator');
 const { loginRateLimiter } = require('../middleware/rateLimiting');
 const { registrarAuditoria } = require('../middleware/auditoria');
+const { validarCPF, limparCPF } = require('../utils/validators');
 
 router.post('/register', registerValidation, async (req, res) => {
   try {
@@ -48,6 +49,7 @@ router.post('/register', registerValidation, async (req, res) => {
 
     const tokenPayload = {
       userId: usuarioCompleto.id,
+      cpf: usuarioCompleto.cpf,
       email: usuarioCompleto.email,
       nome: usuarioCompleto.nome,
       nivelAcesso: usuarioCompleto.NivelAcesso.nome,
@@ -66,6 +68,7 @@ router.post('/register', registerValidation, async (req, res) => {
         id: usuarioCompleto.id,
         nome: usuarioCompleto.nome,
         email: usuarioCompleto.email,
+        cpf: usuarioCompleto.cpf,
         nivelAcesso: usuarioCompleto.NivelAcesso.nome,
         nivelAcessoId: usuarioCompleto.NivelAcesso.id
       }
@@ -92,31 +95,32 @@ router.post('/login', loginRateLimiter, loginValidation, async (req, res) => {
   try {
     console.log('[AUTH] Requisição de login recebida');
     console.log('[AUTH] Origin:', req.headers.origin);
-    console.log('[AUTH] Body:', { email: req.body.email, senha: req.body.senha ? '***' : 'vazio' });
+    console.log('[AUTH] Body:', { cpf: req.body.cpf ? '***' : 'vazio', senha: req.body.senha ? '***' : 'vazio' });
     
-    const { email, senha } = req.body;
+    const { cpf, senha } = req.body;
 
-    if (!email || !senha) {
+    if (!cpf || !senha) {
       console.log('[AUTH] Campos obrigatórios faltando');
       return res.status(400).json({ 
         error: 'Campos obrigatórios',
-        message: 'Por favor, preencha o email e a senha para continuar.',
+        message: 'Por favor, preencha o CPF e a senha para continuar.',
         code: 'CAMPOS_OBRIGATORIOS'
       });
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    // Limpar e validar CPF
+    const cpfLimpo = limparCPF(cpf);
+    if (!validarCPF(cpfLimpo)) {
       return res.status(400).json({ 
-        error: 'Email inválido',
-        message: 'Por favor, digite um email válido no formato: exemplo@email.com',
-        code: 'EMAIL_INVALIDO'
+        error: 'CPF inválido',
+        message: 'Por favor, digite um CPF válido.',
+        code: 'CPF_INVALIDO'
       });
     }
 
-    console.log('[AUTH] Buscando usuário no banco...');
+    console.log('[AUTH] Buscando usuário no banco pelo CPF...');
     const usuario = await Usuario.findOne({
-      where: { email: email.toLowerCase() },
+      where: { cpf: cpfLimpo },
       include: {
         model: NivelAcesso,
         attributes: ['id', 'nome', 'descricao']
@@ -124,7 +128,7 @@ router.post('/login', loginRateLimiter, loginValidation, async (req, res) => {
     });
 
     if (!usuario) {
-      console.log('[AUTH] ERRO - Usuário não encontrado:', email.toLowerCase());
+      console.log('[AUTH] ERRO - Usuário não encontrado com CPF:', cpfLimpo);
       
       // Registrar tentativa de login falhada
       await registrarAuditoria({
@@ -132,24 +136,24 @@ router.post('/login', loginRateLimiter, loginValidation, async (req, res) => {
         acao: 'LOGIN_FAILED',
         entidade: 'Usuario',
         nivelCritico: true,
-        detalhes: `Tentativa de login com email não cadastrado: ${email.toLowerCase()}`
+        detalhes: `Tentativa de login com CPF não cadastrado: ${cpfLimpo}`
       });
       
       return res.status(401).json({ 
         error: 'Credenciais inválidas',
-        message: 'Email não encontrado no sistema. Verifique se digitou corretamente ou entre em contato com o administrador.',
-        code: 'EMAIL_NAO_ENCONTRADO'
+        message: 'CPF não encontrado no sistema. Verifique se digitou corretamente ou entre em contato com o administrador.',
+        code: 'CPF_NAO_ENCONTRADO'
       });
     }
 
-    console.log('[AUTH] OK - Usuário encontrado:', usuario.email);
+    console.log('[AUTH] OK - Usuário encontrado:', usuario.nome, '(CPF:', cpfLimpo, ')');
     console.log('[AUTH] Verificando senha...');
     
     const senhaValida = await bcrypt.compare(senha, usuario.senha_hash);
     console.log('[AUTH] Senha válida?', senhaValida ? 'SIM' : 'NAO');
     
     if (!senhaValida) {
-      console.log('[AUTH] ERRO - Senha incorreta para:', usuario.email);
+      console.log('[AUTH] ERRO - Senha incorreta para CPF:', cpfLimpo);
       
       // Registrar tentativa de login falhada
       await registrarAuditoria({
@@ -158,7 +162,7 @@ router.post('/login', loginRateLimiter, loginValidation, async (req, res) => {
         entidade: 'Usuario',
         entidadeId: usuario.id,
         nivelCritico: true,
-        detalhes: `Tentativa de login com senha incorreta para: ${usuario.email}`
+        detalhes: `Tentativa de login com senha incorreta para CPF: ${cpfLimpo}`
       });
       
       return res.status(401).json({ 
@@ -170,6 +174,7 @@ router.post('/login', loginRateLimiter, loginValidation, async (req, res) => {
 
     const tokenPayload = {
       userId: usuario.id,
+      cpf: usuario.cpf,
       email: usuario.email,
       nome: usuario.nome,
       nivelAcesso: usuario.NivelAcesso.nome,
@@ -180,7 +185,7 @@ router.post('/login', loginRateLimiter, loginValidation, async (req, res) => {
       expiresIn: '24h'
     });
 
-    console.log('[AUTH] Login bem-sucedido para:', usuario.email);
+    console.log('[AUTH] Login bem-sucedido para:', usuario.nome, '(CPF:', cpfLimpo, ')');
 
     // Registrar login bem-sucedido
     await registrarAuditoria({
@@ -189,7 +194,7 @@ router.post('/login', loginRateLimiter, loginValidation, async (req, res) => {
       entidade: 'Usuario',
       entidadeId: usuario.id,
       nivelCritico: false,
-      detalhes: `Login bem-sucedido: ${usuario.nome} (${usuario.email})`
+      detalhes: `Login bem-sucedido: ${usuario.nome} (CPF: ${cpfLimpo})`
     });
 
     res.json({
@@ -200,6 +205,7 @@ router.post('/login', loginRateLimiter, loginValidation, async (req, res) => {
         id: usuario.id,
         nome: usuario.nome,
         email: usuario.email,
+        cpf: usuario.cpf,
         nivelAcesso: usuario.NivelAcesso.nome,
         nivelAcessoId: usuario.NivelAcesso.id,
         deveAtualizarSenha: usuario.deve_atualizar_senha
@@ -219,6 +225,7 @@ router.get('/me', requireAuth, async (req, res) => {
         id: req.user.id,
         nome: req.user.nome,
         email: req.user.email,
+        cpf: req.user.cpf,
         nivelAcesso: req.user.NivelAcesso.nome,
         nivelAcessoId: req.user.NivelAcesso.id,
         nivelAcessoDescricao: req.user.NivelAcesso.descricao
@@ -321,14 +328,22 @@ router.put('/change-password', requireAuthAllowPasswordUpdate, async (req, res) 
       return res.status(400).json({ error: 'Senha atual e nova senha são obrigatórias.' });
     }
 
-    if (novaSenha.length < 6) {
-      return res.status(400).json({ error: 'Nova senha deve ter pelo menos 6 caracteres.' });
+    // Validar critérios da nova senha primeiro (antes de verificar senha atual)
+    const senhaValidation = validatePassword(novaSenha);
+    if (!senhaValidation.isValid) {
+      return res.status(400).json({ 
+        error: 'Senha não atende aos critérios',
+        details: senhaValidation.errors
+      });
     }
 
-    // Verificar senha atual
+    // Verificar senha atual (retornar 400 ao invés de 401 para não fazer logout)
     const senhaAtualValida = await bcrypt.compare(senhaAtual, req.user.senha_hash);
     if (!senhaAtualValida) {
-      return res.status(401).json({ error: 'Senha atual incorreta.' });
+      return res.status(400).json({ 
+        error: 'Senha atual incorreta',
+        message: 'A senha atual informada está incorreta. Verifique e tente novamente.'
+      });
     }
 
     // Hash da nova senha
@@ -401,6 +416,7 @@ router.put('/force-password-update', async (req, res) => {
     // Gerar novo token
     const tokenPayload = {
       userId: usuario.id,
+      cpf: usuario.cpf,
       email: usuario.email,
       nome: usuario.nome,
       nivelAcesso: usuario.NivelAcesso.nome,
@@ -419,8 +435,10 @@ router.put('/force-password-update', async (req, res) => {
         id: usuario.id,
         nome: usuario.nome,
         email: usuario.email,
+        cpf: usuario.cpf,
         nivelAcesso: usuario.NivelAcesso.nome,
-        nivelAcessoId: usuario.NivelAcesso.id
+        nivelAcessoId: usuario.NivelAcesso.id,
+        deveAtualizarSenha: false
       }
     });
   } catch (error) {

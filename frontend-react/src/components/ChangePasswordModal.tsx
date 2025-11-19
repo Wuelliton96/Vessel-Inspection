@@ -328,12 +328,22 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
         onClose();
       }, 1500);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.error || 'Erro ao alterar senha';
-      if (errorMessage.includes('incorreta') || errorMessage.includes('inválida') || errorMessage.includes('atual')) {
+      // Não fechar o modal em caso de erro - manter aberto para o usuário tentar novamente
+      const errorResponse = err.response?.data;
+      const errorMessage = errorResponse?.message || errorResponse?.error || 'Erro ao alterar senha';
+      
+      // Mensagens mais específicas baseadas no erro
+      if (errorMessage.toLowerCase().includes('atual') || errorMessage.toLowerCase().includes('incorreta')) {
         setError('Senha atual incorreta. Verifique e tente novamente.');
+      } else if (errorResponse?.details && Array.isArray(errorResponse.details)) {
+        // Se houver detalhes de validação, mostrar os critérios não atendidos
+        setError(`Senha não atende aos critérios: ${errorResponse.details.join(', ')}`);
       } else {
         setError(errorMessage);
       }
+      
+      // Limpar apenas a senha atual em caso de erro, mantendo os outros campos
+      setCurrentPassword('');
     }
   };
 

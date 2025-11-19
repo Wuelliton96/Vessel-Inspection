@@ -1,7 +1,7 @@
 // backend/routes/vistoriadorRoutes.js
 const express = require('express');
 const router = express.Router();
-const { Vistoria, Embarcacao, Local, StatusVistoria, Usuario, Foto, TipoFotoChecklist, Cliente } = require('../models');
+const { Vistoria, Embarcacao, Local, StatusVistoria, Usuario, Foto, TipoFotoChecklist, Cliente, LotePagamento, VistoriaLotePagamento } = require('../models');
 const { requireAuth, requireVistoriador } = require('../middleware/auth');
 
 // Aplicar middleware de autenticação em todas as rotas
@@ -14,9 +14,19 @@ router.get('/vistorias', async (req, res) => {
     console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
     console.log('Nível de acesso:', req.user?.NivelAcesso?.nome);
     
+    // Buscar status EM_ANDAMENTO e CONCLUIDA
+    const statusEmAndamento = await StatusVistoria.findOne({ where: { nome: 'EM_ANDAMENTO' } });
+    const statusConcluida = await StatusVistoria.findOne({ where: { nome: 'CONCLUIDA' } });
+    
+    const statusIds = [];
+    if (statusEmAndamento) statusIds.push(statusEmAndamento.id);
+    if (statusConcluida) statusIds.push(statusConcluida.id);
+    
+    // Filtrar apenas vistorias que foram iniciadas (EM_ANDAMENTO ou CONCLUIDA)
     const vistorias = await Vistoria.findAll({
       where: {
-        vistoriador_id: req.user.id
+        vistoriador_id: req.user.id,
+        status_id: statusIds.length > 0 ? statusIds : [0] // Se não encontrar status, retorna vazio
       },
       include: [
         { model: Embarcacao, as: 'Embarcacao' },
@@ -348,6 +358,146 @@ router.get('/vistorias/:id/checklist-status', async (req, res) => {
     });
   } catch (error) {
     console.error('Erro ao verificar status do checklist:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// GET /api/vistoriador/financeiro - Resumo financeiro do vistoriador
+router.get('/financeiro', async (req, res) => {
+  try {
+    console.log('=== ROTA GET /api/vistoriador/financeiro ===');
+    console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
+    
+    const { Op } = require('sequelize');
+    
+    const vistoriadorId = req.user.id;
+    
+    // Data de início e fim do mês atual
+    const agora = new Date();
+    const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
+    const fimMes = new Date(agora.getFullYear(), agora.getMonth() + 1, 0, 23, 59, 59);
+    
+    // 1. Pagamentos já recebidos (lotes PAGO)
+    const lotesPagos = await LotePagamento.findAll({
+      where: {
+        vistoriador_id: vistoriadorId,
+        status: 'PAGO'
+      },
+      include: [{
+        model: VistoriaLotePagamento,
+        as: 'vistoriasLote',
+        include: [{
+          model: Vistoria,
+          as: 'vistoria',
+          attributes: ['id']
+        }]
+      }]
+    });
+    
+    const totalRecebido = lotesPagos.reduce((sum, lote) => sum + parseFloat(lote.valor_total || 0), 0);
+    const quantidadeRecebida = lotesPagos.reduce((sum, lote) => sum + (lote.vistoriasLote?.length || 0), 0);
+    
+    // Pagamentos do mês atual
+    const lotesMesAtual = lotesPagos.filter(lote => {
+      const dataPagamento = new Date(lote.data_pagamento || lote.updated_at);
+      return dataPagamento >= inicioMes && dataPagamento <= fimMes;
+    });
+    
+    const totalRecebidoMes = lotesMesAtual.reduce((sum, lote) => sum + parseFloat(lote.valor_total || 0), 0);
+    const quantidadeRecebidaMes = lotesMesAtual.reduce((sum, lote) => sum + (lote.vistoriasLote?.length || 0), 0);
+    
+    // 2. Pagamentos pendentes (vistorias concluídas mas não pagas)
+    const statusConcluida = await StatusVistoria.findOne({ where: { nome: 'CONCLUIDA' } });
+    
+    if (!statusConcluida) {
+      return res.json({
+        recebido: {
+          total: 0,
+          quantidade: 0,
+          mes: {
+            total: 0,
+            quantidade: 0
+          }
+        },
+        pendente: {
+          total: 0,
+          quantidade: 0,
+          mes: {
+            total: 0,
+            quantidade: 0
+          }
+        }
+      });
+    }
+    
+    // Buscar vistorias concluídas do vistoriador que têm valor_vistoriador
+    const vistoriasConcluidas = await Vistoria.findAll({
+      where: {
+        vistoriador_id: vistoriadorId,
+        status_id: statusConcluida.id,
+        valor_vistoriador: {
+          [Op.not]: null,
+          [Op.gt]: 0
+        }
+      },
+      attributes: ['id', 'valor_vistoriador', 'data_conclusao']
+    });
+    
+    // Buscar vistorias que já estão em lotes PAGO ou PENDENTE
+    const vistoriasJaPagas = await VistoriaLotePagamento.findAll({
+      include: [{
+        model: LotePagamento,
+        as: 'lotePagamento',
+        where: {
+          status: ['PAGO', 'PENDENTE']
+        }
+      }],
+      attributes: ['vistoria_id']
+    });
+    
+    const idsJaPagos = vistoriasJaPagas.map(v => v.vistoria_id);
+    
+    // Filtrar vistorias não pagas
+    const vistoriasPendentes = vistoriasConcluidas.filter(v => !idsJaPagos.includes(v.id));
+    
+    const totalPendente = vistoriasPendentes.reduce((sum, v) => sum + parseFloat(v.valor_vistoriador || 0), 0);
+    const quantidadePendente = vistoriasPendentes.length;
+    
+    // Pendentes do mês atual
+    const vistoriasPendentesMes = vistoriasPendentes.filter(v => {
+      if (!v.data_conclusao) return false;
+      const dataConclusao = new Date(v.data_conclusao);
+      return dataConclusao >= inicioMes && dataConclusao <= fimMes;
+    });
+    
+    const totalPendenteMes = vistoriasPendentesMes.reduce((sum, v) => sum + parseFloat(v.valor_vistoriador || 0), 0);
+    const quantidadePendenteMes = vistoriasPendentesMes.length;
+    
+    const resultado = {
+      recebido: {
+        total: totalRecebido,
+        quantidade: quantidadeRecebida,
+        mes: {
+          total: totalRecebidoMes,
+          quantidade: quantidadeRecebidaMes
+        }
+      },
+      pendente: {
+        total: totalPendente,
+        quantidade: quantidadePendente,
+        mes: {
+          total: totalPendenteMes,
+          quantidade: quantidadePendenteMes
+        }
+      }
+    };
+    
+    console.log('Resumo financeiro:', JSON.stringify(resultado, null, 2));
+    console.log('=== FIM ROTA GET /api/vistoriador/financeiro ===\n');
+    
+    res.json(resultado);
+  } catch (error) {
+    console.error('Erro ao buscar resumo financeiro:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });

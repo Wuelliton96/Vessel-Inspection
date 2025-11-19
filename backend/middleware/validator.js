@@ -4,9 +4,12 @@ const { body, validationResult } = require('express-validator');
 const validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    const firstError = errors.array()[0];
     return res.status(400).json({ 
-      error: 'Dados invalidos',
-      details: errors.array() 
+      error: firstError.msg || 'Dados invalidos',
+      message: firstError.msg || 'Por favor, verifique os dados informados.',
+      details: errors.array(),
+      code: 'VALIDACAO_FALHOU'
     });
   }
   next();
@@ -25,12 +28,19 @@ const sanitizeString = (str) => {
 
 // Validacoes comuns
 const loginValidation = [
-  body('email')
-    .isEmail()
-    .withMessage('Email invalido')
-    .normalizeEmail()
+  body('cpf')
+    .notEmpty()
+    .withMessage('CPF é obrigatório')
     .trim()
-    .escape(),
+    .custom((value) => {
+      // Remover caracteres não numéricos
+      const cpfLimpo = value.replace(/\D/g, '');
+      // Validar que tem 11 dígitos
+      if (cpfLimpo.length !== 11) {
+        throw new Error('CPF deve ter 11 dígitos');
+      }
+      return true;
+    }),
   body('senha')
     .isLength({ min: 6 })
     .withMessage('Senha deve ter no minimo 6 caracteres')

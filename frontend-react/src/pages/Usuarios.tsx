@@ -11,11 +11,14 @@ import {
   Users,
   Shield,
   Eye,
-  EyeOff
+  EyeOff,
+  Phone,
+  MapPin
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { usuarioService } from '../services/api';
 import { Usuario } from '../types';
+import { formatarTelefone, mascaraTelefone, converterParaE164, validarCPF, limparCPF, mascaraCPF, formatarCPF } from '../utils/validators';
 
 const Container = styled.div`
   display: flex;
@@ -167,6 +170,12 @@ const UserInfo = styled.div`
   align-items: center;
   gap: 1rem;
   flex: 1;
+  flex-wrap: wrap;
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 `;
 
 const UserName = styled.h3`
@@ -182,6 +191,24 @@ const UserEmail = styled.p`
   font-size: 0.9rem;
   margin: 0;
   min-width: 200px;
+`;
+
+const UserContact = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #6b7280;
+  font-size: 0.85rem;
+  min-width: 150px;
+`;
+
+const UserLocation = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #6b7280;
+  font-size: 0.85rem;
+  min-width: 80px;
 `;
 
 const UserRole = styled.div<{ role: string }>`
@@ -419,17 +446,39 @@ const Usuarios: React.FC = () => {
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
+    cpf: '',
     senha: '',
     nivelAcessoId: 2,
-    ativo: true
+    ativo: true,
+    telefone_e164: '',
+    estado: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState('');
+  const [cpfError, setCpfError] = useState('');
 
   // Função para validar email
   const validateEmail = (email: string): boolean => {
+    if (!email || email.trim() === '') return true; // Email é opcional agora
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
+  };
+
+  // Função para validar CPF
+  const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const valor = mascaraCPF(e.target.value);
+    setFormData({ ...formData, cpf: valor });
+    
+    const cpfLimpo = limparCPF(valor);
+    if (valor && valor.trim() !== '') {
+      if (!validarCPF(cpfLimpo)) {
+        setCpfError('CPF inválido');
+      } else {
+        setCpfError('');
+      }
+    } else {
+      setCpfError('');
+    }
   };
 
   // Função para lidar com mudança no campo email
@@ -470,8 +519,10 @@ const Usuarios: React.FC = () => {
     }
     
     // Filtrar por termo de busca
-    return user.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const termo = searchTerm.toLowerCase();
+    return user.nome.toLowerCase().includes(termo) ||
+           (user.email && user.email.toLowerCase().includes(termo)) ||
+           (user.cpf && user.cpf.includes(searchTerm.replace(/\D/g, '')));
   });
 
   const handleCreateUser = () => {
@@ -480,11 +531,15 @@ const Usuarios: React.FC = () => {
     setFormData({
       nome: '',
       email: '',
+      cpf: '',
       senha: '',
       nivelAcessoId: 2,
-      ativo: true
+      ativo: true,
+      telefone_e164: '',
+      estado: ''
     });
     setEmailError('');
+    setCpfError('');
     setShowModal(true);
   };
 
@@ -493,12 +548,16 @@ const Usuarios: React.FC = () => {
     setSelectedUser(user);
     setFormData({
       nome: user.nome,
-      email: user.email,
+      email: user.email || '',
+      cpf: user.cpf ? formatarCPF(user.cpf) : '',
       senha: '',
       nivelAcessoId: user.nivelAcessoId,
-      ativo: user.ativo
+      ativo: user.ativo,
+      telefone_e164: user.telefone_e164 ? formatarTelefone(user.telefone_e164) : '',
+      estado: user.estado || ''
     });
     setEmailError('');
+    setCpfError('');
     setShowModal(true);
   };
 
@@ -507,10 +566,13 @@ const Usuarios: React.FC = () => {
     setSelectedUser(user);
     setFormData({
       nome: user.nome,
-      email: user.email,
+      email: user.email || '',
+      cpf: user.cpf ? formatarCPF(user.cpf) : '',
       senha: '',
       nivelAcessoId: user.nivelAcessoId,
-      ativo: user.ativo
+      ativo: user.ativo,
+      telefone_e164: user.telefone_e164 ? formatarTelefone(user.telefone_e164) : '',
+      estado: user.estado || ''
     });
     setShowModal(true);
   };
@@ -537,20 +599,59 @@ const Usuarios: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validar email antes de enviar
-    if (formData.email && !validateEmail(formData.email)) {
+    // Validar CPF antes de enviar
+    const cpfLimpo = limparCPF(formData.cpf);
+    if (!formData.cpf || formData.cpf.trim() === '') {
+      setCpfError('CPF é obrigatório');
+      return;
+    }
+    
+    if (!validarCPF(cpfLimpo)) {
+      setCpfError('CPF inválido');
+      return;
+    }
+    
+    // Validar email antes de enviar (opcional)
+    if (formData.email && formData.email.trim() !== '' && !validateEmail(formData.email)) {
       setEmailError('Formato de email inválido');
       return;
     }
     
     try {
+      // Preparar dados para envio
+      const userData: any = { ...formData };
+      
+      // Converter CPF para apenas números
+      userData.cpf = cpfLimpo;
+      
+      // Converter telefone para E.164 se fornecido
+      if (userData.telefone_e164 && userData.telefone_e164.trim() !== '') {
+        userData.telefone_e164 = converterParaE164(userData.telefone_e164);
+      } else {
+        userData.telefone_e164 = null;
+      }
+      
+      // Normalizar estado (maiúsculas ou null)
+      if (userData.estado && userData.estado.trim() !== '') {
+        userData.estado = userData.estado.toUpperCase();
+      } else {
+        userData.estado = null;
+      }
+      
+      // Email opcional - null se vazio
+      if (!userData.email || userData.email.trim() === '') {
+        userData.email = null;
+      }
+      
       if (modalType === 'create') {
         // Remover senha dos dados para criação (senha padrão será usada)
-        const { senha, ...userData } = formData;
-        await usuarioService.create(userData);
+        const { senha, ...createData } = userData;
+        await usuarioService.create(createData);
         console.log('Usuário criado com sucesso');
       } else if (modalType === 'edit' && selectedUser) {
-        await usuarioService.update(selectedUser.id, formData);
+        // Remover senha dos dados para edição (senha não é editada aqui)
+        const { senha, ...updateData } = userData;
+        await usuarioService.update(selectedUser.id, updateData);
         console.log('Usuário atualizado com sucesso');
       } else if (modalType === 'password' && selectedUser) {
         await usuarioService.resetPassword(selectedUser.id, { novaSenha: formData.senha });
@@ -561,8 +662,22 @@ const Usuarios: React.FC = () => {
       const usuariosData = await usuarioService.getAll();
       setUsuarios(usuariosData);
       setShowModal(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao processar usuário:', error);
+      
+      // Tratar erros específicos
+      const errorMessage = error.response?.data?.error || 'Erro ao processar usuário';
+      
+      if (errorMessage.includes('CPF já está cadastrado') || errorMessage.includes('Este CPF')) {
+        setCpfError('Este CPF já está cadastrado no sistema');
+      } else if (errorMessage.includes('CPF inválido')) {
+        setCpfError('CPF inválido');
+      } else if (errorMessage.includes('Email já cadastrado')) {
+        setEmailError('Email já cadastrado');
+      } else {
+        // Mostrar erro geral
+        alert(errorMessage);
+      }
     }
   };
 
@@ -647,7 +762,27 @@ const Usuarios: React.FC = () => {
             <UserListItem key={user.id}>
               <UserInfo>
                   <UserName>{user.nome}</UserName>
-                  <UserEmail>{user.email}</UserEmail>
+                  {user.cpf && (
+                    <UserContact>
+                      <Shield size={12} />
+                      {formatarCPF(user.cpf)}
+                    </UserContact>
+                  )}
+                  {user.email && (
+                    <UserEmail>{user.email}</UserEmail>
+                  )}
+                  {user.telefone_e164 && (
+                    <UserContact>
+                      <Phone size={12} />
+                      {formatarTelefone(user.telefone_e164)}
+                    </UserContact>
+                  )}
+                  {user.estado && (
+                    <UserLocation>
+                      <MapPin size={12} />
+                      {user.estado}
+                    </UserLocation>
+                  )}
                   <UserRole role={user.nivelAcesso?.nome || 'DESCONHECIDO'}>
                     <Shield size={12} />
                     {user.nivelAcesso?.nome || 'DESCONHECIDO'}
@@ -742,13 +877,34 @@ const Usuarios: React.FC = () => {
               </FormGroup>
 
               <FormGroup>
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="cpf">CPF *</Label>
+                <Input
+                  id="cpf"
+                  type="text"
+                  value={formData.cpf}
+                  onChange={handleCPFChange}
+                  required
+                  placeholder="000.000.000-00"
+                  maxLength={14}
+                  style={{ borderColor: cpfError ? '#ef4444' : undefined }}
+                />
+                {cpfError && (
+                  <ErrorMessage style={{ marginTop: '0.5rem' }}>
+                    {cpfError}
+                  </ErrorMessage>
+                )}
+                <InfoMessage style={{ marginTop: '0.5rem', fontSize: '0.75rem' }}>
+                  CPF é obrigatório e será usado para login. Deve ser único.
+                </InfoMessage>
+              </FormGroup>
+
+              <FormGroup>
+                <Label htmlFor="email">Email (Opcional)</Label>
                 <Input
                   id="email"
                   type="email"
                   value={formData.email}
                   onChange={handleEmailChange}
-                  required
                   style={{ borderColor: emailError ? '#ef4444' : undefined }}
                 />
                 {emailError && (
@@ -791,6 +947,61 @@ const Usuarios: React.FC = () => {
                   </InfoMessage>
                 </FormGroup>
               )}
+
+              <FormGroup>
+                <Label htmlFor="telefone">Telefone Celular</Label>
+                <Input
+                  id="telefone"
+                  type="text"
+                  placeholder="(11) 99999-8888"
+                  value={formData.telefone_e164}
+                  onChange={(e) => {
+                    const valor = mascaraTelefone(e.target.value);
+                    setFormData({ ...formData, telefone_e164: valor });
+                  }}
+                />
+                <InfoMessage style={{ marginTop: '0.5rem', fontSize: '0.75rem' }}>
+                  Formato: (11) 99999-8888
+                </InfoMessage>
+              </FormGroup>
+
+              <FormGroup>
+                <Label htmlFor="estado">Estado (UF)</Label>
+                <Select
+                  id="estado"
+                  value={formData.estado}
+                  onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                >
+                  <option value="">Selecione um estado</option>
+                  <option value="AC">AC - Acre</option>
+                  <option value="AL">AL - Alagoas</option>
+                  <option value="AP">AP - Amapá</option>
+                  <option value="AM">AM - Amazonas</option>
+                  <option value="BA">BA - Bahia</option>
+                  <option value="CE">CE - Ceará</option>
+                  <option value="DF">DF - Distrito Federal</option>
+                  <option value="ES">ES - Espírito Santo</option>
+                  <option value="GO">GO - Goiás</option>
+                  <option value="MA">MA - Maranhão</option>
+                  <option value="MT">MT - Mato Grosso</option>
+                  <option value="MS">MS - Mato Grosso do Sul</option>
+                  <option value="MG">MG - Minas Gerais</option>
+                  <option value="PA">PA - Pará</option>
+                  <option value="PB">PB - Paraíba</option>
+                  <option value="PR">PR - Paraná</option>
+                  <option value="PE">PE - Pernambuco</option>
+                  <option value="PI">PI - Piauí</option>
+                  <option value="RJ">RJ - Rio de Janeiro</option>
+                  <option value="RN">RN - Rio Grande do Norte</option>
+                  <option value="RS">RS - Rio Grande do Sul</option>
+                  <option value="RO">RO - Rondônia</option>
+                  <option value="RR">RR - Roraima</option>
+                  <option value="SC">SC - Santa Catarina</option>
+                  <option value="SP">SP - São Paulo</option>
+                  <option value="SE">SE - Sergipe</option>
+                  <option value="TO">TO - Tocantins</option>
+                </Select>
+              </FormGroup>
 
               <FormGroup>
                 <Label htmlFor="nivelAcesso">Nível de Acesso</Label>

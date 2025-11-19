@@ -19,6 +19,7 @@
     "test:upload-checklist": "node scripts/testUploadComChecklist.js",
     "test:upload-validacao": "node scripts/testUploadCompletoValidacao.js",
     "test:visualizacao": "node scripts/testVisualizacaoImagem.js",
+    "test:visualizacao-troca": "node scripts/testCompletoVisualizacaoTrocaFoto.js",
     "dev": "nodemon server.js",
     "setup:auth": "node scripts/setupLocalAuth.js",
     "migrate:password": "node scripts/addPasswordUpdateField.js",
