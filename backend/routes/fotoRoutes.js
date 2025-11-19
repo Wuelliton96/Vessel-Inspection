@@ -799,13 +799,72 @@ router.post('/', upload.single('foto'), async (req, res) => {
   }
 });
 
+// GET /api/fotos/:id/imagem-url - Obter URL da imagem (retorna JSON com presigned URL)
+router.get('/:id/imagem-url', async (req, res) => {
+  try {
+    console.log('\n=== ROTA GET /api/fotos/:id/imagem-url ===');
+    console.log('ID da foto:', req.params.id);
+    console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
+    
+    const foto = await Foto.findByPk(req.params.id, {
+      include: [{ model: Vistoria, as: 'Vistoria' }]
+    });
+    
+    if (!foto) {
+      return res.status(404).json({ error: 'Foto não encontrada' });
+    }
+    
+    // Verificar se o usuário pode acessar esta foto
+    const isAdmin = req.user.NivelAcesso?.id === 1;
+    const isOwner = foto.Vistoria.vistoriador_id === req.user.id;
+    
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+    
+    // Se está no S3, gerar presigned URL
+    if (foto.url_arquivo && foto.url_arquivo.startsWith('vistorias/')) {
+      const { s3Client, bucket } = require('../config/aws');
+      const { GetObjectCommand } = require('@aws-sdk/client-s3');
+      const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+      
+      const key = foto.url_arquivo;
+      const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+      const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+      
+      return res.json({ 
+        url: presignedUrl,
+        foto_id: foto.id,
+        encontrada: true
+      });
+    }
+    
+    // Se não está no S3, retornar URL local
+    const { getFullPath } = require('../services/uploadService');
+    const url = getFullPath(foto.url_arquivo, foto.vistoria_id);
+    const baseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+    return res.json({ 
+      url: url.startsWith('http') ? url : `${baseUrl}${url}`,
+      foto_id: foto.id,
+      encontrada: true
+    });
+  } catch (error) {
+    console.error('Erro ao obter URL da imagem:', error);
+    return res.status(500).json({ 
+      error: 'Erro ao obter URL da imagem',
+      encontrada: false
+    });
+  }
+});
+
 // GET /api/fotos/:id/imagem - Servir imagem (S3 ou local)
 router.get('/:id/imagem', async (req, res) => {
   try {
-    console.log('=== ROTA GET /api/fotos/:id/imagem ===');
+    console.log('\n=== ROTA GET /api/fotos/:id/imagem ===');
     console.log('ID da foto:', req.params.id);
     console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
     console.log('UPLOAD_STRATEGY:', UPLOAD_STRATEGY);
+    console.log('Timestamp:', new Date().toISOString());
     
     const foto = await Foto.findByPk(req.params.id, {
       include: [{ model: Vistoria, as: 'Vistoria' }]
@@ -832,14 +891,176 @@ router.get('/:id/imagem', async (req, res) => {
       return res.status(403).json({ error: 'Acesso negado' });
     }
     
-    // Verificar se a imagem está no S3 (se url_arquivo começa com "vistorias/")
-    const isS3File = foto.url_arquivo && foto.url_arquivo.startsWith('vistorias/');
+    // Verificar se a imagem está no S3
+    // Se url_arquivo começa com "vistorias/", definitivamente está no S3
+    // Se não começa com "vistorias/" mas também não é uma URL HTTP, pode estar no S3 (caso antigo)
+    const isS3File = foto.url_arquivo && (
+      foto.url_arquivo.startsWith('vistorias/') || 
+      foto.url_arquivo.includes('/id-') ||
+      (!foto.url_arquivo.includes('http') && !foto.url_arquivo.startsWith('/'))
+    );
+    
+    // SEMPRE usar S3 se:
+    // 1. UPLOAD_STRATEGY está configurado como 's3', OU
+    // 2. A imagem claramente está no S3 (começa com "vistorias/")
     const shouldUseS3 = UPLOAD_STRATEGY === 's3' || isS3File;
     
     console.log(`[IMAGEM] Estrategia de armazenamento:`);
     console.log(`[IMAGEM]   - UPLOAD_STRATEGY: ${UPLOAD_STRATEGY}`);
-    console.log(`[IMAGEM]   - url_arquivo começa com "vistorias/": ${isS3File}`);
+    console.log(`[IMAGEM]   - url_arquivo: "${foto.url_arquivo}"`);
+    console.log(`[IMAGEM]   - url_arquivo começa com "vistorias/": ${foto.url_arquivo?.startsWith('vistorias/')}`);
+    console.log(`[IMAGEM]   - url_arquivo contém "/id-": ${foto.url_arquivo?.includes('/id-')}`);
+    console.log(`[IMAGEM]   - É arquivo S3: ${isS3File}`);
     console.log(`[IMAGEM]   - Usar S3: ${shouldUseS3}`);
+    
+    // FORÇAR uso do S3 se a imagem claramente está no S3
+    // Se começa com "vistorias/", SEMPRE está no S3, independente da configuração
+    if (foto.url_arquivo && foto.url_arquivo.startsWith('vistorias/')) {
+      console.log(`[IMAGEM] FORÇANDO uso do S3 - imagem claramente está no S3 (começa com "vistorias/")`);
+      // Garantir que shouldUseS3 seja true
+      const shouldUseS3 = true;
+      
+      // Entrar diretamente no bloco S3
+      // S3: Gerar presigned URL ou redirecionar para URL pública
+      try {
+        const { s3Client, bucket } = require('../config/aws');
+        const { GetObjectCommand } = require('@aws-sdk/client-s3');
+        const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+        
+        // A key do S3 é o url_arquivo completo
+        let key = foto.url_arquivo;
+        
+        console.log('[IMAGEM] Configuração S3 (FORÇADO):');
+        console.log(`[IMAGEM]   - Bucket: ${bucket}`);
+        console.log(`[IMAGEM]   - Key: ${key}`);
+        console.log(`[IMAGEM]   - Vistoria ID: ${foto.vistoria_id}`);
+        
+        if (!bucket) {
+          throw new Error('Bucket S3 não configurado. Verifique AWS_S3_BUCKET no .env');
+        }
+        
+        if (!key) {
+          throw new Error('Key do arquivo não encontrada');
+        }
+        
+        const command = new GetObjectCommand({
+          Bucket: bucket,
+          Key: key
+        });
+        
+        // VERIFICAR SE A IMAGEM EXISTE NO S3 ANTES DE GERAR PRESIGNED URL
+        console.log('[IMAGEM] Verificando se imagem existe no S3...');
+        const { HeadObjectCommand } = require('@aws-sdk/client-s3');
+        const headCommand = new HeadObjectCommand({
+          Bucket: bucket,
+          Key: key
+        });
+        
+        try {
+          const headResult = await s3Client.send(headCommand);
+          console.log('[IMAGEM] OK: Imagem encontrada no S3!');
+          console.log(`[IMAGEM]   - Content-Type: ${headResult.ContentType}`);
+          console.log(`[IMAGEM]   - Content-Length: ${headResult.ContentLength} bytes`);
+          console.log(`[IMAGEM]   - LastModified: ${headResult.LastModified}`);
+        } catch (headError) {
+          console.error('[IMAGEM] ERRO: Imagem não encontrada no S3!');
+          console.error(`[IMAGEM]   - Nome do erro: ${headError.name}`);
+          console.error(`[IMAGEM]   - Código: ${headError.code}`);
+          console.error(`[IMAGEM]   - Mensagem: ${headError.message}`);
+          
+          if (headError.name === 'NoSuchKey' || headError.code === 'NoSuchKey') {
+            return res.status(404).json({ 
+              error: 'Imagem não encontrada no S3',
+              details: `O arquivo não foi encontrado no bucket S3. Key: "${key}"`,
+              foto_id: foto.id,
+              url_arquivo: foto.url_arquivo,
+              key_tentada: key,
+              bucket: bucket
+            });
+          }
+          throw headError;
+        }
+        
+        console.log('[IMAGEM] Gerando presigned URL...');
+        console.log(`[IMAGEM]   - Comando: GetObjectCommand({ Bucket: "${bucket}", Key: "${key}" })`);
+        
+        // Gerar presigned URL válida por 1 hora
+        const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+        
+        console.log('[IMAGEM] Presigned URL gerada com sucesso');
+        console.log(`[IMAGEM] URL completa: ${presignedUrl}`);
+        console.log('[IMAGEM] Redirecionando para presigned URL do S3...');
+        console.log('=== FIM ROTA GET /api/fotos/:id/imagem (302) ===\n');
+        
+        // IMPORTANTE: Sempre redirecionar para o S3 quando a imagem está no S3
+        return res.redirect(302, presignedUrl);
+      } catch (s3Error) {
+        console.error('[IMAGEM] ERRO ao gerar presigned URL:', s3Error.message);
+        console.error('[IMAGEM] Stack:', s3Error.stack);
+        console.error('[IMAGEM] Detalhes do erro:', {
+          name: s3Error.name,
+          code: s3Error.code,
+          message: s3Error.message,
+          bucket: bucket,
+          key: foto.url_arquivo
+        });
+        
+        // Se o erro for de credenciais ou configuração, retornar erro específico
+        if (s3Error.name === 'InvalidAccessKeyId' || s3Error.name === 'SignatureDoesNotMatch') {
+          console.error('[IMAGEM] ERRO: Credenciais AWS inválidas ou não configuradas');
+          return res.status(500).json({ 
+            error: 'Erro de configuração AWS',
+            details: 'Credenciais AWS inválidas ou não configuradas. Verifique AWS_ACCESS_KEY_ID e AWS_SECRET_ACCESS_KEY no .env',
+            foto_id: foto.id,
+            url_arquivo: foto.url_arquivo
+          });
+        }
+        
+        // Se o erro for de bucket não encontrado
+        if (s3Error.name === 'NoSuchBucket' || s3Error.code === 'NoSuchBucket') {
+          console.error('[IMAGEM] ERRO: Bucket não encontrado');
+          return res.status(500).json({ 
+            error: 'Bucket S3 não encontrado',
+            details: `Bucket "${bucket}" não foi encontrado. Verifique AWS_S3_BUCKET no .env`,
+            foto_id: foto.id,
+            url_arquivo: foto.url_arquivo,
+            bucket: bucket
+          });
+        }
+        
+        // Se o erro for de arquivo não encontrado
+        if (s3Error.name === 'NoSuchKey' || s3Error.code === 'NoSuchKey') {
+          console.error('[IMAGEM] ERRO: Arquivo não encontrado no S3');
+          console.error(`[IMAGEM] Tentando key: "${foto.url_arquivo}" no bucket "${bucket}"`);
+          return res.status(404).json({ 
+            error: 'Imagem não encontrada no S3',
+            details: `O arquivo não foi encontrado no bucket S3. Key: "${foto.url_arquivo}"`,
+            foto_id: foto.id,
+            url_arquivo: foto.url_arquivo,
+            key_tentada: foto.url_arquivo,
+            bucket: bucket
+          });
+        }
+        
+        // Fallback: tentar URL pública
+        try {
+          const publicUrl = getFullPath(foto.url_arquivo, foto.vistoria_id);
+          console.log('[IMAGEM] Tentando URL pública como fallback:', publicUrl);
+          console.log('=== FIM ROTA GET /api/fotos/:id/imagem (302) ===\n');
+          return res.redirect(302, publicUrl);
+        } catch (fallbackError) {
+          console.error('[IMAGEM] ERRO no fallback:', fallbackError.message);
+          return res.status(500).json({ 
+            error: 'Erro ao acessar imagem no S3',
+            details: s3Error.message,
+            foto_id: foto.id,
+            url_arquivo: foto.url_arquivo,
+            key_tentada: foto.url_arquivo,
+            bucket: bucket
+          });
+        }
+      }
+    }
     
     if (shouldUseS3) {
       // S3: Gerar presigned URL ou redirecionar para URL pública
@@ -848,7 +1069,26 @@ router.get('/:id/imagem', async (req, res) => {
         const { GetObjectCommand } = require('@aws-sdk/client-s3');
         const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
         
-        const key = foto.url_arquivo;
+        // A key do S3 pode ser:
+        // 1. Caminho completo: vistorias/id-30/foto-checklist-554-1763522840081-812548231.jpg
+        // 2. Apenas o nome: foto-checklist-554-1763522840081-812548231.jpg
+        let key = foto.url_arquivo;
+        
+        // Se o url_arquivo não começa com "vistorias/", é apenas o nome do arquivo
+        // Nesse caso, construir o caminho completo: vistorias/id-{vistoria_id}/{nome_arquivo}
+        if (!key.startsWith('vistorias/')) {
+          if (foto.vistoria_id) {
+            // Construir caminho completo: vistorias/id-{vistoria_id}/{nome_arquivo}
+            key = `vistorias/id-${foto.vistoria_id}/${key}`;
+            console.log(`[IMAGEM] url_arquivo no banco contém apenas o nome do arquivo`);
+            console.log(`[IMAGEM] Caminho completo construído: ${key}`);
+          } else {
+            console.error(`[IMAGEM] ERRO: Não foi possível construir caminho completo - vistoria_id não disponível`);
+            throw new Error('Não foi possível determinar o caminho completo da imagem no S3');
+          }
+        } else {
+          console.log(`[IMAGEM] url_arquivo já contém caminho completo: ${key}`);
+        }
         
         console.log('[IMAGEM] Configuração S3:');
         console.log(`[IMAGEM]   - Bucket: ${bucket}`);
@@ -856,7 +1096,7 @@ router.get('/:id/imagem', async (req, res) => {
         console.log(`[IMAGEM]   - Vistoria ID: ${foto.vistoria_id}`);
         
         if (!bucket) {
-          throw new Error('Bucket S3 não configurado');
+          throw new Error('Bucket S3 não configurado. Verifique AWS_S3_BUCKET no .env');
         }
         
         if (!key) {
@@ -869,11 +1109,13 @@ router.get('/:id/imagem', async (req, res) => {
         });
         
         console.log('[IMAGEM] Gerando presigned URL...');
+        console.log(`[IMAGEM]   - Comando: GetObjectCommand({ Bucket: "${bucket}", Key: "${key}" })`);
+        
         // Gerar presigned URL válida por 1 hora
         const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
         
         console.log('[IMAGEM] Presigned URL gerada com sucesso');
-        console.log(`[IMAGEM] URL: ${presignedUrl.substring(0, 100)}...`);
+        console.log(`[IMAGEM] URL completa: ${presignedUrl}`);
         console.log('=== FIM ROTA GET /api/fotos/:id/imagem (302) ===\n');
         return res.redirect(presignedUrl);
       } catch (s3Error) {
@@ -882,8 +1124,47 @@ router.get('/:id/imagem', async (req, res) => {
         console.error('[IMAGEM] Detalhes do erro:', {
           name: s3Error.name,
           code: s3Error.code,
-          message: s3Error.message
+          message: s3Error.message,
+          bucket: bucket,
+          key: key
         });
+        
+        // Se o erro for de credenciais ou configuração, retornar erro específico
+        if (s3Error.name === 'InvalidAccessKeyId' || s3Error.name === 'SignatureDoesNotMatch') {
+          console.error('[IMAGEM] ERRO: Credenciais AWS inválidas ou não configuradas');
+          return res.status(500).json({ 
+            error: 'Erro de configuração AWS',
+            details: 'Credenciais AWS inválidas ou não configuradas. Verifique AWS_ACCESS_KEY_ID e AWS_SECRET_ACCESS_KEY no .env',
+            foto_id: foto.id,
+            url_arquivo: foto.url_arquivo
+          });
+        }
+        
+        // Se o erro for de bucket não encontrado
+        if (s3Error.name === 'NoSuchBucket' || s3Error.code === 'NoSuchBucket') {
+          console.error('[IMAGEM] ERRO: Bucket não encontrado');
+          return res.status(500).json({ 
+            error: 'Bucket S3 não encontrado',
+            details: `Bucket "${bucket}" não foi encontrado. Verifique AWS_S3_BUCKET no .env`,
+            foto_id: foto.id,
+            url_arquivo: foto.url_arquivo,
+            bucket: bucket
+          });
+        }
+        
+        // Se o erro for de arquivo não encontrado
+        if (s3Error.name === 'NoSuchKey' || s3Error.code === 'NoSuchKey') {
+          console.error('[IMAGEM] ERRO: Arquivo não encontrado no S3');
+          console.error(`[IMAGEM] Tentando key: "${key}" no bucket "${bucket}"`);
+          return res.status(404).json({ 
+            error: 'Imagem não encontrada no S3',
+            details: `O arquivo não foi encontrado no bucket S3. Key: "${key}"`,
+            foto_id: foto.id,
+            url_arquivo: foto.url_arquivo,
+            key_tentada: key,
+            bucket: bucket
+          });
+        }
         
         // Fallback: tentar URL pública
         try {
@@ -897,7 +1178,9 @@ router.get('/:id/imagem', async (req, res) => {
             error: 'Erro ao acessar imagem no S3',
             details: s3Error.message,
             foto_id: foto.id,
-            url_arquivo: foto.url_arquivo
+            url_arquivo: foto.url_arquivo,
+            key_tentada: key,
+            bucket: bucket
           });
         }
       }

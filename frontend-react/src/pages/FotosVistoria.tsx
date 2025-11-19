@@ -310,12 +310,41 @@ const FotosVistoria: React.FC = () => {
     }
   };
 
-  const handleDownload = (fotoId: number | undefined, nomeItem: string) => {
+  const handleDownload = async (fotoId: number | undefined, nomeItem: string) => {
     if (!fotoId) return;
-    const link = document.createElement('a');
-    link.href = `${API_CONFIG.BASE_URL}/api/fotos/${fotoId}/imagem`;
-    link.download = `${nomeItem}.jpg`;
-    link.click();
+    
+    try {
+      // Buscar URL da imagem primeiro
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/fotos/${fotoId}/imagem-url`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.encontrada && data.url) {
+          const link = document.createElement('a');
+          link.href = data.url;
+          link.download = `${nomeItem}.jpg`;
+          link.click();
+          return;
+        }
+      }
+      
+      // Fallback: usar rota antiga
+      const link = document.createElement('a');
+      link.href = `${API_CONFIG.BASE_URL}/api/fotos/${fotoId}/imagem`;
+      link.download = `${nomeItem}.jpg`;
+      link.click();
+    } catch (error) {
+      console.error('Erro ao fazer download:', error);
+      // Fallback: usar rota antiga
+      const link = document.createElement('a');
+      link.href = `${API_CONFIG.BASE_URL}/api/fotos/${fotoId}/imagem`;
+      link.download = `${nomeItem}.jpg`;
+      link.click();
+    }
   };
 
   if (loading) {
@@ -388,10 +417,57 @@ const FotosVistoria: React.FC = () => {
                   )}
                 </FotoHeader>
 
-                <FotoImageContainer onClick={() => setImagemAmpliada(item.foto?.id ? `${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem` : '')}>
+                <FotoImageContainer onClick={async () => {
+                  if (!item.foto?.id) return;
+                  
+                  try {
+                    // Buscar URL da imagem primeiro
+                    const response = await fetch(`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem-url`, {
+                      headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                      }
+                    });
+                    
+                    if (response.ok) {
+                      const data = await response.json();
+                      if (data.encontrada && data.url) {
+                        setImagemAmpliada(data.url);
+                        return;
+                      }
+                    }
+                    
+                    // Fallback: usar rota antiga
+                    setImagemAmpliada(`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`);
+                  } catch (error) {
+                    console.error('Erro ao buscar URL da imagem:', error);
+                    // Fallback: usar rota antiga
+                    setImagemAmpliada(`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`);
+                  }
+                }}>
                   <FotoImage 
                     src={item.foto?.id ? `${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem` : ''} 
                     alt={item.nome}
+                    onError={async (e) => {
+                      // Se falhar, tentar buscar URL via API
+                      if (item.foto?.id) {
+                        try {
+                          const response = await fetch(`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem-url`, {
+                            headers: {
+                              'Authorization': `Bearer ${localStorage.getItem('token')}`
+                            }
+                          });
+                          
+                          if (response.ok) {
+                            const data = await response.json();
+                            if (data.encontrada && data.url) {
+                              e.currentTarget.src = data.url;
+                            }
+                          }
+                        } catch (error) {
+                          console.error('Erro ao buscar URL alternativa:', error);
+                        }
+                      }
+                    }}
                   />
                   <div style={{
                     position: 'absolute',

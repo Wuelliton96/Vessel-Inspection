@@ -618,6 +618,8 @@ const VistoriadorVistoria: React.FC = () => {
   const [showCamera, setShowCamera] = useState(false);
   const [fotoVisualizada, setFotoVisualizada] = useState<{ id: number; nome: string } | null>(null);
   const [erroCarregamentoImagem, setErroCarregamentoImagem] = useState(false);
+  const [urlImagem, setUrlImagem] = useState<string | null>(null);
+  const [carregandoImagem, setCarregandoImagem] = useState(false);
   const videoRef = React.useRef<HTMLVideoElement>(null);
 
   const loadVistoria = useCallback(async () => {
@@ -1845,9 +1847,41 @@ const VistoriadorVistoria: React.FC = () => {
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
                         <ActionButton 
                           variant="primary" 
-                          onClick={() => {
-                            setErroCarregamentoImagem(false);
+                          onClick={async () => {
                             setFotoVisualizada({ id: item.foto.id, nome: item.nome });
+                            setErroCarregamentoImagem(false);
+                            setCarregandoImagem(true);
+                            setUrlImagem(null);
+                            
+                            // Buscar URL da imagem primeiro
+                            try {
+                              const response = await fetch(`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem-url`, {
+                                headers: {
+                                  'Authorization': `Bearer ${token}`
+                                }
+                              });
+                              
+                              if (response.ok) {
+                                const data = await response.json();
+                                if (data.encontrada && data.url) {
+                                  console.log('[FRONTEND] URL da imagem obtida:', data.url);
+                                  setUrlImagem(data.url);
+                                  setCarregandoImagem(false);
+                                } else {
+                                  console.error('[FRONTEND] Imagem não encontrada');
+                                  setErroCarregamentoImagem(true);
+                                  setCarregandoImagem(false);
+                                }
+                              } else {
+                                console.error('[FRONTEND] Erro ao buscar URL da imagem:', response.status);
+                                setErroCarregamentoImagem(true);
+                                setCarregandoImagem(false);
+                              }
+                            } catch (error) {
+                              console.error('[FRONTEND] Erro ao buscar URL da imagem:', error);
+                              setErroCarregamentoImagem(true);
+                              setCarregandoImagem(false);
+                            }
                           }}
                           style={{ background: '#3b82f6' }}
                         >
@@ -2066,6 +2100,8 @@ const VistoriadorVistoria: React.FC = () => {
         <FotoVisualizacaoModal onClick={() => {
           setFotoVisualizada(null);
           setErroCarregamentoImagem(false);
+          setUrlImagem(null);
+          setCarregandoImagem(false);
         }}>
           <FotoVisualizacaoContent onClick={(e) => e.stopPropagation()}>
             <FotoVisualizacaoHeader>
@@ -2073,11 +2109,18 @@ const VistoriadorVistoria: React.FC = () => {
               <FotoVisualizacaoCloseButton onClick={() => {
                 setFotoVisualizada(null);
                 setErroCarregamentoImagem(false);
+                setUrlImagem(null);
+                setCarregandoImagem(false);
               }}>
                 <X size={24} />
               </FotoVisualizacaoCloseButton>
             </FotoVisualizacaoHeader>
-            {erroCarregamentoImagem ? (
+            {carregandoImagem ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '3rem', color: '#6b7280' }}>
+                <div style={{ marginBottom: '1rem' }}>Carregando imagem...</div>
+                <div style={{ fontSize: '0.875rem' }}>Verificando se a imagem existe no servidor...</div>
+              </div>
+            ) : erroCarregamentoImagem ? (
               <FotoVisualizacaoErro>
                 <FotoVisualizacaoErroTitulo>
                   <AlertCircle size={32} />
@@ -2093,22 +2136,36 @@ const VistoriadorVistoria: React.FC = () => {
                 </FotoVisualizacaoErroMensagem>
                 <FotoVisualizacaoErroDetalhes>
                   Foto ID: {fotoVisualizada.id}<br/>
-                  URL: {`${API_CONFIG.BASE_URL}/api/fotos/${fotoVisualizada.id}/imagem`}
+                  URL: {urlImagem || `${API_CONFIG.BASE_URL}/api/fotos/${fotoVisualizada.id}/imagem`}
                 </FotoVisualizacaoErroDetalhes>
               </FotoVisualizacaoErro>
+            ) : urlImagem ? (
+              <FotoVisualizacaoImage 
+                src={urlImagem}
+                alt={fotoVisualizada.nome}
+                onError={(e) => {
+                  console.error('[FRONTEND] ERRO ao carregar imagem:', fotoVisualizada.id);
+                  console.error('[FRONTEND] URL tentada:', urlImagem);
+                  setErroCarregamentoImagem(true);
+                  e.currentTarget.style.display = 'none';
+                }}
+                onLoad={() => {
+                  console.log('[FRONTEND] OK: Imagem carregada com sucesso:', fotoVisualizada.id);
+                  console.log('[FRONTEND] URL usada:', urlImagem);
+                  setErroCarregamentoImagem(false);
+                }}
+              />
             ) : (
               <FotoVisualizacaoImage 
                 src={`${API_CONFIG.BASE_URL}/api/fotos/${fotoVisualizada.id}/imagem`}
                 alt={fotoVisualizada.nome}
                 onError={(e) => {
-                  console.error('Erro ao carregar imagem:', fotoVisualizada.id);
-                  console.error('URL tentada:', `${API_CONFIG.BASE_URL}/api/fotos/${fotoVisualizada.id}/imagem`);
+                  console.error('[FRONTEND] ERRO ao carregar imagem (fallback):', fotoVisualizada.id);
                   setErroCarregamentoImagem(true);
-                  // Esconder a imagem que falhou
                   e.currentTarget.style.display = 'none';
                 }}
                 onLoad={() => {
-                  console.log('[FRONTEND] OK: Imagem carregada com sucesso:', fotoVisualizada.id);
+                  console.log('[FRONTEND] OK: Imagem carregada com sucesso (fallback):', fotoVisualizada.id);
                   setErroCarregamentoImagem(false);
                 }}
               />
