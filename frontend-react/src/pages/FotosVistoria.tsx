@@ -310,9 +310,10 @@ const FotosVistoria: React.FC = () => {
     }
   };
 
-  const handleDownload = (fotoUrl: string, nomeItem: string) => {
+  const handleDownload = (fotoId: number | undefined, nomeItem: string) => {
+    if (!fotoId) return;
     const link = document.createElement('a');
-    link.href = `${API_CONFIG.BASE_URL}${fotoUrl}`;
+    link.href = `${API_CONFIG.BASE_URL}/api/fotos/${fotoId}/imagem`;
     link.download = `${nomeItem}.jpg`;
     link.click();
   };
@@ -387,9 +388,9 @@ const FotosVistoria: React.FC = () => {
                   )}
                 </FotoHeader>
 
-                <FotoImageContainer onClick={() => setImagemAmpliada(item.foto?.url_arquivo)}>
+                <FotoImageContainer onClick={() => setImagemAmpliada(item.foto?.id ? `${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem` : '')}>
                   <FotoImage 
-                    src={`${API_CONFIG.BASE_URL}${item.foto?.url_arquivo}`} 
+                    src={item.foto?.id ? `${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem` : ''} 
                     alt={item.nome}
                   />
                   <div style={{
@@ -411,7 +412,7 @@ const FotosVistoria: React.FC = () => {
                 <FotoActions>
                   <IconButton 
                     variant="primary"
-                    onClick={() => handleDownload(item.foto?.url_arquivo, item.nome)}
+                    onClick={() => handleDownload(item.foto?.id, item.nome)}
                   >
                     <Download size={16} />
                     Baixar
@@ -433,7 +434,7 @@ const FotosVistoria: React.FC = () => {
           <CloseButton onClick={() => setImagemAmpliada(null)}>
             <X size={20} />
           </CloseButton>
-          <ModalImage src={`${API_CONFIG.BASE_URL}${imagemAmpliada}`} alt="Foto ampliada" />
+          <ModalImage src={imagemAmpliada} alt="Foto ampliada" />
         </Modal>
       )}
     </Container>
