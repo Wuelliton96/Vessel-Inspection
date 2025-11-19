@@ -19,7 +19,8 @@ import {
   X,
   MessageCircle,
   MapPin,
-  Navigation
+  Navigation,
+  Eye
 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -251,6 +252,324 @@ const FileInput = styled.input`
   display: none;
 `;
 
+const PhotoModal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 2rem;
+`;
+
+const PhotoModalContent = styled.div`
+  background: white;
+  border-radius: 1rem;
+  padding: 2rem;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+`;
+
+const PhotoModalHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+`;
+
+const PhotoModalTitle = styled.h2`
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+`;
+
+const PhotoPreviewContainer = styled.div`
+  margin-bottom: 1.5rem;
+  text-align: center;
+`;
+
+const PhotoPreviewImage = styled.img`
+  max-width: 100%;
+  max-height: 400px;
+  border-radius: 0.5rem;
+  border: 2px solid #e5e7eb;
+`;
+
+const CameraContainer = styled.div`
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  background: #000;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  margin-bottom: 1rem;
+`;
+
+const CameraVideo = styled.video`
+  width: 100%;
+  max-height: 600px;
+  display: block;
+  object-fit: contain;
+  transform: scaleX(-1); /* Espelhar para parecer mais natural */
+`;
+
+const CameraControls = styled.div`
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.8);
+`;
+
+const CaptureButton = styled.button`
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 4px solid white;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  
+  &:hover {
+    transform: scale(1.1);
+  }
+  
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
+const CameraInnerCircle = styled.div`
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #3b82f6;
+`;
+
+const StopCameraButton = styled.button`
+  padding: 0.75rem 1.5rem;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: #dc2626;
+  }
+`;
+
+const PhotoModalActions = styled.div`
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+`;
+
+const PhotoButtonGroup = styled.div`
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 1rem;
+`;
+
+const PhotoUploadButton = styled.button<{ variant?: 'primary' | 'secondary' }>`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex: 1;
+  
+  ${props => {
+    if (props.variant === 'primary') {
+      return `
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: white;
+        box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);
+        &:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 12px rgba(59, 130, 246, 0.4);
+        }
+      `;
+    }
+    return `
+      background: #f3f4f6;
+      color: #374151;
+      &:hover {
+        background: #e5e7eb;
+      }
+    `;
+  }}
+`;
+
+const PhotoDisplay = styled.div`
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 0.5rem;
+  border: 2px solid #10b981;
+`;
+
+const PhotoDisplayImage = styled.img`
+  width: 100%;
+  max-width: 300px;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 0.5rem;
+`;
+
+const FotoVisualizacaoModal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 2rem;
+`;
+
+const FotoVisualizacaoContent = styled.div`
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+`;
+
+const FotoVisualizacaoImage = styled.img`
+  max-width: 100%;
+  max-height: 85vh;
+  object-fit: contain;
+  border-radius: 0.5rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+`;
+
+const FotoVisualizacaoHeader = styled.div`
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  right: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: white;
+  z-index: 10;
+`;
+
+const FotoVisualizacaoTitle = styled.h3`
+  color: white;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+`;
+
+const FotoVisualizacaoCloseButton = styled.button`
+  background: rgba(239, 68, 68, 0.9);
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0.75rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  
+  &:hover {
+    background: rgba(220, 38, 38, 1);
+    transform: scale(1.1);
+  }
+`;
+
+const FotoVisualizacaoErro = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 2px solid rgba(239, 68, 68, 0.5);
+  border-radius: 1rem;
+  color: white;
+  text-align: center;
+  max-width: 500px;
+  margin: 2rem auto;
+`;
+
+const FotoVisualizacaoErroTitulo = styled.h3`
+  color: #fecaca;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const FotoVisualizacaoErroMensagem = styled.p`
+  color: #fca5a5;
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0;
+`;
+
+const FotoVisualizacaoErroDetalhes = styled.div`
+  margin-top: 1rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  color: #fca5a5;
+  font-family: monospace;
+`;
+
+const CloseModalButton = styled.button`
+  background: transparent;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: #f3f4f6;
+    color: #1f2937;
+  }
+`;
+
 const StatusActions = styled.div`
   display: flex;
   gap: 1rem;
@@ -287,10 +606,19 @@ const VistoriadorVistoria: React.FC = () => {
   const [checklistStatus, setChecklistStatus] = useState<ChecklistStatus | null>(null);
   const [checklistItens, setChecklistItens] = useState<VistoriaChecklistItem[]>([]);
   const [progresso, setProgresso] = useState<ChecklistProgresso | null>(null);
+  const [tiposFoto, setTiposFoto] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [uploading, setUploading] = useState<number | null>(null);
+  const [selectedItemForPhoto, setSelectedItemForPhoto] = useState<VistoriaChecklistItem | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const [fotoVisualizada, setFotoVisualizada] = useState<{ id: number; nome: string } | null>(null);
+  const [erroCarregamentoImagem, setErroCarregamentoImagem] = useState(false);
+  const videoRef = React.useRef<HTMLVideoElement>(null);
 
   const loadVistoria = useCallback(async () => {
     if (!id || !token) return;
@@ -311,12 +639,34 @@ const VistoriadorVistoria: React.FC = () => {
       // Carregar novo sistema de checklist
       try {
         const itens = await checklistService.getChecklistVistoria(parseInt(id));
+        console.log(`Checklist carregado: ${itens.length} itens`);
+        
+        // Verificar quantos itens têm foto
+        const itensComFoto = itens.filter(item => item.foto && item.status === 'CONCLUIDO');
+        console.log(`Itens com foto: ${itensComFoto.length}`);
+        if (itensComFoto.length > 0) {
+          console.log('Itens com foto:');
+          itensComFoto.forEach(item => {
+            console.log(`  - "${item.nome}" (ID: ${item.id}) - Foto ID: ${item.foto?.id}`);
+          });
+        }
+        
         setChecklistItens(itens);
         
         const prog = await checklistService.getProgresso(parseInt(id));
+        console.log(`Progresso: ${prog.concluidos}/${prog.total} (${prog.percentual}%)`);
         setProgresso(prog);
       } catch (checkErr) {
+        console.error('Erro ao carregar checklist:', checkErr);
         console.log('Checklist ainda não copiado para esta vistoria');
+      }
+      
+      // Carregar tipos de foto
+      try {
+        const tipos = await vistoriadorService.getTiposFotoChecklist();
+        setTiposFoto(tipos);
+      } catch (tiposErr) {
+        console.error('Erro ao carregar tipos de foto:', tiposErr);
       }
       
     } catch (err: any) {
@@ -329,6 +679,11 @@ const VistoriadorVistoria: React.FC = () => {
 
   useEffect(() => {
     loadVistoria();
+    
+    // Limpar stream da câmera ao desmontar o componente
+    return () => {
+      stopCamera();
+    };
   }, [loadVistoria]);
 
   const handleIniciarVistoria = async () => {
@@ -376,16 +731,406 @@ const VistoriadorVistoria: React.FC = () => {
     }
   };
 
-  const handlePhotoUpload = async (tipoId: number, file: File) => {
-    if (!token || !id) return;
+  const getTipoFotoPorItem = (item: VistoriaChecklistItem) => {
+    if (!tiposFoto || tiposFoto.length === 0) {
+      console.error('Nenhum tipo de foto disponível! Carregando tipos...');
+      // Tentar recarregar tipos de foto
+      vistoriadorService.getTiposFotoChecklist().then(tipos => {
+        setTiposFoto(tipos);
+      }).catch(err => {
+        console.error('Erro ao carregar tipos de foto:', err);
+      });
+      return null;
+    }
+    
+    console.log('=== BUSCANDO TIPO DE FOTO ===');
+    console.log('Item do checklist:', item.nome);
+    console.log('Tipos de foto disponíveis:', tiposFoto.map(t => `${t.nome_exibicao} (ID: ${t.id})`));
+    
+    // 1. Tentar busca exata (case-insensitive)
+    let tipoFoto = tiposFoto.find(tipo => 
+      tipo.nome_exibicao?.toLowerCase().trim() === item.nome?.toLowerCase().trim()
+    );
+    
+    if (tipoFoto) {
+      console.log('Match 1: Busca exata encontrada:', tipoFoto.nome_exibicao);
+      return tipoFoto;
+    }
+    
+    // 2. Se não encontrar, tentar busca parcial (contém)
+    tipoFoto = tiposFoto.find(tipo => {
+      const nomeTipo = tipo.nome_exibicao?.toLowerCase().trim() || '';
+      const nomeItem = item.nome?.toLowerCase().trim() || '';
+      const match = nomeTipo.includes(nomeItem) || nomeItem.includes(nomeTipo);
+      if (match) {
+        console.log(`Match 2: Busca parcial - "${nomeTipo}" contém "${nomeItem}" ou vice-versa`);
+      }
+      return match;
+    });
+    
+    if (tipoFoto) {
+      console.log('Match 2: Busca parcial encontrada:', tipoFoto.nome_exibicao);
+      return tipoFoto;
+    }
+    
+    // 3. Se ainda não encontrar, tentar remover "Foto do" / "Foto da" / "Foto dos" e buscar
+    const nomeItemLimpo = item.nome?.replace(/^Foto\s+(do|da|dos|das)\s+/i, '').trim() || '';
+    tipoFoto = tiposFoto.find(tipo => {
+      const nomeTipo = tipo.nome_exibicao?.replace(/^Foto\s+(do|da|dos|das)\s+/i, '').trim() || '';
+      const match = nomeTipo.toLowerCase() === nomeItemLimpo.toLowerCase();
+      if (match) {
+        console.log(`Match 3: Sem prefixo - "${nomeTipo}" = "${nomeItemLimpo}"`);
+      }
+      return match;
+    });
+    
+    if (tipoFoto) {
+      console.log('Match 3: Sem prefixo encontrada:', tipoFoto.nome_exibicao);
+      return tipoFoto;
+    }
+    
+    // 4. Busca por palavras-chave comuns
+    const palavrasChave: { [key: string]: string[] } = {
+      'casco': ['casco', 'hull', 'casca'],
+      'motor': ['motor', 'engine', 'maquina'],
+      'interior': ['interior', 'inside', 'interno'],
+      'documento': ['documento', 'document', 'papel'],
+      'proa': ['proa', 'bow', 'frente'],
+      'popa': ['popa', 'stern', 'traseira'],
+      'convés': ['conves', 'deck', 'coberta'],
+      'cabine': ['cabine', 'cabin', 'interior'],
+      'timão': ['timao', 'rudder', 'leme'],
+      'hélice': ['helice', 'propeller', 'propulsao']
+    };
+    
+    for (const [chave, variações] of Object.entries(palavrasChave)) {
+      const nomeItemLower = item.nome?.toLowerCase() || '';
+      const temPalavraChave = variações.some(v => nomeItemLower.includes(v));
+      
+      if (temPalavraChave) {
+        tipoFoto = tiposFoto.find(tipo => {
+          const nomeTipoLower = tipo.nome_exibicao?.toLowerCase() || '';
+          return variações.some(v => nomeTipoLower.includes(v));
+        });
+        
+        if (tipoFoto) {
+          console.log(`Match 4: Palavra-chave "${chave}" encontrada:`, tipoFoto.nome_exibicao);
+          return tipoFoto;
+        }
+      }
+    }
+    
+    // 5. Fallback final: usar o primeiro tipo disponível (SEMPRE retorna algo se houver tipos)
+    if (tiposFoto.length > 0) {
+      console.warn('Nenhum match encontrado. Usando primeiro tipo disponível como fallback:', tiposFoto[0].nome_exibicao);
+      return tiposFoto[0];
+    }
+    
+    console.error('CRÍTICO: Nenhum tipo de foto disponível!');
+    return null;
+  };
+
+  const handleOpenPhotoModal = (item: VistoriaChecklistItem) => {
+    setSelectedItemForPhoto(item);
+    setPhotoPreview(null);
+    setPhotoFile(null);
+  };
+
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+  };
+
+  const handleClosePhotoModal = () => {
+    stopCamera();
+    setSelectedItemForPhoto(null);
+    setPhotoPreview(null);
+    setPhotoFile(null);
+    setShowCamera(false);
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.type.startsWith('image/')) {
+        setPhotoFile(file);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPhotoPreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        setError('Por favor, selecione apenas imagens');
+      }
+    }
+  };
+
+  const startCamera = async () => {
+    try {
+      stopCamera(); // Parar qualquer stream anterior
+      
+      // Configuração para modo retrato (portrait)
+      const constraints: MediaStreamConstraints = {
+        video: {
+          facingMode: 'environment', // Câmera traseira no mobile, webcam no desktop
+          // Modo retrato: altura maior que largura
+          width: { ideal: 720, max: 1280 },
+          height: { ideal: 1280, max: 1920 },
+          aspectRatio: { ideal: 9 / 16 }, // Proporção retrato (vertical)
+        }
+      };
+      
+      console.log('Solicitando acesso à câmera com constraints:', constraints);
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      console.log('Câmera acessada com sucesso');
+      setCameraStream(stream);
+      setShowCamera(true);
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        // Aguardar o vídeo carregar
+        await new Promise((resolve) => {
+          if (videoRef.current) {
+            videoRef.current.onloadedmetadata = () => {
+              console.log('Vídeo carregado. Dimensões:', 
+                videoRef.current?.videoWidth, 'x', videoRef.current?.videoHeight);
+              resolve(true);
+            };
+          }
+        });
+      }
+    } catch (error: any) {
+      console.error('Erro ao acessar câmera:', error);
+      
+      let errorMessage = 'Não foi possível acessar a câmera.';
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        errorMessage = 'Permissão de câmera negada. Por favor, permita o acesso à câmera nas configurações do navegador.';
+      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        errorMessage = 'Nenhuma câmera encontrada. Usando galeria...';
+        handleTakePhotoFallback();
+        return;
+      } else if (error.name === 'OverconstrainedError') {
+        // Tentar com constraints mais simples
+        console.log('Tentando com constraints mais simples...');
+        try {
+          const simpleStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user' } // Câmera frontal como fallback
+          });
+          setCameraStream(simpleStream);
+          setShowCamera(true);
+          if (videoRef.current) {
+            videoRef.current.srcObject = simpleStream;
+          }
+          return;
+        } catch (fallbackError) {
+          errorMessage = 'Não foi possível acessar a câmera. Use a opção de escolher da galeria.';
+        }
+      }
+      
+      setError(errorMessage);
+      // Fallback para input com capture
+      handleTakePhotoFallback();
+    }
+  };
+
+  const capturePhotoFromCamera = () => {
+    if (!videoRef.current || !cameraStream) {
+      console.error('Vídeo ou stream da câmera não disponível');
+      setError('Câmera não está pronta. Aguarde a câmera carregar completamente.');
+      return;
+    }
     
     try {
-      setUploading(tipoId);
+      const video = videoRef.current;
+      
+      // Aguardar o vídeo estar pronto com dimensões válidas
+      const waitForVideoReady = (): Promise<void> => {
+        return new Promise((resolve, reject) => {
+          if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+            console.log('Vídeo pronto. Dimensões:', video.videoWidth, 'x', video.videoHeight);
+            resolve();
+            return;
+          }
+          
+          console.log('Aguardando vídeo carregar... Estado:', video.readyState);
+          
+          const checkReady = () => {
+            if (video.videoWidth > 0 && video.videoHeight > 0) {
+              console.log('Vídeo carregado. Dimensões:', video.videoWidth, 'x', video.videoHeight);
+              resolve();
+            } else {
+              console.log('Ainda aguardando... Estado:', video.readyState, 'Dimensões:', video.videoWidth, 'x', video.videoHeight);
+            }
+          };
+          
+          video.addEventListener('loadedmetadata', checkReady, { once: true });
+          video.addEventListener('loadeddata', checkReady, { once: true });
+          video.addEventListener('canplay', checkReady, { once: true });
+          
+          // Timeout após 5 segundos
+          setTimeout(() => {
+            if (video.videoWidth === 0 || video.videoHeight === 0) {
+              reject(new Error('Timeout aguardando vídeo carregar'));
+            }
+          }, 5000);
+        });
+      };
+      
+      waitForVideoReady().then(() => {
+        const canvas = document.createElement('canvas');
+        
+        // Garantir que temos dimensões válidas
+        if (!video.videoWidth || !video.videoHeight) {
+          console.error('Dimensões do vídeo inválidas após aguardar:', video.videoWidth, 'x', video.videoHeight);
+          setError('Não foi possível capturar a foto. O vídeo não está pronto.');
+          return;
+        }
+      
+        // Configurar canvas com dimensões do vídeo (mantendo proporção retrato)
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        console.log('Capturando foto:', canvas.width, 'x', canvas.height);
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          throw new Error('Não foi possível criar contexto do canvas');
+        }
+        
+        // Capturar frame do vídeo
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Converter para blob (JPEG com qualidade 0.9)
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            console.error('Erro ao criar blob da foto');
+            setError('Erro ao processar a foto capturada');
+            return;
+          }
+          
+          console.log('Foto capturada com sucesso. Tamanho:', blob.size, 'bytes');
+          
+          // Criar File a partir do blob
+          const file = new File([blob], `foto-${Date.now()}.jpg`, { 
+            type: 'image/jpeg',
+            lastModified: Date.now()
+          });
+          
+          setPhotoFile(file);
+          setPhotoPreview(canvas.toDataURL('image/jpeg', 0.9));
+          setShowCamera(false);
+          stopCamera();
+          
+          console.log('Preview gerado e câmera parada');
+        }, 'image/jpeg', 0.9);
+      }).catch((error: any) => {
+        console.error('Erro ao aguardar vídeo carregar:', error);
+        setError('Não foi possível capturar a foto. Aguarde a câmera carregar completamente ou escolha da galeria.');
+      });
+    } catch (error: any) {
+      console.error('Erro ao capturar foto:', error);
+      setError('Erro ao capturar foto da câmera: ' + (error.message || 'Erro desconhecido'));
+    }
+  };
+
+  const handleTakePhotoFallback = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';
+    input.onchange = (e: any) => {
+      handleFileSelect(e);
+    };
+    input.click();
+  };
+
+  const handleTakePhoto = async () => {
+    // Tentar usar a câmera diretamente
+    if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+      await startCamera();
+    } else {
+      // Fallback para input com capture
+      handleTakePhotoFallback();
+    }
+  };
+
+  const handleChooseFromGallery = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e: any) => {
+      handleFileSelect(e);
+    };
+    input.click();
+  };
+
+  const handleConfirmPhotoUpload = async () => {
+    if (!photoFile || !selectedItemForPhoto || !id) {
+      setError('Por favor, selecione uma foto antes de enviar');
+      return;
+    }
+    
+    console.log('=== INICIANDO UPLOAD DE FOTO ===');
+    console.log('Item do checklist:', selectedItemForPhoto.nome);
+    console.log('Tipos de foto disponíveis:', tiposFoto.length);
+    
+    // Garantir que tipos de foto foram carregados
+    if (!tiposFoto || tiposFoto.length === 0) {
+      console.error('Tipos de foto não foram carregados ainda');
+      setError('Carregando tipos de foto... Por favor, aguarde e tente novamente.');
+      
+      // Tentar carregar tipos de foto
+      try {
+        const tiposRecarregados = await vistoriadorService.getTiposFotoChecklist();
+        setTiposFoto(tiposRecarregados);
+        if (tiposRecarregados.length === 0) {
+          setError('Nenhum tipo de foto configurado no sistema. Por favor, entre em contato com o administrador.');
+          return;
+        }
+      } catch (err) {
+        console.error('Erro ao carregar tipos de foto:', err);
+        setError('Erro ao carregar tipos de foto. Por favor, recarregue a página.');
+        return;
+      }
+    }
+    
+    const tipoFoto = getTipoFotoPorItem(selectedItemForPhoto);
+    if (!tipoFoto) {
+      console.error('ERRO CRÍTICO: Tipo de foto não encontrado após todas as tentativas');
+      console.error('Item:', selectedItemForPhoto);
+      console.error('Tipos disponíveis:', tiposFoto);
+      setError('Erro ao identificar tipo de foto. Por favor, entre em contato com o administrador ou tente novamente.');
+      return;
+    }
+    
+    console.log('Tipo de foto selecionado:', tipoFoto.nome_exibicao, '(ID:', tipoFoto.id, ')');
+    
+    try {
+      setUploading(tipoFoto.id);
       
       const formData = new FormData();
-      formData.append('file', file);
-      formData.append('vistoria_id', id);
-      formData.append('tipo_foto_id', tipoId.toString());
+      formData.append('foto', photoFile);
+      
+      // IMPORTANTE: Garantir que vistoria_id seja uma string
+      const vistoriaIdStr = String(id!);
+      formData.append('vistoria_id', vistoriaIdStr);
+      formData.append('tipo_foto_id', tipoFoto.id.toString());
+      formData.append('checklist_item_id', selectedItemForPhoto.id.toString()); // Enviar ID do item para mapeamento preciso
+      formData.append('observacao', '');
+      
+      console.log('\n[FRONTEND] === INICIANDO UPLOAD DE FOTO ===');
+      console.log('[FRONTEND] Dados do upload:');
+      console.log('  - vistoria_id:', vistoriaIdStr, '(tipo:', typeof vistoriaIdStr, ')');
+      console.log('  - tipo_foto_id:', tipoFoto.id);
+      console.log('  - checklist_item_id:', selectedItemForPhoto.id, '(tipo:', typeof selectedItemForPhoto.id, ')');
+      console.log('  - Item do checklist:', selectedItemForPhoto.nome);
+      console.log('  - Tipo de foto:', tipoFoto.nome_exibicao);
+      console.log('  - Arquivo:', photoFile.name || 'captured-photo', `(${photoFile.size} bytes)`);
+      console.log('  - URL da API:', `${API_CONFIG.BASE_URL}/api/fotos`);
+      console.log('[FRONTEND] Enviando requisição...\n');
       
       const response = await fetch(`${API_CONFIG.BASE_URL}/api/fotos`, {
         method: 'POST',
@@ -396,15 +1141,243 @@ const VistoriadorVistoria: React.FC = () => {
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao fazer upload da foto');
+        let errorMessage = 'Erro ao fazer upload da foto';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          errorMessage = `Erro ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
       
-      setSuccess('Foto enviada com sucesso!');
-      setTimeout(() => setSuccess(''), 3000);
+      const responseData = await response.json();
+      
+      console.log('\n[FRONTEND] === RESPOSTA DO UPLOAD ===');
+      console.log('[FRONTEND] Upload realizado com sucesso!');
+      console.log('[FRONTEND] Dados recebidos:');
+      console.log('  - Foto ID:', responseData.id);
+      console.log('  - url_arquivo:', responseData.url_arquivo);
+      console.log('  - url_completa:', responseData.url_completa);
+      console.log('  - checklist_item_id_enviado:', responseData.checklist_item_id_enviado || 'null');
+      console.log('  - checklist_atualizado:', responseData.checklist_atualizado ? 'sim' : 'não');
+      
+      if (responseData.checklist_atualizado) {
+        console.log('[FRONTEND] Detalhes do checklist atualizado:');
+        console.log('  - Item ID:', responseData.checklist_atualizado.item_id);
+        console.log('  - Item Nome:', responseData.checklist_atualizado.item_nome);
+        console.log('  - Status:', responseData.checklist_atualizado.status);
+        console.log('  - Foto ID vinculada:', responseData.checklist_atualizado.foto_id);
+        
+        // Verificar se o ID enviado corresponde ao ID atualizado
+        if (responseData.checklist_item_id_enviado && responseData.checklist_atualizado.item_id) {
+          const idEnviado = parseInt(responseData.checklist_item_id_enviado);
+          const idAtualizado = responseData.checklist_atualizado.item_id;
+          if (idEnviado === idAtualizado) {
+            console.log(`[FRONTEND] OK: IDs correspondem: ${idEnviado} === ${idAtualizado}`);
+          } else {
+            console.error(`[FRONTEND] ERRO: IDs NÃO correspondem!`);
+            console.error(`[FRONTEND]   Enviado: ${idEnviado}`);
+            console.error(`[FRONTEND]   Atualizado: ${idAtualizado}`);
+          }
+        }
+      } else {
+        console.warn('[FRONTEND] ATENCAO: Checklist NÃO foi atualizado!');
+        console.warn('[FRONTEND]   Verifique os logs do servidor para mais detalhes.');
+      }
+      
+      // Verificar se o nome do arquivo contém checklist_item_id
+      if (responseData.checklist_item_id_enviado && responseData.url_arquivo) {
+        const itemId = responseData.checklist_item_id_enviado;
+        if (responseData.url_arquivo.includes(`checklist-${itemId}`)) {
+          console.log(`[FRONTEND] OK: Nome do arquivo contém checklist_item_id: checklist-${itemId}`);
+        } else {
+          console.warn(`[FRONTEND] ATENCAO: Nome do arquivo NÃO contém checklist_item_id esperado`);
+          console.warn(`[FRONTEND]   Esperado: checklist-${itemId}`);
+          console.warn(`[FRONTEND]   Recebido: ${responseData.url_arquivo}`);
+        }
+      }
+      
+      console.log('[FRONTEND] === FIM DA RESPOSTA ===\n');
+      
+      // VALIDAÇÃO: Confirmar que a foto foi realmente salva
+      if (!responseData.id) {
+        throw new Error('Foto não foi criada. ID não retornado pelo servidor.');
+      }
+      
+      if (!responseData.url_arquivo) {
+        throw new Error('Foto não tem url_arquivo. Upload pode ter falhado.');
+      }
+      
+      // VALIDAÇÃO: Testar se a imagem realmente existe e é acessível
+      const imageUrl = responseData.url_completa || `${API_CONFIG.BASE_URL}/uploads/fotos/vistoria-${id}/${responseData.url_arquivo}`;
+      console.log('Validando se a imagem existe:', imageUrl);
+      
+      try {
+        const imageValidation = await fetch(imageUrl, { method: 'HEAD' });
+        if (!imageValidation.ok) {
+          console.warn('[FRONTEND] ATENCAO: Imagem não acessível ainda, mas continuando... Status:', imageValidation.status);
+        } else {
+          console.log('[FRONTEND] OK: Imagem validada e acessível');
+        }
+      } catch (imgError) {
+        console.warn('[FRONTEND] ATENCAO: Não foi possível validar imagem imediatamente:', imgError);
+        // Não falhar o upload por isso, pois pode ser um problema de rede/cache
+      }
+      
+      setSuccess(`Foto anexada com sucesso! Foto ID: ${responseData.id}. Item marcado como concluído.`);
+      setTimeout(() => setSuccess(''), 8000);
+      
+      handleClosePhotoModal();
+      
+      // Aguardar um pouco para garantir que o backend processou tudo
+      await new Promise(resolve => setTimeout(resolve, 800));
       
       // Recarregar status do checklist
+      console.log('Recarregando dados da vistoria...');
       await loadVistoria();
+      console.log('Dados da vistoria recarregados');
+      
+      // VALIDAÇÃO FINAL: Verificar se o item foi atualizado no checklist
+      const itemAtualizado = checklistItens.find(item => 
+        item.id === selectedItemForPhoto.id && 
+        item.status === 'CONCLUIDO' && 
+        item.foto && 
+        item.foto.id === responseData.id
+      );
+      
+      if (itemAtualizado) {
+        console.log('[FRONTEND] OK: Validação completa: Item do checklist atualizado com foto vinculada');
+        console.log(`  - Item: "${itemAtualizado.nome}"`);
+        console.log(`  - Status: ${itemAtualizado.status}`);
+        console.log(`  - Foto ID: ${itemAtualizado.foto.id}`);
+      } else {
+        // Aguardar mais um pouco e verificar novamente
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await loadVistoria();
+        
+        const itemNovamente = checklistItens.find(item => 
+          item.id === selectedItemForPhoto.id && 
+          item.status === 'CONCLUIDO' && 
+          item.foto
+        );
+        
+        if (itemNovamente && itemNovamente.foto) {
+          console.log('[FRONTEND] OK: Validação confirmada após segunda verificação');
+          console.log(`  - Foto ID encontrada: ${itemNovamente.foto.id}`);
+        } else {
+          console.warn('[FRONTEND] ATENCAO: Item do checklist pode não ter sido atualizado automaticamente');
+          console.warn('  A foto foi salva, mas o item pode precisar ser atualizado manualmente');
+        }
+      }
+      
+    } catch (err: any) {
+      console.error('Erro ao fazer upload:', err);
+      setError('Erro ao fazer upload da foto: ' + err.message);
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  const handlePhotoUpload = async (tipoId: number, file: File) => {
+    if (!token || !id) return;
+    
+    try {
+      setUploading(tipoId);
+      
+      const formData = new FormData();
+      formData.append('foto', file);
+      
+      // IMPORTANTE: Garantir que vistoria_id seja uma string
+      const vistoriaIdStr = String(id);
+      formData.append('vistoria_id', vistoriaIdStr);
+      formData.append('tipo_foto_id', tipoId.toString());
+      // Não temos checklist_item_id aqui, mas o backend usará mapeamento por nome
+      
+      console.log('Enviando upload (file):');
+      console.log('  - vistoria_id:', vistoriaIdStr, '(tipo:', typeof vistoriaIdStr, ')');
+      console.log('  - tipo_foto_id:', tipoId);
+      console.log('  - Arquivo:', file.name, `(${file.size} bytes)`);
+      
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/fotos`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+      
+      if (!response.ok) {
+        let errorMessage = 'Erro ao fazer upload da foto';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          errorMessage = `Erro ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+      
+      const responseData = await response.json();
+      console.log('Upload realizado com sucesso:', responseData);
+      console.log('  - Foto ID:', responseData.id);
+      console.log('  - url_arquivo:', responseData.url_arquivo);
+      console.log('  - checklist_atualizado:', responseData.checklist_atualizado);
+      
+      // VALIDAÇÃO: Confirmar que a foto foi realmente salva
+      if (!responseData.id) {
+        throw new Error('Foto não foi criada. ID não retornado pelo servidor.');
+      }
+      
+      if (!responseData.url_arquivo) {
+        throw new Error('Foto não tem url_arquivo. Upload pode ter falhado.');
+      }
+      
+      // VALIDAÇÃO: Testar se a imagem realmente existe e é acessível
+      const imageUrl = responseData.url_completa || `${API_CONFIG.BASE_URL}/uploads/fotos/vistoria-${id}/${responseData.url_arquivo}`;
+      console.log('Validando se a imagem existe:', imageUrl);
+      
+      try {
+        const imageValidation = await fetch(imageUrl, { method: 'HEAD' });
+        if (!imageValidation.ok) {
+          console.warn('[FRONTEND] ATENCAO: Imagem não acessível ainda, mas continuando... Status:', imageValidation.status);
+        } else {
+          console.log('[FRONTEND] OK: Imagem validada e acessível');
+        }
+      } catch (imgError) {
+        console.warn('[FRONTEND] ATENCAO: Não foi possível validar imagem imediatamente:', imgError);
+        // Não falhar o upload por isso, pois pode ser um problema de rede/cache
+      }
+      
+      setSuccess(`Foto anexada com sucesso! Foto ID: ${responseData.id}. Item marcado como concluído.`);
+      setTimeout(() => setSuccess(''), 8000);
+      
+      // Aguardar um pouco para garantir que o backend processou tudo
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      // Recarregar status do checklist
+      console.log('Recarregando dados da vistoria...');
+      await loadVistoria();
+      console.log('Dados da vistoria recarregados');
+      
+      // VALIDAÇÃO FINAL: Aguardar mais um pouco e verificar se o item foi atualizado
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await loadVistoria();
+      
+      const itemAtualizado = checklistItens.find(item => 
+        item.id === tipoId && 
+        item.status === 'CONCLUIDO' && 
+        item.foto
+      );
+      
+      if (itemAtualizado && itemAtualizado.foto) {
+        console.log('[FRONTEND] OK: Validação completa: Item do checklist atualizado com foto vinculada');
+        console.log(`  - Item: "${itemAtualizado.nome}"`);
+        console.log(`  - Foto ID: ${itemAtualizado.foto.id}`);
+      } else {
+        console.warn('⚠ Item do checklist pode não ter sido atualizado automaticamente');
+        console.warn('  A foto foi salva, mas o item pode precisar ser atualizado manualmente');
+      }
       
     } catch (err: any) {
       console.error('Erro ao fazer upload:', err);
@@ -843,16 +1816,112 @@ const VistoriadorVistoria: React.FC = () => {
                 </ChecklistInfo>
                 
                 <ChecklistActions>
-                  {item.status === 'CONCLUIDO' ? (
-                    <ActionButton variant="danger" onClick={() => handleMarcarPendente(item.id)}>
-                      <X size={16} />
-                      Desmarcar
-                    </ActionButton>
+                  {item.status === 'CONCLUIDO' && item.foto ? (
+                    <>
+                      <PhotoDisplay>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                          <CheckCircle size={16} color="#10b981" />
+                          <strong style={{ color: '#065f46' }}>Foto anexada</strong>
+                          <span style={{
+                            background: '#dcfce7',
+                            color: '#166534',
+                            padding: '0.125rem 0.5rem',
+                            borderRadius: '0.25rem',
+                            fontSize: '0.7rem',
+                            fontWeight: '600'
+                          }}>
+                            ID: {item.foto.id}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem', marginBottom: '1rem' }}>
+                          Enviada em: {new Date(item.concluido_em || item.updatedAt).toLocaleString('pt-BR')}
+                        </div>
+                        {item.foto.url_arquivo && (
+                          <div style={{ fontSize: '0.7rem', color: '#9ca3af', marginTop: '0.25rem', marginBottom: '1rem', wordBreak: 'break-all' }}>
+                            Arquivo: {item.foto.url_arquivo.substring(0, 50)}...
+                          </div>
+                        )}
+                      </PhotoDisplay>
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                        <ActionButton 
+                          variant="primary" 
+                          onClick={() => {
+                            setErroCarregamentoImagem(false);
+                            setFotoVisualizada({ id: item.foto.id, nome: item.nome });
+                          }}
+                          style={{ background: '#3b82f6' }}
+                        >
+                          <Eye size={16} />
+                          Visualizar Foto
+                        </ActionButton>
+                        <ActionButton 
+                          variant="primary" 
+                          onClick={() => handleOpenPhotoModal(item)}
+                          style={{ background: '#10b981' }}
+                        >
+                          <Camera size={16} />
+                          Trocar Foto
+                        </ActionButton>
+                        {!item.obrigatorio && (
+                          <ActionButton variant="danger" onClick={() => handleMarcarPendente(item.id)}>
+                            <X size={16} />
+                            Desmarcar
+                          </ActionButton>
+                        )}
+                      </div>
+                    </>
+                  ) : item.status === 'CONCLUIDO' && !item.foto ? (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: '#10b981' }}>
+                        <CheckCircle size={16} />
+                        <strong>Item concluído sem foto</strong>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                        <PhotoUploadButton 
+                          variant="primary" 
+                          onClick={() => handleOpenPhotoModal(item)}
+                          disabled={uploading !== null}
+                        >
+                          <Camera size={18} />
+                          {uploading ? 'Enviando...' : 'Anexar Foto'}
+                        </PhotoUploadButton>
+                        {!item.obrigatorio && (
+                          <ActionButton variant="danger" onClick={() => handleMarcarPendente(item.id)}>
+                            <X size={16} />
+                            Desmarcar
+                          </ActionButton>
+                        )}
+                      </div>
+                    </>
                   ) : (
-                    <ActionButton variant="primary" onClick={() => handleMarcarConcluido(item.id)}>
-                      <CheckCircle size={16} />
-                      Concluir
-                    </ActionButton>
+                    <>
+                      <PhotoButtonGroup>
+                        <PhotoUploadButton 
+                          variant="primary" 
+                          onClick={() => handleOpenPhotoModal(item)}
+                          disabled={uploading !== null}
+                        >
+                          <Camera size={18} />
+                          {uploading ? 'Enviando...' : 'Tirar/Anexar Foto'}
+                        </PhotoUploadButton>
+                        {!item.obrigatorio && (
+                          <ActionButton onClick={() => handleMarcarConcluido(item.id)}>
+                            <CheckCircle size={16} />
+                            Concluir sem foto
+                          </ActionButton>
+                        )}
+                      </PhotoButtonGroup>
+                      {item.obrigatorio && (
+                        <div style={{ 
+                          fontSize: '0.75rem', 
+                          color: '#ef4444', 
+                          marginTop: '0.5rem',
+                          fontWeight: 500
+                        }}>
+                          Foto obrigatória para este item
+                        </div>
+                      )}
+                    </>
                   )}
                 </ChecklistActions>
               </ChecklistHeader>
@@ -897,6 +1966,156 @@ const VistoriadorVistoria: React.FC = () => {
           </div>
         )}
       </StatusActions>
+
+      {/* Modal de Foto */}
+      {selectedItemForPhoto && (
+        <PhotoModal onClick={(e) => {
+          if (e.target === e.currentTarget) handleClosePhotoModal();
+        }}>
+          <PhotoModalContent onClick={(e) => e.stopPropagation()}>
+            <PhotoModalHeader>
+              <PhotoModalTitle>
+                {selectedItemForPhoto.nome}
+                {selectedItemForPhoto.obrigatorio && (
+                  <span style={{
+                    marginLeft: '0.5rem',
+                    background: '#fee2e2',
+                    color: '#991b1b',
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '0.25rem',
+                    fontSize: '0.75rem',
+                    fontWeight: '600'
+                  }}>
+                    Obrigatório
+                  </span>
+                )}
+              </PhotoModalTitle>
+              <CloseModalButton onClick={handleClosePhotoModal}>
+                <X size={24} />
+              </CloseModalButton>
+            </PhotoModalHeader>
+
+            {selectedItemForPhoto.descricao && (
+              <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
+                {selectedItemForPhoto.descricao}
+              </p>
+            )}
+
+            {showCamera && cameraStream ? (
+              <>
+                <CameraContainer>
+                  <CameraVideo
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                  />
+                </CameraContainer>
+                <CameraControls>
+                  <StopCameraButton onClick={() => {
+                    setShowCamera(false);
+                    stopCamera();
+                  }}>
+                    Cancelar
+                  </StopCameraButton>
+                  <CaptureButton onClick={capturePhotoFromCamera}>
+                    <CameraInnerCircle />
+                  </CaptureButton>
+                  <div style={{ width: '70px' }}></div>
+                </CameraControls>
+              </>
+            ) : photoPreview ? (
+              <>
+                <PhotoPreviewContainer>
+                  <PhotoPreviewImage src={photoPreview} alt="Preview" />
+                </PhotoPreviewContainer>
+                <PhotoModalActions>
+                  <ActionButton variant="secondary" onClick={() => {
+                    setPhotoPreview(null);
+                    setPhotoFile(null);
+                  }}>
+                    Escolher outra
+                  </ActionButton>
+                  <ActionButton 
+                    variant="primary" 
+                    onClick={handleConfirmPhotoUpload}
+                    disabled={uploading !== null}
+                  >
+                    {uploading ? 'Enviando...' : 'Confirmar e Enviar'}
+                  </ActionButton>
+                </PhotoModalActions>
+              </>
+            ) : (
+              <PhotoModalActions style={{ flexDirection: 'column', gap: '1rem' }}>
+                <PhotoUploadButton variant="primary" onClick={handleTakePhoto}>
+                  <Camera size={20} />
+                  Tirar Foto com Câmera
+                </PhotoUploadButton>
+                <PhotoUploadButton variant="secondary" onClick={handleChooseFromGallery}>
+                  <Upload size={20} />
+                  Escolher da Galeria
+                </PhotoUploadButton>
+              </PhotoModalActions>
+            )}
+          </PhotoModalContent>
+        </PhotoModal>
+      )}
+
+      {/* Modal de Visualização de Foto */}
+      {fotoVisualizada && (
+        <FotoVisualizacaoModal onClick={() => {
+          setFotoVisualizada(null);
+          setErroCarregamentoImagem(false);
+        }}>
+          <FotoVisualizacaoContent onClick={(e) => e.stopPropagation()}>
+            <FotoVisualizacaoHeader>
+              <FotoVisualizacaoTitle>{fotoVisualizada.nome}</FotoVisualizacaoTitle>
+              <FotoVisualizacaoCloseButton onClick={() => {
+                setFotoVisualizada(null);
+                setErroCarregamentoImagem(false);
+              }}>
+                <X size={24} />
+              </FotoVisualizacaoCloseButton>
+            </FotoVisualizacaoHeader>
+            {erroCarregamentoImagem ? (
+              <FotoVisualizacaoErro>
+                <FotoVisualizacaoErroTitulo>
+                  <AlertCircle size={32} />
+                  Erro ao Carregar Imagem
+                </FotoVisualizacaoErroTitulo>
+                <FotoVisualizacaoErroMensagem>
+                  Não foi possível carregar a imagem. Isso pode acontecer se:
+                </FotoVisualizacaoErroMensagem>
+                <FotoVisualizacaoErroMensagem style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+                  • A imagem foi removida ou não existe mais<br/>
+                  • Há um problema de conexão com o servidor<br/>
+                  • O arquivo está corrompido ou inacessível
+                </FotoVisualizacaoErroMensagem>
+                <FotoVisualizacaoErroDetalhes>
+                  Foto ID: {fotoVisualizada.id}<br/>
+                  URL: {`${API_CONFIG.BASE_URL}/api/fotos/${fotoVisualizada.id}/imagem`}
+                </FotoVisualizacaoErroDetalhes>
+              </FotoVisualizacaoErro>
+            ) : (
+              <FotoVisualizacaoImage 
+                src={`${API_CONFIG.BASE_URL}/api/fotos/${fotoVisualizada.id}/imagem`}
+                alt={fotoVisualizada.nome}
+                onError={(e) => {
+                  console.error('Erro ao carregar imagem:', fotoVisualizada.id);
+                  console.error('URL tentada:', `${API_CONFIG.BASE_URL}/api/fotos/${fotoVisualizada.id}/imagem`);
+                  setErroCarregamentoImagem(true);
+                  // Esconder a imagem que falhou
+                  e.currentTarget.style.display = 'none';
+                }}
+                onLoad={() => {
+                  console.log('[FRONTEND] OK: Imagem carregada com sucesso:', fotoVisualizada.id);
+                  setErroCarregamentoImagem(false);
+                }}
+              />
+            )}
+          </FotoVisualizacaoContent>
+        </FotoVisualizacaoModal>
+      )}
     </Container>
   );
 };
