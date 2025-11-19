@@ -15,6 +15,52 @@ if (!process.env.DATABASE_URL) {
 
 const DB_SSL = String(process.env.DB_SSL || '').trim().toLowerCase() === 'true';
 
+// Detecta se a URL requer SSL (verifica se contém ?sslmode= ou similar)
+const urlRequiresSSL = process.env.DATABASE_URL && (
+  process.env.DATABASE_URL.includes('?sslmode=') ||
+  process.env.DATABASE_URL.includes('?ssl=true') ||
+  process.env.DATABASE_URL.includes('&sslmode=')
+);
+
+// Detecta se é uma URL de produção que geralmente requer SSL
+const isProductionLike = process.env.DATABASE_URL && (
+  process.env.DATABASE_URL.includes('amazonaws.com') ||
+  process.env.DATABASE_URL.includes('heroku.com') ||
+  process.env.DATABASE_URL.includes('render.com') ||
+  process.env.DATABASE_URL.includes('railway.app') ||
+  process.env.DATABASE_URL.includes('supabase.co') ||
+  process.env.DATABASE_URL.includes('neon.tech') ||
+  process.env.DATABASE_URL.includes('planetscale.com')
+);
+
+// Se DB_SSL estiver true OU a URL exigir SSL OU for uma URL de produção, configura SSL
+// com rejeição de certificado desabilitada para aceitar certificados auto-assinados
+const useSSL = DB_SSL || urlRequiresSSL || isProductionLike;
+
+// Remove parâmetros SSL da URL para evitar conflito com dialectOptions
+// O Sequelize deve usar apenas a configuração via dialectOptions
+let cleanDatabaseUrl = process.env.DATABASE_URL;
+if (useSSL) {
+  // Remove ?sslmode=require ou similar da URL usando regex
+  // Isso garante que não haja conflito entre o parâmetro da URL e dialectOptions
+  const urlParts = cleanDatabaseUrl.split('?');
+  if (urlParts.length > 1) {
+    const baseUrl = urlParts[0];
+    const params = urlParts[1];
+    // Remove parâmetros SSL
+    const cleanParams = params
+      .split('&')
+      .filter(param => !param.toLowerCase().startsWith('sslmode=') && !param.toLowerCase().startsWith('ssl='))
+      .join('&');
+    
+    if (cleanParams) {
+      cleanDatabaseUrl = `${baseUrl}?${cleanParams}`;
+    } else {
+      cleanDatabaseUrl = baseUrl;
+    }
+  }
+}
+
 const options = {
   dialect: 'postgres',
   protocol: 'postgres',
@@ -26,14 +72,23 @@ const options = {
     idle: Number(process.env.DB_POOL_IDLE || 10000),
   },
   define: { underscored: true },
-  dialectOptions: DB_SSL
-    ? { ssl: { require: true, rejectUnauthorized: false } }
+  dialectOptions: useSSL
+    ? { 
+        ssl: { 
+          require: true,
+          rejectUnauthorized: false  // Aceita certificados auto-assinados
+        } 
+      }
     : { ssl: false },
 };
 
-console.log('[config/database] DATABASE_URL =', redact(process.env.DATABASE_URL));
+console.log('[config/database] DATABASE_URL original =', redact(process.env.DATABASE_URL));
+console.log('[config/database] DATABASE_URL limpa =', redact(cleanDatabaseUrl));
 console.log('[config/database] DB_SSL =', DB_SSL);
+console.log('[config/database] URL requires SSL =', urlRequiresSSL);
+console.log('[config/database] Is production-like URL =', isProductionLike);
+console.log('[config/database] Using SSL (with rejectUnauthorized: false) =', useSSL);
 
-const sequelize = new Sequelize(process.env.DATABASE_URL, options);
+const sequelize = new Sequelize(cleanDatabaseUrl, options);
 
 module.exports = sequelize;
