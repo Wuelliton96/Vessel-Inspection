@@ -778,6 +778,7 @@ router.get('/:id/imagem', async (req, res) => {
     console.log('=== ROTA GET /api/fotos/:id/imagem ===');
     console.log('ID da foto:', req.params.id);
     console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
+    console.log('UPLOAD_STRATEGY:', UPLOAD_STRATEGY);
     
     const foto = await Foto.findByPk(req.params.id, {
       include: [{ model: Vistoria, as: 'Vistoria' }]
@@ -789,6 +790,11 @@ router.get('/:id/imagem', async (req, res) => {
       return res.status(404).json({ error: 'Foto não encontrada' });
     }
     
+    console.log('[IMAGEM] Foto encontrada:');
+    console.log(`[IMAGEM]   - ID: ${foto.id}`);
+    console.log(`[IMAGEM]   - url_arquivo: ${foto.url_arquivo}`);
+    console.log(`[IMAGEM]   - vistoria_id: ${foto.vistoria_id}`);
+    
     // Verificar se o usuário pode acessar esta foto
     const isAdmin = req.user.NivelAcesso?.id === 1;
     const isOwner = foto.Vistoria.vistoriador_id === req.user.id;
@@ -799,7 +805,16 @@ router.get('/:id/imagem', async (req, res) => {
       return res.status(403).json({ error: 'Acesso negado' });
     }
     
-    if (UPLOAD_STRATEGY === 's3') {
+    // Verificar se a imagem está no S3 (se url_arquivo começa com "vistorias/")
+    const isS3File = foto.url_arquivo && foto.url_arquivo.startsWith('vistorias/');
+    const shouldUseS3 = UPLOAD_STRATEGY === 's3' || isS3File;
+    
+    console.log(`[IMAGEM] Estrategia de armazenamento:`);
+    console.log(`[IMAGEM]   - UPLOAD_STRATEGY: ${UPLOAD_STRATEGY}`);
+    console.log(`[IMAGEM]   - url_arquivo começa com "vistorias/": ${isS3File}`);
+    console.log(`[IMAGEM]   - Usar S3: ${shouldUseS3}`);
+    
+    if (shouldUseS3) {
       // S3: Gerar presigned URL ou redirecionar para URL pública
       try {
         const { s3Client, bucket } = require('../config/aws');
@@ -807,24 +822,57 @@ router.get('/:id/imagem', async (req, res) => {
         const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
         
         const key = foto.url_arquivo;
+        
+        console.log('[IMAGEM] Configuração S3:');
+        console.log(`[IMAGEM]   - Bucket: ${bucket}`);
+        console.log(`[IMAGEM]   - Key: ${key}`);
+        console.log(`[IMAGEM]   - Vistoria ID: ${foto.vistoria_id}`);
+        
+        if (!bucket) {
+          throw new Error('Bucket S3 não configurado');
+        }
+        
+        if (!key) {
+          throw new Error('Key do arquivo não encontrada');
+        }
+        
         const command = new GetObjectCommand({
           Bucket: bucket,
           Key: key
         });
         
+        console.log('[IMAGEM] Gerando presigned URL...');
         // Gerar presigned URL válida por 1 hora
         const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
         
-        console.log('Redirecionando para presigned URL do S3');
+        console.log('[IMAGEM] Presigned URL gerada com sucesso');
+        console.log(`[IMAGEM] URL: ${presignedUrl.substring(0, 100)}...`);
         console.log('=== FIM ROTA GET /api/fotos/:id/imagem (302) ===\n');
         return res.redirect(presignedUrl);
       } catch (s3Error) {
-        console.error('Erro ao gerar presigned URL:', s3Error.message);
+        console.error('[IMAGEM] ERRO ao gerar presigned URL:', s3Error.message);
+        console.error('[IMAGEM] Stack:', s3Error.stack);
+        console.error('[IMAGEM] Detalhes do erro:', {
+          name: s3Error.name,
+          code: s3Error.code,
+          message: s3Error.message
+        });
+        
         // Fallback: tentar URL pública
-        const publicUrl = getFullPath(foto.url_arquivo, foto.vistoria_id);
-        console.log('Usando URL pública como fallback:', publicUrl);
-        console.log('=== FIM ROTA GET /api/fotos/:id/imagem (302) ===\n');
-        return res.redirect(publicUrl);
+        try {
+          const publicUrl = getFullPath(foto.url_arquivo, foto.vistoria_id);
+          console.log('[IMAGEM] Tentando URL pública como fallback:', publicUrl);
+          console.log('=== FIM ROTA GET /api/fotos/:id/imagem (302) ===\n');
+          return res.redirect(publicUrl);
+        } catch (fallbackError) {
+          console.error('[IMAGEM] ERRO no fallback:', fallbackError.message);
+          return res.status(500).json({ 
+            error: 'Erro ao acessar imagem no S3',
+            details: s3Error.message,
+            foto_id: foto.id,
+            url_arquivo: foto.url_arquivo
+          });
+        }
       }
     } else {
       // Local: Servir arquivo diretamente
