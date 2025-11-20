@@ -212,6 +212,73 @@ UNION ALL
 SELECT id, 24, 'Documentos (TIE)', 'Foto dos documentos, principalmente TIE', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 ON CONFLICT DO NOTHING;
 
+-- Checklist para EMBARCACAO_COMERCIAL
+INSERT INTO checklist_templates (tipo_embarcacao, nome, descricao, ativo) VALUES
+    ('EMBARCACAO_COMERCIAL', 'Checklist Padrão - Embarcação Comercial', 'Sequência de fotos para vistoria de Embarcação Comercial', TRUE)
+ON CONFLICT (tipo_embarcacao) DO NOTHING;
+
+INSERT INTO checklist_template_itens (checklist_template_id, ordem, nome, descricao, obrigatorio, permite_video)
+SELECT id, 1, 'Confirmação do nº de inscrição e nome', 'Foto mostrando claramente o número de inscrição e nome da embarcação comercial', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 2, 'Nome do acompanhante', 'Foto ou identificação da pessoa que acompanha a vistoria', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 3, 'Proa (frente)', 'Foto da parte frontal da embarcação', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 4, 'Âncora e sistema de ancoragem', 'Foto da âncora, corrente e sistema completo de ancoragem', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 5, 'Costado direito completo', 'Foto do lado direito completo da embarcação', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 6, 'Costado esquerdo completo', 'Foto do lado esquerdo completo da embarcação', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 7, 'Nome da embarcação', 'Foto do nome/identificação da embarcação', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 8, 'Popa (traseira)', 'Foto da parte traseira completa', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 9, 'Nº de inscrição e capitania', 'Foto da placa/adesivo com número de inscrição e capitania', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 10, 'Plaqueta do casco/chassi', 'Foto da plaqueta de identificação do casco', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 11, 'Estrutura do convés', 'Foto geral do convés principal', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 12, 'Cabine de comando', 'Foto externa da cabine de comando', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 13, 'Painel de comando principal', 'Foto do painel de comando completo', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 14, 'Equipamentos de navegação', 'Foto dos equipamentos de navegação (GPS, radar, etc)', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 15, 'Rádio comunicador', 'Foto do rádio comunicador e certificado', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 16, 'Acionamento do motor', 'Foto ou vídeo do RPM com embarcação ligada ou motor funcionando', TRUE, TRUE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 17, 'Horas do motor', 'Foto do horímetro mostrando as horas de uso', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 18, 'Extintores + validade', 'Foto dos extintores mostrando validade e localização', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 19, 'Boias salva-vidas', 'Foto das boias salva-vidas e quantidade', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 20, 'Coletes salva-vidas', 'Foto dos coletes salva-vidas e quantidade', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 21, 'Bote salva-vidas', 'Foto do bote salva-vidas e sistema de lançamento', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 22, 'Sinalizadores de emergência', 'Foto dos sinalizadores e equipamentos de sinalização', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 23, 'Visão geral do motor', 'Foto do motor completo', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 24, 'Plaqueta do motor/etiqueta', 'Foto da plaqueta de identificação do motor', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 25, 'Bombas de porão', 'Foto das bombas de porão e sistema de drenagem', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 26, 'Bombas de água doce', 'Foto do sistema de água doce', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 27, 'Baterias', 'Foto das baterias e sistema elétrico', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 28, 'Sistema de combustível', 'Foto do sistema de combustível e tanques', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 29, 'Equipamentos de segurança', 'Foto de equipamentos adicionais (EPIs, cordas, etc)', FALSE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+UNION ALL
+SELECT id, 30, 'Documentos (TIE e licenças)', 'Foto dos documentos, principalmente TIE e licenças comerciais', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+ON CONFLICT DO NOTHING;
+
 -- Tabela: Itens de checklist de cada vistoria
 CREATE TABLE IF NOT EXISTS vistoria_checklist_itens (
     id                  SERIAL PRIMARY KEY,
@@ -251,6 +318,7 @@ SELECT
     'Sistema de checklist criado com sucesso!' as mensagem,
     (SELECT COUNT(*) FROM checklist_templates) as total_templates,
     (SELECT COUNT(*) FROM checklist_template_itens WHERE checklist_template_id = (SELECT id FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI')) as itens_jetski,
-    (SELECT COUNT(*) FROM checklist_template_itens WHERE checklist_template_id = (SELECT id FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA')) as itens_lancha;
+    (SELECT COUNT(*) FROM checklist_template_itens WHERE checklist_template_id = (SELECT id FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA')) as itens_lancha,
+    (SELECT COUNT(*) FROM checklist_template_itens WHERE checklist_template_id = (SELECT id FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL')) as itens_comercial;
 
 

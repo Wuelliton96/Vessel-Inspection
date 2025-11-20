@@ -31,6 +31,16 @@ api.interceptors.response.use(
       localStorage.removeItem('usuario');
       window.location.href = '/login';
     }
+    
+    // Em produção, não expor detalhes do erro
+    if (process.env.NODE_ENV === 'production') {
+      // Criar um erro genérico sem expor detalhes sensíveis
+      const genericError = new Error('Erro ao processar requisição');
+      (genericError as any).response = error.response;
+      (genericError as any).config = error.config;
+      return Promise.reject(genericError);
+    }
+    
     return Promise.reject(error);
   }
 );
@@ -38,12 +48,7 @@ api.interceptors.response.use(
 export const authService = {
   login: async (credentials: LoginRequest): Promise<AuthResponse> => {
     try {
-      console.log('[authService] Iniciando login...');
-      console.log('[authService] API Base URL:', API_BASE_URL);
-      console.log('[authService] Credentials:', { cpf: credentials.cpf ? '***' : 'vazio', senha: '***' });
-      
       const response = await api.post('/api/auth/login', credentials);
-      console.log('[authService] Resposta recebida:', response.status);
       
       const data = response.data;
       
@@ -54,8 +59,6 @@ export const authService = {
       if (!data.user) {
         throw new Error('Dados do usuário não encontrados na resposta');
       }
-      
-      console.log('[authService] Login bem-sucedido!');
       
       const formattedResponse = {
         token: data.token,
@@ -79,7 +82,7 @@ export const authService = {
       
       return formattedResponse;
     } catch (error: any) {
-      console.error('Erro no login:', error);
+      // Erro silencioso em produção
       throw error;
     }
   },
@@ -260,21 +263,9 @@ export const localService = {
 
   update: async (id: number, data: Partial<Local>): Promise<Local> => {
     try {
-      console.log('=== API SERVICE UPDATE LOCAL ===');
-      console.log('ID:', id);
-      console.log('Data:', data);
-      console.log('URL:', `${API_BASE_URL}/api/locais/${id}`);
-      
       const response = await api.put(`/api/locais/${id}`, data);
-      console.log('Response status:', response.status);
-      console.log('Response data:', response.data);
-      console.log('=== FIM API SERVICE UPDATE ===');
-      
       return response.data;
     } catch (error: any) {
-      console.error('API Service: Erro na atualização:', error);
-      console.error('API Service: Error response:', error.response);
-      console.error('API Service: Error message:', error.message);
       throw error;
     }
   },
@@ -308,21 +299,9 @@ export const vistoriaService = {
 
   update: async (id: number, data: Partial<Vistoria>): Promise<Vistoria> => {
     try {
-      console.log('=== API SERVICE UPDATE VISTORIA ===');
-      console.log('ID:', id);
-      console.log('Data:', data);
-      console.log('URL:', `${API_BASE_URL}/api/vistorias/${id}`);
-      
       const response = await api.put(`/api/vistorias/${id}`, data);
-      console.log('Response status:', response.status);
-      console.log('Response data:', response.data);
-      console.log('=== FIM API SERVICE UPDATE ===');
-      
       return response.data;
     } catch (error: any) {
-      console.error('API Service: Erro na atualização:', error);
-      console.error('API Service: Error response:', error.response);
-      console.error('API Service: Error message:', error.message);
       throw error;
     }
   },
@@ -346,45 +325,22 @@ export const vistoriadorService = {
 
   iniciarVistoria: async (id: number): Promise<{ message: string; vistoria: Vistoria; data_inicio: string }> => {
     try {
-      console.log('=== API SERVICE INICIAR VISTORIA ===');
-      console.log('ID:', id);
-      console.log('URL:', `${API_BASE_URL}/api/vistoriador/vistorias/${id}/iniciar`);
-      
       const response = await api.put(`/api/vistoriador/vistorias/${id}/iniciar`);
-      console.log('Response status:', response.status);
-      console.log('Response data:', response.data);
-      console.log('=== FIM API SERVICE INICIAR VISTORIA ===');
-      
       return response.data;
     } catch (error: any) {
-      console.error('API Service: Erro ao iniciar vistoria:', error);
-      console.error('API Service: Error response:', error.response);
-      console.error('API Service: Error message:', error.message);
       throw error;
     }
   },
 
   updateStatus: async (id: number, statusId: number, dadosRascunho?: any): Promise<Vistoria> => {
     try {
-      console.log('=== API SERVICE UPDATE STATUS VISTORIA ===');
-      console.log('ID:', id);
-      console.log('Status ID:', statusId);
-      console.log('Dados Rascunho:', dadosRascunho);
-      
       const response = await api.put(`/api/vistoriador/vistorias/${id}/status`, {
         status_id: statusId,
         dados_rascunho: dadosRascunho
       });
       
-      console.log('Response status:', response.status);
-      console.log('Response data:', response.data);
-      console.log('=== FIM API SERVICE UPDATE STATUS ===');
-      
       return response.data;
     } catch (error: any) {
-      console.error('API Service: Erro ao atualizar status:', error);
-      console.error('API Service: Error response:', error.response);
-      console.error('API Service: Error message:', error.message);
       throw error;
     }
   },

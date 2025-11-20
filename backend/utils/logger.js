@@ -2,9 +2,10 @@ const winston = require('winston');
 const path = require('path');
 
 const logDir = path.join(__dirname, '..', 'logs');
+const isProduction = process.env.NODE_ENV === 'production';
 
 const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
+  level: process.env.LOG_LEVEL || (isProduction ? 'warn' : 'info'),
   format: winston.format.combine(
     winston.format.timestamp({
       format: 'YYYY-MM-DD HH:mm:ss'
@@ -29,7 +30,9 @@ const logger = winston.createLogger({
   ]
 });
 
-if (process.env.NODE_ENV !== 'production') {
+// Em produção, NÃO exibir logs no console
+// Apenas salvar em arquivos
+if (!isProduction) {
   logger.add(new winston.transports.Console({
     format: winston.format.combine(
       winston.format.colorize(),

@@ -286,9 +286,6 @@ const Login: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Iniciando processo de login...');
-    console.log('CPF:', cpf ? '***' : 'vazio');
-    console.log('Senha:', senha ? '***' : 'vazia');
     
     setLoading(true);
     clearErrorMessages();
@@ -318,9 +315,7 @@ const Login: React.FC = () => {
     }
 
     try {
-      console.log('Chamando função login...');
       await login(cpfLimpo, senha);
-      console.log('Login realizado com sucesso!');
       
       // O useEffect vai verificar se precisa atualizar senha
       // Se não precisar, continuar normalmente

@@ -1,6 +1,7 @@
 const { Sequelize } = require('sequelize');
 const path = require('path');
 const fs = require('fs');
+const logger = require('../utils/logger');
 
 const ENV_PATH = path.resolve(__dirname, '..', '.env');
 require('dotenv').config({ path: ENV_PATH });
@@ -8,8 +9,11 @@ require('dotenv').config({ path: ENV_PATH });
 const redact = (s) => (s ? s.replace(/:\/\/(.*?):(.*?)@/, '://****:****@') : s);
 
 if (!process.env.DATABASE_URL) {
-  const sample = fs.existsSync(ENV_PATH) ? fs.readFileSync(ENV_PATH, 'utf8') : '(arquivo não encontrado)';
-  console.error('[config/database] .env (primeiras linhas):\n', sample.split('\n').slice(0, 6).join('\n'));
+  // Em produção, não expor conteúdo do .env
+  if (process.env.NODE_ENV !== 'production') {
+    const sample = fs.existsSync(ENV_PATH) ? fs.readFileSync(ENV_PATH, 'utf8') : '(arquivo não encontrado)';
+    logger.error('[config/database] .env (primeiras linhas):\n', sample.split('\n').slice(0, 6).join('\n'));
+  }
   throw new Error('DATABASE_URL não definida em backend/.env');
 }
 
@@ -61,10 +65,16 @@ if (useSSL) {
   }
 }
 
+// Função de logging que só funciona em desenvolvimento
+const sqlLogger = process.env.NODE_ENV !== 'production' && 
+                  String(process.env.SEQ_LOG_SQL || '').toLowerCase() === 'true' 
+                  ? logger.debug.bind(logger) 
+                  : false;
+
 const options = {
   dialect: 'postgres',
   protocol: 'postgres',
-  logging: String(process.env.SEQ_LOG_SQL || '').toLowerCase() === 'true' ? console.log : false,
+  logging: sqlLogger,
   pool: {
     max: Number(process.env.DB_POOL_MAX || 10),
     min: Number(process.env.DB_POOL_MIN || 0),
@@ -82,12 +92,15 @@ const options = {
     : { ssl: false },
 };
 
-console.log('[config/database] DATABASE_URL original =', redact(process.env.DATABASE_URL));
-console.log('[config/database] DATABASE_URL limpa =', redact(cleanDatabaseUrl));
-console.log('[config/database] DB_SSL =', DB_SSL);
-console.log('[config/database] URL requires SSL =', urlRequiresSSL);
-console.log('[config/database] Is production-like URL =', isProductionLike);
-console.log('[config/database] Using SSL (with rejectUnauthorized: false) =', useSSL);
+// Logs de configuração apenas em desenvolvimento
+if (process.env.NODE_ENV !== 'production') {
+  logger.debug('[config/database] DATABASE_URL original =', redact(process.env.DATABASE_URL));
+  logger.debug('[config/database] DATABASE_URL limpa =', redact(cleanDatabaseUrl));
+  logger.debug('[config/database] DB_SSL =', DB_SSL);
+  logger.debug('[config/database] URL requires SSL =', urlRequiresSSL);
+  logger.debug('[config/database] Is production-like URL =', isProductionLike);
+  logger.debug('[config/database] Using SSL (with rejectUnauthorized: false) =', useSSL);
+}
 
 const sequelize = new Sequelize(cleanDatabaseUrl, options);
 

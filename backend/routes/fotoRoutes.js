@@ -5,17 +5,21 @@ const multer = require('multer');
 const { Foto, Vistoria, TipoFotoChecklist, VistoriaChecklistItem } = require('../models');
 const { requireAuth, requireVistoriador } = require('../middleware/auth');
 const { getUploadConfig, getFileUrl, getFullPath, deleteFile, getStorageInfo, UPLOAD_STRATEGY } = require('../services/uploadService');
+const logger = require('../utils/logger');
 
 // Configurar upload usando o service
 const upload = multer(getUploadConfig());
 
-// Log das configurações ao iniciar
-const storageInfo = getStorageInfo();
-console.log('[FOTO] Configuracoes de Upload:');
-console.log(`[FOTO]   - Estrategia: ${storageInfo.strategy}`);
-console.log(`[FOTO]   - Tamanho maximo: ${storageInfo.maxFileSize}`);
-console.log(`[FOTO]   - Tipos aceitos: ${storageInfo.allowedTypes.join(', ')}`);
-console.log(`[FOTO]   - Localizacao: ${storageInfo.location}`);
+// Log das configurações ao iniciar (apenas em desenvolvimento)
+if (process.env.NODE_ENV !== 'production') {
+  const storageInfo = getStorageInfo();
+  logger.debug('[FOTO] Configuracoes de Upload:', {
+    estrategia: storageInfo.strategy,
+    tamanhoMaximo: storageInfo.maxFileSize,
+    tiposAceitos: storageInfo.allowedTypes,
+    localizacao: storageInfo.location
+  });
+}
 
 // Aplicar middleware de autenticação em todas as rotas
 router.use(requireAuth, requireVistoriador);
@@ -23,10 +27,6 @@ router.use(requireAuth, requireVistoriador);
 // GET /api/fotos/vistoria/:id - Buscar fotos de uma vistoria
 router.get('/vistoria/:id', async (req, res) => {
   try {
-    console.log('=== ROTA GET /api/fotos/vistoria/:id ===');
-    console.log('ID da vistoria:', req.params.id);
-    console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
-    
     const vistoria = await Vistoria.findByPk(req.params.id);
     if (!vistoria) {
       return res.status(404).json({ error: 'Vistoria não encontrada' });
@@ -48,8 +48,6 @@ router.get('/vistoria/:id', async (req, res) => {
       order: [['created_at', 'ASC']]
     });
     
-    console.log('Fotos encontradas:', fotos.length);
-    
     // Construir URLs completas para cada foto
     const fotosComUrlCompleta = fotos.map(foto => {
       const fotoObj = foto.toJSON();
@@ -57,11 +55,12 @@ router.get('/vistoria/:id', async (req, res) => {
       return fotoObj;
     });
     
-    console.log('=== FIM ROTA GET /api/fotos/vistoria/:id ===\n');
-    
     res.json(fotosComUrlCompleta);
   } catch (error) {
-    console.error('Erro ao buscar fotos:', error);
+    logger.error('Erro ao buscar fotos', { 
+      vistoriaId: req.params.id, 
+      error: error.message 
+    });
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });

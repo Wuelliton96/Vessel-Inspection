@@ -2,6 +2,9 @@ if (process.env.NODE_ENV === 'production' && process.env.NEW_RELIC_LICENSE_KEY) 
   require('newrelic');
 }
 
+// IMPORTANTE: Desabilitar console.log em produção ANTES de qualquer outra coisa
+require('./utils/disableConsole');
+
 require('dotenv').config();
 
 const express = require('express');
@@ -74,7 +77,10 @@ app.use(cors({
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.log('Origem bloqueada pelo CORS:', origin);
+      // Em produção, não logar origens bloqueadas
+      if (process.env.NODE_ENV !== 'production') {
+        logger.warn('Origem não permitida pelo CORS:', origin);
+      }
       callback(null, true); // Temporariamente permitir todas para debug
     }
   },
@@ -94,11 +100,9 @@ app.use(morgan('combined', {
 
 sequelize.authenticate()
   .then(() => {
-    console.log('Conexão com o banco de dados bem-sucedida!');
     logger.info('Database connected successfully');
   })
   .catch(err => {
-    console.error('Não foi possível conectar ao banco de dados:', err);
     logger.error('Database connection failed', { error: err.message });
   });
 
@@ -164,14 +168,21 @@ function getLocalIPAddress() {
 }
 
 app.listen(PORT, () => {
-  const localIP = getLocalIPAddress();
-  console.log('='.repeat(60));
-  console.log('BACKEND - Sistema de Gestao de Vistorias Nauticas');
-  console.log('='.repeat(60));
-  console.log(`Porta: ${PORT}`);
-  console.log(`IP Local: ${localIP}`);
-  console.log(`URL Local: http://localhost:${PORT}`);
-  console.log(`URL Rede: http://${localIP}:${PORT}`);
-  console.log(`Ambiente: ${process.env.NODE_ENV || 'development'}`);
-  console.log('='.repeat(60));
+  // Em produção, não exibir informações de inicialização no console
+  if (process.env.NODE_ENV !== 'production') {
+    const localIP = getLocalIPAddress();
+    console.log('='.repeat(60));
+    console.log('BACKEND - Sistema de Gestao de Vistorias Nauticas');
+    console.log('='.repeat(60));
+    console.log(`Porta: ${PORT}`);
+    console.log(`IP Local: ${localIP}`);
+    console.log(`URL Local: http://localhost:${PORT}`);
+    console.log(`URL Rede: http://${localIP}:${PORT}`);
+    console.log(`Ambiente: ${process.env.NODE_ENV || 'development'}`);
+    console.log('='.repeat(60));
+  }
+  logger.info(`Server started on port ${PORT}`, { 
+    environment: process.env.NODE_ENV || 'development',
+    port: PORT 
+  });
 });

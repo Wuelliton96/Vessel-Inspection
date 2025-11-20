@@ -613,27 +613,23 @@ const Vistorias: React.FC = () => {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('=== CARREGANDO DADOS DE VISTORIAS ===');
       
       // Carregar seguradoras
       try {
         const { seguradoraService } = await import('../services/api');
         const segs = await seguradoraService.getAll();
         setSeguradoras(segs || []);
-        console.log('Seguradoras carregadas:', segs?.length || 0);
       } catch (err) {
-        console.error('Erro ao carregar seguradoras:', err);
+        // Erro silencioso em produção
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Erro ao carregar seguradoras:', err);
+        }
       }
-      console.log('isAdmin:', isAdmin);
       
       // Carregar vistorias baseado no nível de acesso
       const vistoriasData = isAdmin 
         ? await vistoriaService.getAll() 
         : await vistoriaService.getByVistoriador();
-      
-      console.log('Vistorias carregadas:', vistoriasData.length);
-      console.log('Primeira vistoria:', vistoriasData[0]);
-      console.log('Estrutura da primeira vistoria:', JSON.stringify(vistoriasData[0], null, 2));
       
       setVistorias(vistoriasData);
       
@@ -644,16 +640,16 @@ const Vistorias: React.FC = () => {
         // Filtrar apenas vistoriadores (nivelAcessoId === 2)
         const vistoriadoresFiltrados = vistoriadoresData.filter(u => u.nivelAcessoId === 2);
         
-        console.log('Vistoriadores carregados:', vistoriadoresFiltrados.length);
         setVistoriadores(vistoriadoresFiltrados);
       } else {
         setVistoriadores([]);
       }
-      
-      console.log('=== DADOS CARREGADOS COM SUCESSO ===');
     } catch (err: any) {
-      console.error('Erro ao carregar dados:', err);
-      setError('Erro ao carregar dados: ' + (err.response?.data?.error || err.message));
+      // Em produção, mostrar apenas mensagem genérica
+      const errorMessage = process.env.NODE_ENV === 'development' 
+        ? 'Erro ao carregar dados: ' + (err.response?.data?.error || err.message)
+        : 'Erro ao carregar dados. Tente novamente.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

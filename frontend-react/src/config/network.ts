@@ -37,7 +37,9 @@ export const getLocalIPAddress = async (): Promise<string> => {
         pc.close();
       }, 2000);
     } catch (error) {
-      console.error('[NETWORK] Erro ao detectar IP:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[NETWORK] Erro ao detectar IP:', error);
+      }
       resolve('N/A');
     }
   });
@@ -59,8 +61,12 @@ export const getNetworkInfo = async () => {
   };
 };
 
-// Exibir informacoes de rede no console ao inicializar
+// Exibir informacoes de rede no console ao inicializar (apenas em desenvolvimento)
 export const logNetworkInfo = async () => {
+  if (process.env.NODE_ENV !== 'development') {
+    return; // Não exibir logs em produção
+  }
+  
   const info = await getNetworkInfo();
   
   console.log('='.repeat(60));

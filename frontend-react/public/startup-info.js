@@ -1,5 +1,14 @@
-// Log de inicializacao do frontend
+// Log de inicializacao do frontend (apenas em desenvolvimento)
 (function() {
+  // Verificar se está em produção - não exibir logs
+  const isProduction = window.location.hostname !== 'localhost' && 
+                       !window.location.hostname.includes('127.0.0.1') &&
+                       !window.location.hostname.includes('.local');
+  
+  if (isProduction) {
+    return; // Não executar logs em produção
+  }
+  
   const startTime = new Date();
   
   // Funcao para detectar IP local
@@ -10,7 +19,11 @@
     pc.createDataChannel('');
     pc.createOffer()
       .then(offer => pc.setLocalDescription(offer))
-      .catch(err => console.log('[FRONTEND] Erro ao detectar IP:', err));
+      .catch(err => {
+        if (!isProduction) {
+          console.log('[FRONTEND] Erro ao detectar IP:', err);
+        }
+      });
     
     pc.onicecandidate = function(ice) {
       if (!ice || !ice.candidate || !ice.candidate.candidate) {

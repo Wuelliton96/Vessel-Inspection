@@ -19,11 +19,13 @@ export const API_CONFIG = {
   TIMEOUT: 10000,
 };
 
-// Log da configuracao ao inicializar
-console.log('[API CONFIG]', {
-  baseUrl: API_CONFIG.BASE_URL,
-  timeout: API_CONFIG.TIMEOUT,
-  environment: process.env.NODE_ENV || 'development'
-});
+// Log da configuracao ao inicializar (apenas em desenvolvimento)
+if (process.env.NODE_ENV === 'development') {
+  console.log('[API CONFIG]', {
+    baseUrl: API_CONFIG.BASE_URL,
+    timeout: API_CONFIG.TIMEOUT,
+    environment: process.env.NODE_ENV || 'development'
+  });
+}
 
 
