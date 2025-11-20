@@ -1,5 +1,6 @@
 const request = require('supertest');
 const express = require('express');
+const bcrypt = require('bcryptjs');
 const vistoriaRoutes = require('../../routes/vistoriaRoutes');
 const { 
   Usuario, 
@@ -9,14 +10,6 @@ const {
   StatusVistoria, 
   Vistoria 
 } = require('../../models');
-
-// Mock do Clerk
-jest.mock('@clerk/clerk-sdk-node', () => ({
-  ClerkExpressRequireAuth: () => (req, res, next) => {
-    req.auth = { userId: 'test-clerk-admin' };
-    next();
-  }
-}));
 
 describe('Rotas de Vistoria', () => {
   let app;
@@ -39,17 +32,21 @@ describe('Rotas de Vistoria', () => {
     });
 
     // Criar usuários
+    const senhaHash = await bcrypt.hash('Teste@123', 10);
+    
     usuarioAdmin = await Usuario.create({
-      clerk_user_id: 'test-clerk-admin',
+      cpf: '12345678901',
       nome: 'Admin Teste',
       email: 'admin@teste.com',
+      senha_hash: senhaHash,
       nivel_acesso_id: nivelAdmin.id
     });
 
     usuarioVistoriador = await Usuario.create({
-      clerk_user_id: 'clerk-vistoriador',
+      cpf: '12345678902',
       nome: 'Vistoriador Teste',
       email: 'vistoriador@teste.com',
+      senha_hash: senhaHash,
       nivel_acesso_id: nivelVistoriador.id
     });
 

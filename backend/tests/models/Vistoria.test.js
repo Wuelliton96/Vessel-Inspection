@@ -1,3 +1,4 @@
+const bcrypt = require('bcryptjs');
 const { 
   Vistoria, 
   Usuario, 
@@ -23,17 +24,21 @@ describe('Modelo Vistoria', () => {
     });
 
     // Criar usuários
+    const senhaHash = await bcrypt.hash('Teste@123', 10);
+    
     vistoriador = await Usuario.create({
-      clerk_user_id: 'clerk_vistoriador',
+      cpf: '12345678911',
       nome: 'Vistoriador Teste',
       email: 'vistoriador@teste.com',
+      senha_hash: senhaHash,
       nivel_acesso_id: nivelVistoriador.id
     });
 
     administrador = await Usuario.create({
-      clerk_user_id: 'clerk_admin',
+      cpf: '12345678912',
       nome: 'Admin Teste',
       email: 'admin@teste.com',
+      senha_hash: senhaHash,
       nivel_acesso_id: nivelAdmin.id
     });
 

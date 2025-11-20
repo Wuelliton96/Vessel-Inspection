@@ -1,3 +1,4 @@
+const bcrypt = require('bcryptjs');
 const { Foto, Vistoria, TipoFotoChecklist, Usuario, Embarcacao, Local, StatusVistoria, NivelAcesso } = require('../../models');
 
 describe('Modelo Foto', () => {
@@ -10,10 +11,12 @@ describe('Modelo Foto', () => {
       descricao: 'Nível para vistoriadores'
     });
 
+    const senhaHash = await bcrypt.hash('Teste@123', 10);
     const usuario = await Usuario.create({
-      clerk_user_id: 'clerk_test',
+      cpf: '12345678913',
       nome: 'Usuário Teste',
       email: 'teste@teste.com',
+      senha_hash: senhaHash,
       nivel_acesso_id: nivelAcesso.id
     });
 

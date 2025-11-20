@@ -14,10 +14,19 @@ describe('Rotas de Seguradoras', () => {
   beforeAll(async () => {
     await sequelize.sync({ force: true });
     await NivelAcesso.create({ id: 1, nome: 'ADMINISTRADOR', descricao: 'Admin' });
+    const senhaHash = await bcrypt.hash('Teste@123', 10);
     const admin = await Usuario.create({
-      nome: 'Admin', email: 'admin@seg.test', senha_hash: 'hash', nivel_acesso_id: 1
+      cpf: '12345678906',
+      nome: 'Admin', 
+      email: 'admin@seg.test', 
+      senha_hash: senhaHash, 
+      nivel_acesso_id: 1
     });
-    adminToken = jwt.sign({ userId: admin.id, nivelAcessoId: 1 }, process.env.JWT_SECRET || 'test-secret');
+    adminToken = jwt.sign({ 
+      userId: admin.id, 
+      cpf: admin.cpf,
+      nivelAcessoId: 1 
+    }, process.env.JWT_SECRET || 'sua-chave-secreta-jwt');
   });
 
   afterAll(async () => {

@@ -1,3 +1,4 @@
+const bcrypt = require('bcryptjs');
 const { Usuario, NivelAcesso } = require('../../models');
 
 describe('Modelo Usuario', () => {
@@ -13,10 +14,12 @@ describe('Modelo Usuario', () => {
 
   describe('Criação de usuário', () => {
     it('deve criar um usuário com dados válidos', async () => {
+      const senhaHash = await bcrypt.hash('Teste@123', 10);
       const usuarioData = {
-        clerk_user_id: 'clerk_123',
+        cpf: '12345678901',
         nome: 'João Silva',
         email: 'joao@teste.com',
+        senha_hash: senhaHash,
         nivel_acesso_id: nivelAcesso.id,
         ativo: true
       };
@@ -24,7 +27,7 @@ describe('Modelo Usuario', () => {
       const usuario = await Usuario.create(usuarioData);
 
       expect(usuario).toBeDefined();
-      expect(usuario.clerk_user_id).toBe(usuarioData.clerk_user_id);
+      expect(usuario.cpf).toBe(usuarioData.cpf);
       expect(usuario.nome).toBe(usuarioData.nome);
       expect(usuario.email).toBe(usuarioData.email);
       expect(usuario.nivel_acesso_id).toBe(usuarioData.nivel_acesso_id);
@@ -32,10 +35,12 @@ describe('Modelo Usuario', () => {
     });
 
     it('deve definir ativo como true por padrão', async () => {
+      const senhaHash = await bcrypt.hash('Teste@123', 10);
       const usuarioData = {
-        clerk_user_id: 'clerk_456',
+        cpf: '12345678902',
         nome: 'Maria Santos',
         email: 'maria@teste.com',
+        senha_hash: senhaHash,
         nivel_acesso_id: nivelAcesso.id
       };
 
@@ -44,10 +49,12 @@ describe('Modelo Usuario', () => {
       expect(usuario.ativo).toBe(true);
     });
 
-    it('deve falhar ao criar usuário sem clerk_user_id', async () => {
+    it('deve falhar ao criar usuário sem cpf', async () => {
+      const senhaHash = await bcrypt.hash('Teste@123', 10);
       const usuarioData = {
         nome: 'João Silva',
         email: 'joao@teste.com',
+        senha_hash: senhaHash,
         nivel_acesso_id: nivelAcesso.id
       };
 
@@ -55,18 +62,20 @@ describe('Modelo Usuario', () => {
     });
 
     it('deve falhar ao criar usuário sem nome', async () => {
+      const senhaHash = await bcrypt.hash('Teste@123', 10);
       const usuarioData = {
-        clerk_user_id: 'clerk_123',
+        cpf: '12345678903',
         email: 'joao@teste.com',
+        senha_hash: senhaHash,
         nivel_acesso_id: nivelAcesso.id
       };
 
       await expect(Usuario.create(usuarioData)).rejects.toThrow();
     });
 
-    it('deve falhar ao criar usuário sem email', async () => {
+    it('deve falhar ao criar usuário sem senha_hash', async () => {
       const usuarioData = {
-        clerk_user_id: 'clerk_123',
+        cpf: '12345678904',
         nome: 'João Silva',
         nivel_acesso_id: nivelAcesso.id
       };
@@ -75,10 +84,12 @@ describe('Modelo Usuario', () => {
     });
 
     it('deve falhar ao criar usuário sem nivel_acesso_id', async () => {
+      const senhaHash = await bcrypt.hash('Teste@123', 10);
       const usuarioData = {
-        clerk_user_id: 'clerk_123',
+        cpf: '12345678905',
         nome: 'João Silva',
-        email: 'joao@teste.com'
+        email: 'joao@teste.com',
+        senha_hash: senhaHash
       };
 
       await expect(Usuario.create(usuarioData)).rejects.toThrow();
@@ -86,18 +97,21 @@ describe('Modelo Usuario', () => {
   });
 
   describe('Validações de unicidade', () => {
-    it('deve falhar ao criar usuário com clerk_user_id duplicado', async () => {
+    it('deve falhar ao criar usuário com cpf duplicado', async () => {
+      const senhaHash = await bcrypt.hash('Teste@123', 10);
       const usuarioData1 = {
-        clerk_user_id: 'clerk_duplicado',
+        cpf: '12345678906',
         nome: 'João Silva',
         email: 'joao@teste.com',
+        senha_hash: senhaHash,
         nivel_acesso_id: nivelAcesso.id
       };
 
       const usuarioData2 = {
-        clerk_user_id: 'clerk_duplicado',
+        cpf: '12345678906',
         nome: 'Maria Santos',
         email: 'maria@teste.com',
+        senha_hash: senhaHash,
         nivel_acesso_id: nivelAcesso.id
       };
 
@@ -106,17 +120,20 @@ describe('Modelo Usuario', () => {
     });
 
     it('deve falhar ao criar usuário com email duplicado', async () => {
+      const senhaHash = await bcrypt.hash('Teste@123', 10);
       const usuarioData1 = {
-        clerk_user_id: 'clerk_123',
+        cpf: '12345678907',
         nome: 'João Silva',
         email: 'email@duplicado.com',
+        senha_hash: senhaHash,
         nivel_acesso_id: nivelAcesso.id
       };
 
       const usuarioData2 = {
-        clerk_user_id: 'clerk_456',
+        cpf: '12345678908',
         nome: 'Maria Santos',
         email: 'email@duplicado.com',
+        senha_hash: senhaHash,
         nivel_acesso_id: nivelAcesso.id
       };
 
@@ -127,17 +144,19 @@ describe('Modelo Usuario', () => {
 
   describe('Associações', () => {
     it('deve incluir NivelAcesso ao buscar usuário', async () => {
+      const senhaHash = await bcrypt.hash('Teste@123', 10);
       const usuarioData = {
-        clerk_user_id: 'clerk_123',
+        cpf: '12345678909',
         nome: 'João Silva',
         email: 'joao@teste.com',
+        senha_hash: senhaHash,
         nivel_acesso_id: nivelAcesso.id
       };
 
       await Usuario.create(usuarioData);
 
       const usuario = await Usuario.findOne({
-        where: { clerk_user_id: 'clerk_123' },
+        where: { cpf: '12345678909' },
         include: NivelAcesso
       });
 
@@ -151,10 +170,12 @@ describe('Modelo Usuario', () => {
     let usuario;
 
     beforeEach(async () => {
+      const senhaHash = await bcrypt.hash('Teste@123', 10);
       usuario = await Usuario.create({
-        clerk_user_id: 'clerk_crud',
+        cpf: '12345678910',
         nome: 'Usuário CRUD',
         email: 'crud@teste.com',
+        senha_hash: senhaHash,
         nivel_acesso_id: nivelAcesso.id
       });
     });

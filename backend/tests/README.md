@@ -112,7 +112,7 @@ module.exports = {
 ### Setup Global (`tests/setup.js`)
 - Configuração do banco de dados de teste
 - Limpeza entre testes
-- Mocks globais (Clerk, etc.)
+- Mocks globais (se necessário)
 
 ### Helpers (`tests/helpers/testHelpers.js`)
 - Funções utilitárias para criar dados de teste

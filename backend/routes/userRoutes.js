@@ -7,43 +7,6 @@ const { registrarAuditoria, auditoriaMiddleware, salvarDadosOriginais } = requir
 const { strictRateLimiter, moderateRateLimiter } = require('../middleware/rateLimiting');
 const { validarTelefoneE164, converterParaE164, validarEstado, validarCPF, limparCPF } = require('../utils/validators');
 
-router.post('/sync', async (req, res) => {
-  try {
-    const safeBody = (req && req.body && typeof req.body === 'object') ? req.body : {};
-    const { id: clerk_user_id, email, nome } = safeBody;
-
-    if (!clerk_user_id || !email || !nome) {
-      return res.status(400).json({ error: 'Dados do usuário incompletos.' });
-    }
-
-    const vistoriadorRole = await NivelAcesso.findOne({ where: { nome: 'VISTORIADOR' } });
-    if (!vistoriadorRole) {
-      return res.status(500).json({ error: 'Nível de acesso "VISTORIADOR" não encontrado.' });
-    }
-
-    const [usuario, criado] = await Usuario.findOrCreate({
-      where: { clerk_user_id: clerk_user_id },
-      defaults: {
-        nome: nome,
-        email: email,
-        nivel_acesso_id: vistoriadorRole.id
-      }
-    });
-
-    if (criado) {
-      console.log(`Novo usuário sincronizado: ${usuario.email}`);
-      return res.status(201).json({ message: 'Usuário sincronizado com sucesso!', usuario });
-    }
-
-    console.log(`Usuário já existente: ${usuario.email}`);
-    return res.status(200).json({ message: 'Usuário já estava sincronizado.', usuario });
-
-  } catch (error) {
-    console.error('Erro ao sincronizar usuário:', error);
-    res.status(500).json({ error: 'Erro interno do servidor.' });
-  }
-});
-
 router.get('/', requireAuth, requireAdmin, async (req, res) => {
   try {
     const usuarios = await Usuario.findAll({

@@ -1,8 +1,9 @@
 const request = require('supertest');
 const express = require('express');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { sequelize, Embarcacao, Usuario, NivelAcesso, Seguradora, Cliente } = require('../../models');
 const embarcacaoRoutes = require('../../routes/embarcacaoRoutes');
-const jwt = require('jsonwebtoken');
 
 const app = express();
 app.use(express.json());
@@ -18,12 +19,22 @@ describe('Rotas de Embarcações', () => {
     await NivelAcesso.create({ id: 1, nome: 'ADMINISTRADOR', descricao: 'Admin' });
     await NivelAcesso.create({ id: 2, nome: 'VISTORIADOR', descricao: 'Vistoriador' });
 
+    const senhaHash = await bcrypt.hash('Teste@123', 10);
+    
     admin = await Usuario.create({
-      nome: 'Admin', email: 'admin@emb.test', senha_hash: 'hash', nivel_acesso_id: 1
+      cpf: '12345678903',
+      nome: 'Admin', 
+      email: 'admin@emb.test', 
+      senha_hash: senhaHash, 
+      nivel_acesso_id: 1
     });
 
     vistoriador = await Usuario.create({
-      nome: 'Vistoriador', email: 'vist@emb.test', senha_hash: 'hash', nivel_acesso_id: 2
+      cpf: '12345678904',
+      nome: 'Vistoriador', 
+      email: 'vist@emb.test', 
+      senha_hash: senhaHash, 
+      nivel_acesso_id: 2
     });
 
     adminToken = jwt.sign({ userId: admin.id, nivelAcessoId: 1 }, process.env.JWT_SECRET || 'test-secret');

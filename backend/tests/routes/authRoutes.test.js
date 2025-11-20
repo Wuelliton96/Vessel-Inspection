@@ -21,6 +21,7 @@ describe('Rotas de Autenticação', () => {
     const senhaHash = await bcrypt.hash('Teste@123', 10);
     
     admin = await Usuario.create({
+      cpf: '12345678901',
       nome: 'Admin Test',
       email: 'admin@auth.test',
       senha_hash: senhaHash,
@@ -28,6 +29,7 @@ describe('Rotas de Autenticação', () => {
     });
 
     vistoriador = await Usuario.create({
+      cpf: '12345678902',
       nome: 'Vistoriador Test',
       email: 'vist@auth.test',
       senha_hash: senhaHash,
@@ -40,66 +42,85 @@ describe('Rotas de Autenticação', () => {
   });
 
   describe('POST /api/auth/login', () => {
-    it('deve fazer login com credenciais válidas', async () => {
+    it('deve fazer login com CPF e senha válidos', async () => {
       const response = await request(app)
         .post('/api/auth/login')
         .send({
-          email: 'admin@auth.test',
+          cpf: '12345678901',
           senha: 'Teste@123'
         });
 
       expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
       expect(response.body.token).toBeDefined();
+      expect(response.body.user.cpf).toBe('12345678901');
       expect(response.body.user.email).toBe('admin@auth.test');
     });
 
-    it('deve retornar 400 sem email', async () => {
+    it('deve fazer login com CPF formatado', async () => {
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({
+          cpf: '123.456.789-01',
+          senha: 'Teste@123'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+
+    it('deve retornar 400 sem CPF', async () => {
       const response = await request(app)
         .post('/api/auth/login')
         .send({ senha: 'Teste@123' });
 
       expect(response.status).toBe(400);
+      expect(response.body.code).toBe('CAMPOS_OBRIGATORIOS');
     });
 
     it('deve retornar 400 sem senha', async () => {
       const response = await request(app)
         .post('/api/auth/login')
-        .send({ email: 'admin@auth.test' });
+        .send({ cpf: '12345678901' });
 
       expect(response.status).toBe(400);
+      expect(response.body.code).toBe('CAMPOS_OBRIGATORIOS');
     });
 
-    it('deve retornar 400 com email inválido', async () => {
+    it('deve retornar 400 com CPF inválido', async () => {
       const response = await request(app)
         .post('/api/auth/login')
         .send({
-          email: 'email-invalido',
+          cpf: '123',
           senha: 'Teste@123'
         });
 
       expect(response.status).toBe(400);
+      expect(response.body.code).toBe('CPF_INVALIDO');
     });
 
-    it('deve retornar 401 com email não cadastrado', async () => {
+    it('deve retornar 401 com CPF não cadastrado', async () => {
       const response = await request(app)
         .post('/api/auth/login')
         .send({
-          email: 'inexistente@test.com',
+          cpf: '99999999999',
           senha: 'Teste@123'
         });
 
       expect(response.status).toBe(401);
+      expect(response.body.code).toBe('CPF_NAO_ENCONTRADO');
     });
 
     it('deve retornar 401 com senha incorreta', async () => {
       const response = await request(app)
         .post('/api/auth/login')
         .send({
-          email: 'admin@auth.test',
+          cpf: '12345678901',
           senha: 'SenhaErrada@123'
         });
 
       expect(response.status).toBe(401);
+      expect(response.body.code).toBe('SENHA_INCORRETA');
     });
   });
 
@@ -114,6 +135,7 @@ describe('Rotas de Autenticação', () => {
         });
 
       expect(response.status).toBe(201);
+      expect(response.body.success).toBe(true);
       expect(response.body.token).toBeDefined();
       expect(response.body.user.email).toBe('novo@auth.test');
     });
@@ -136,6 +158,7 @@ describe('Rotas de Autenticação', () => {
         });
 
       expect(response.status).toBe(400);
+      expect(response.body.error).toContain('Email já cadastrado');
     });
 
     it('deve retornar 400 sem campos obrigatórios', async () => {
@@ -144,14 +167,33 @@ describe('Rotas de Autenticação', () => {
         .send({ nome: 'Sem Email' });
 
       expect(response.status).toBe(400);
+      expect(response.body.error).toContain('obrigatórios');
+    });
+
+    it('deve retornar 400 sem nome', async () => {
+      const response = await request(app)
+        .post('/api/auth/register')
+        .send({
+          email: 'teste@test.com',
+          senha: 'Senha@123'
+        });
+
+      expect(response.status).toBe(400);
     });
   });
 
   describe('GET /api/auth/me', () => {
     it('deve retornar dados do usuário autenticado', async () => {
       const token = jwt.sign(
-        { userId: admin.id, email: admin.email },
-        process.env.JWT_SECRET || 'test-secret'
+        { 
+          userId: admin.id, 
+          cpf: admin.cpf,
+          email: admin.email,
+          nome: admin.nome,
+          nivelAcesso: 'ADMINISTRADOR',
+          nivelAcessoId: 1
+        },
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
       );
 
       const response = await request(app)
@@ -159,7 +201,9 @@ describe('Rotas de Autenticação', () => {
         .set('Authorization', `Bearer ${token}`);
 
       expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
       expect(response.body.user.email).toBe('admin@auth.test');
+      expect(response.body.user.cpf).toBe('12345678901');
     });
 
     it('deve retornar 401 sem token', async () => {

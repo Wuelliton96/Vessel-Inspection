@@ -1,4 +1,5 @@
 // Helpers para testes
+const bcrypt = require('bcryptjs');
 const { 
   Usuario, 
   NivelAcesso, 
@@ -32,24 +33,29 @@ const createTestData = async () => {
   });
 
   // Criar usuários
+  const senhaHash = await bcrypt.hash('Teste@123', 10);
+  
   const usuarioAdmin = await Usuario.create({
-    clerk_user_id: 'clerk_admin_test',
+    cpf: '12345678901',
     nome: 'Admin Teste',
     email: 'admin@teste.com',
+    senha_hash: senhaHash,
     nivel_acesso_id: nivelAdmin.id
   });
 
   const usuarioVistoriador = await Usuario.create({
-    clerk_user_id: 'clerk_vistoriador_test',
+    cpf: '12345678902',
     nome: 'Vistoriador Teste',
     email: 'vistoriador@teste.com',
+    senha_hash: senhaHash,
     nivel_acesso_id: nivelVistoriador.id
   });
 
   const usuarioAprovador = await Usuario.create({
-    clerk_user_id: 'clerk_aprovador_test',
+    cpf: '12345678903',
     nome: 'Aprovador Teste',
     email: 'aprovador@teste.com',
+    senha_hash: senhaHash,
     nivel_acesso_id: nivelAprovador.id
   });
 
@@ -244,15 +250,21 @@ const cleanupTestData = async () => {
  * Cria um usuário de teste com dados específicos
  */
 const createTestUser = async (overrides = {}) => {
+  const senhaHash = await bcrypt.hash('Teste@123', 10);
   const defaultData = {
-    clerk_user_id: 'clerk_test_user',
+    cpf: '12345678900',
     nome: 'Usuário Teste',
     email: 'teste@teste.com',
+    senha_hash: senhaHash,
     nivel_acesso_id: 1,
     ativo: true
   };
 
   const userData = { ...defaultData, ...overrides };
+  // Se cpf não foi fornecido, gerar um único
+  if (!userData.cpf || userData.cpf === defaultData.cpf) {
+    userData.cpf = `${Date.now()}`.slice(-11).padStart(11, '0');
+  }
   return await Usuario.create(userData);
 };
 
@@ -309,9 +321,10 @@ const createTestVistoria = async (overrides = {}) => {
  */
 const mockRequestData = {
   usuario: {
-    id: 'clerk_test_user',
+    id: 1,
     email: 'teste@teste.com',
-    nome: 'Usuário Teste'
+    nome: 'Usuário Teste',
+    cpf: '12345678900'
   },
   vistoria: {
     embarcacao_nome: 'Barco Teste',
