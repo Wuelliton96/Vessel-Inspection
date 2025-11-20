@@ -1,21 +1,33 @@
 const jwt = require('jsonwebtoken');
-const { authenticateToken, requireAdmin, requireAdminOrVistoriador } = require('../../middleware/auth');
+const bcrypt = require('bcryptjs');
+const { requireAuth, requireAdmin, requireVistoriador, requireAuthAllowPasswordUpdate } = require('../../middleware/auth');
 const { Usuario, NivelAcesso, sequelize } = require('../../models');
 
 describe('Auth Middleware', () => {
   let mockReq, mockRes, mockNext;
-  let testUser;
+  let testUser, testVistoriador;
 
   beforeAll(async () => {
     await sequelize.sync({ force: true });
     await NivelAcesso.create({ id: 1, nome: 'ADMINISTRADOR', descricao: 'Admin' });
     await NivelAcesso.create({ id: 2, nome: 'VISTORIADOR', descricao: 'Vistoriador' });
     
+    const senhaHash = await bcrypt.hash('Teste@123', 10);
+    
     testUser = await Usuario.create({
+      cpf: '12345678916',
       nome: 'Test User',
       email: 'test@auth.middleware',
-      senha_hash: 'hash',
+      senha_hash: senhaHash,
       nivel_acesso_id: 1
+    });
+
+    testVistoriador = await Usuario.create({
+      cpf: '12345678917',
+      nome: 'Test Vistoriador',
+      email: 'vist@auth.middleware',
+      senha_hash: senhaHash,
+      nivel_acesso_id: 2
     });
   });
 
@@ -35,16 +47,23 @@ describe('Auth Middleware', () => {
     mockNext = jest.fn();
   });
 
-  describe('authenticateToken', () => {
+  describe('requireAuth', () => {
     it('deve passar com token válido', async () => {
       const token = jwt.sign(
-        { userId: testUser.id, email: testUser.email },
-        process.env.JWT_SECRET || 'test-secret'
+        { 
+          userId: testUser.id, 
+          cpf: testUser.cpf,
+          email: testUser.email,
+          nome: testUser.nome,
+          nivelAcesso: 'ADMINISTRADOR',
+          nivelAcessoId: 1
+        },
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
       );
 
       mockReq.header.mockReturnValue(`Bearer ${token}`);
 
-      await authenticateToken(mockReq, mockRes, mockNext);
+      await requireAuth(mockReq, mockRes, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
       expect(mockReq.user).toBeDefined();
@@ -54,96 +73,178 @@ describe('Auth Middleware', () => {
     it('deve retornar 401 sem token', async () => {
       mockReq.header.mockReturnValue(null);
 
-      await authenticateToken(mockReq, mockRes, mockNext);
+      await requireAuth(mockReq, mockRes, mockNext);
 
       expect(mockRes.status).toHaveBeenCalledWith(401);
       expect(mockRes.json).toHaveBeenCalledWith({ 
-        error: 'Token não fornecido' 
+        error: 'Token não fornecido.' 
       });
     });
 
     it('deve retornar 401 com token inválido', async () => {
       mockReq.header.mockReturnValue('Bearer token-invalido');
 
-      await authenticateToken(mockReq, mockRes, mockNext);
+      await requireAuth(mockReq, mockRes, mockNext);
 
       expect(mockRes.status).toHaveBeenCalledWith(401);
     });
 
-    it('deve retornar 404 se usuário não existir', async () => {
+    it('deve retornar 401 se usuário não existir', async () => {
       const token = jwt.sign(
-        { userId: 99999, email: 'fake@test.com' },
-        process.env.JWT_SECRET || 'test-secret'
+        { 
+          userId: 99999, 
+          cpf: '99999999999',
+          email: 'fake@test.com',
+          nome: 'Fake',
+          nivelAcesso: 'ADMINISTRADOR',
+          nivelAcessoId: 1
+        },
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
       );
 
       mockReq.header.mockReturnValue(`Bearer ${token}`);
 
-      await authenticateToken(mockReq, mockRes, mockNext);
+      await requireAuth(mockReq, mockRes, mockNext);
 
-      expect(mockRes.status).toHaveBeenCalledWith(404);
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+    });
+
+    it('deve retornar 403 se usuário deve atualizar senha', async () => {
+      await testUser.update({ deve_atualizar_senha: true });
+      
+      const token = jwt.sign(
+        { 
+          userId: testUser.id, 
+          cpf: testUser.cpf,
+          email: testUser.email,
+          nome: testUser.nome,
+          nivelAcesso: 'ADMINISTRADOR',
+          nivelAcessoId: 1
+        },
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
+      );
+
+      mockReq.header.mockReturnValue(`Bearer ${token}`);
+
+      await requireAuth(mockReq, mockRes, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(403);
+      
+      await testUser.update({ deve_atualizar_senha: false });
     });
   });
 
   describe('requireAdmin', () => {
-    it('deve passar para admin', () => {
-      mockReq.user = { nivelAcessoId: 1 };
+    it('deve passar para admin', async () => {
+      const token = jwt.sign(
+        { 
+          userId: testUser.id, 
+          cpf: testUser.cpf,
+          nivelAcessoId: 1
+        },
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
+      );
 
-      requireAdmin(mockReq, mockRes, mockNext);
+      mockReq.header.mockReturnValue(`Bearer ${token}`);
+      await requireAuth(mockReq, mockRes, mockNext);
 
-      expect(mockNext).toHaveBeenCalled();
+      await requireAdmin(mockReq, mockRes, mockNext);
+      expect(mockNext).toHaveBeenCalledTimes(2);
     });
 
-    it('deve retornar 403 para não-admin', () => {
-      mockReq.user = { nivelAcessoId: 2 };
+    it('deve retornar 403 para não-admin', async () => {
+      const token = jwt.sign(
+        { 
+          userId: testVistoriador.id, 
+          cpf: testVistoriador.cpf,
+          nivelAcessoId: 2
+        },
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
+      );
 
-      requireAdmin(mockReq, mockRes, mockNext);
+      mockReq.header.mockReturnValue(`Bearer ${token}`);
+      await requireAuth(mockReq, mockRes, mockNext);
 
+      await requireAdmin(mockReq, mockRes, mockNext);
       expect(mockRes.status).toHaveBeenCalledWith(403);
-      expect(mockRes.json).toHaveBeenCalledWith({ 
-        error: 'Acesso negado. Apenas administradores.' 
-      });
     });
 
-    it('deve retornar 403 sem usuário', () => {
+    it('deve retornar 401 sem usuário', async () => {
       mockReq.user = null;
 
-      requireAdmin(mockReq, mockRes, mockNext);
+      await requireAdmin(mockReq, mockRes, mockNext);
 
-      expect(mockRes.status).toHaveBeenCalledWith(403);
+      expect(mockRes.status).toHaveBeenCalledWith(401);
     });
   });
 
-  describe('requireAdminOrVistoriador', () => {
-    it('deve passar para admin', () => {
-      mockReq.user = { nivelAcessoId: 1 };
+  describe('requireVistoriador', () => {
+    it('deve passar para admin', async () => {
+      const token = jwt.sign(
+        { 
+          userId: testUser.id, 
+          cpf: testUser.cpf,
+          nivelAcessoId: 1
+        },
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
+      );
 
-      requireAdminOrVistoriador(mockReq, mockRes, mockNext);
+      mockReq.header.mockReturnValue(`Bearer ${token}`);
+      await requireAuth(mockReq, mockRes, mockNext);
 
-      expect(mockNext).toHaveBeenCalled();
+      await requireVistoriador(mockReq, mockRes, mockNext);
+      expect(mockNext).toHaveBeenCalledTimes(2);
     });
 
-    it('deve passar para vistoriador', () => {
-      mockReq.user = { nivelAcessoId: 2 };
+    it('deve passar para vistoriador', async () => {
+      const token = jwt.sign(
+        { 
+          userId: testVistoriador.id, 
+          cpf: testVistoriador.cpf,
+          nivelAcessoId: 2
+        },
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
+      );
 
-      requireAdminOrVistoriador(mockReq, mockRes, mockNext);
+      mockReq.header.mockReturnValue(`Bearer ${token}`);
+      await requireAuth(mockReq, mockRes, mockNext);
 
-      expect(mockNext).toHaveBeenCalled();
+      await requireVistoriador(mockReq, mockRes, mockNext);
+      expect(mockNext).toHaveBeenCalledTimes(2);
     });
 
-    it('deve retornar 403 para outros níveis', () => {
-      mockReq.user = { nivelAcessoId: 3 };
-
-      requireAdminOrVistoriador(mockReq, mockRes, mockNext);
-
-      expect(mockRes.status).toHaveBeenCalledWith(403);
-    });
-
-    it('deve retornar 403 sem usuário', () => {
+    it('deve retornar 401 sem usuário', async () => {
       mockReq.user = null;
 
-      requireAdminOrVistoriador(mockReq, mockRes, mockNext);
+      await requireVistoriador(mockReq, mockRes, mockNext);
 
-      expect(mockRes.status).toHaveBeenCalledWith(403);
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+    });
+  });
+
+  describe('requireAuthAllowPasswordUpdate', () => {
+    it('deve passar mesmo com deve_atualizar_senha = true', async () => {
+      await testUser.update({ deve_atualizar_senha: true });
+      
+      const token = jwt.sign(
+        { 
+          userId: testUser.id, 
+          cpf: testUser.cpf,
+          email: testUser.email,
+          nome: testUser.nome,
+          nivelAcesso: 'ADMINISTRADOR',
+          nivelAcessoId: 1
+        },
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
+      );
+
+      mockReq.header.mockReturnValue(`Bearer ${token}`);
+
+      await requireAuthAllowPasswordUpdate(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      
+      await testUser.update({ deve_atualizar_senha: false });
     });
   });
 });

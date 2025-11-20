@@ -1,8 +1,9 @@
 const request = require('supertest');
 const express = require('express');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { sequelize, Local, Usuario, NivelAcesso } = require('../../models');
 const localRoutes = require('../../routes/localRoutes');
-const jwt = require('jsonwebtoken');
 
 const app = express();
 app.use(express.json());
@@ -14,10 +15,19 @@ describe('Rotas de Locais', () => {
   beforeAll(async () => {
     await sequelize.sync({ force: true });
     await NivelAcesso.create({ id: 2, nome: 'VISTORIADOR', descricao: 'Vistoriador' });
+    const senhaHash = await bcrypt.hash('Teste@123', 10);
     const vistoriador = await Usuario.create({
-      nome: 'Vistoriador', email: 'vist@local.test', senha_hash: 'hash', nivel_acesso_id: 2
+      cpf: '12345678907',
+      nome: 'Vistoriador', 
+      email: 'vist@local.test', 
+      senha_hash: senhaHash, 
+      nivel_acesso_id: 2
     });
-    vistoriadorToken = jwt.sign({ userId: vistoriador.id, nivelAcessoId: 2 }, process.env.JWT_SECRET || 'test-secret');
+    vistoriadorToken = jwt.sign({ 
+      userId: vistoriador.id, 
+      cpf: vistoriador.cpf,
+      nivelAcessoId: 2 
+    }, process.env.JWT_SECRET || 'sua-chave-secreta-jwt');
   });
 
   afterAll(async () => {

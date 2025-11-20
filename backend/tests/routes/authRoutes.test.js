@@ -220,5 +220,208 @@ describe('Rotas de Autenticação', () => {
       expect(response.body.success).toBe(true);
     });
   });
+
+  describe('PUT /api/auth/change-password', () => {
+    it('deve atualizar senha quando senha atual é correta', async () => {
+      const token = jwt.sign(
+        { 
+          userId: admin.id, 
+          cpf: admin.cpf,
+          email: admin.email,
+          nome: admin.nome,
+          nivelAcesso: 'ADMINISTRADOR',
+          nivelAcessoId: 1
+        },
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
+      );
+
+      const response = await request(app)
+        .put('/api/auth/change-password')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          senhaAtual: 'Teste@123',
+          novaSenha: 'NovaSenha@123'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+
+    it('deve retornar 400 quando senha atual está incorreta', async () => {
+      const token = jwt.sign(
+        { 
+          userId: admin.id, 
+          cpf: admin.cpf,
+          email: admin.email,
+          nome: admin.nome,
+          nivelAcesso: 'ADMINISTRADOR',
+          nivelAcessoId: 1
+        },
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
+      );
+
+      const response = await request(app)
+        .put('/api/auth/change-password')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          senhaAtual: 'SenhaErrada@123',
+          novaSenha: 'NovaSenha@123'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('Senha atual incorreta');
+    });
+
+    it('deve retornar 400 quando nova senha não atende aos critérios', async () => {
+      const token = jwt.sign(
+        { 
+          userId: admin.id, 
+          cpf: admin.cpf,
+          email: admin.email,
+          nome: admin.nome,
+          nivelAcesso: 'ADMINISTRADOR',
+          nivelAcessoId: 1
+        },
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
+      );
+
+      const response = await request(app)
+        .put('/api/auth/change-password')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          senhaAtual: 'Teste@123',
+          novaSenha: '123'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('critérios');
+    });
+  });
+
+  describe('PUT /api/auth/force-password-update', () => {
+    it('deve atualizar senha obrigatória com token válido', async () => {
+      const senhaHash = await bcrypt.hash('Temp@123', 10);
+      const usuarioTemp = await Usuario.create({
+        cpf: '12345678908',
+        nome: 'Usuario Temp',
+        email: 'temp@auth.test',
+        senha_hash: senhaHash,
+        nivel_acesso_id: 2,
+        deve_atualizar_senha: true
+      });
+
+      const token = jwt.sign(
+        { 
+          userId: usuarioTemp.id, 
+          cpf: usuarioTemp.cpf,
+          email: usuarioTemp.email,
+          nome: usuarioTemp.nome,
+          nivelAcesso: 'VISTORIADOR',
+          nivelAcessoId: 2
+        },
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
+      );
+
+      const response = await request(app)
+        .put('/api/auth/force-password-update')
+        .send({
+          token: token,
+          novaSenha: 'NovaSenha@123'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.token).toBeDefined();
+      expect(response.body.user.deveAtualizarSenha).toBe(false);
+    });
+
+    it('deve retornar 400 quando token não é fornecido', async () => {
+      const response = await request(app)
+        .put('/api/auth/force-password-update')
+        .send({ novaSenha: 'NovaSenha@123' });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('deve retornar 401 quando token é inválido', async () => {
+      const response = await request(app)
+        .put('/api/auth/force-password-update')
+        .send({ 
+          token: 'token-invalido', 
+          novaSenha: 'NovaSenha@123' 
+        });
+
+      expect(response.status).toBe(401);
+    });
+  });
+
+  describe('PUT /api/auth/user/:id/role', () => {
+    it('deve atualizar nível de acesso do usuário (admin)', async () => {
+      const token = jwt.sign(
+        { 
+          userId: admin.id, 
+          cpf: admin.cpf,
+          email: admin.email,
+          nome: admin.nome,
+          nivelAcesso: 'ADMINISTRADOR',
+          nivelAcessoId: 1
+        },
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
+      );
+
+      const response = await request(app)
+        .put(`/api/auth/user/${vistoriador.id}/role`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nivelAcessoId: 1 });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+
+    it('deve retornar 400 quando nível de acesso não existe', async () => {
+      const token = jwt.sign(
+        { 
+          userId: admin.id, 
+          cpf: admin.cpf,
+          email: admin.email,
+          nome: admin.nome,
+          nivelAcesso: 'ADMINISTRADOR',
+          nivelAcessoId: 1
+        },
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
+      );
+
+      const response = await request(app)
+        .put(`/api/auth/user/${vistoriador.id}/role`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nivelAcessoId: 999 });
+
+      expect(response.status).toBe(400);
+    });
+  });
+
+  describe('GET /api/auth/users', () => {
+    it('deve listar todos os usuários (admin)', async () => {
+      const token = jwt.sign(
+        { 
+          userId: admin.id, 
+          cpf: admin.cpf,
+          email: admin.email,
+          nome: admin.nome,
+          nivelAcesso: 'ADMINISTRADOR',
+          nivelAcessoId: 1
+        },
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
+      );
+
+      const response = await request(app)
+        .get('/api/auth/users')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(Array.isArray(response.body.users)).toBe(true);
+    });
+  });
 });
 

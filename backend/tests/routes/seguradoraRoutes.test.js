@@ -1,8 +1,9 @@
 const request = require('supertest');
 const express = require('express');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { sequelize, Seguradora, Usuario, NivelAcesso } = require('../../models');
 const seguradoraRoutes = require('../../routes/seguradoraRoutes');
-const jwt = require('jsonwebtoken');
 
 const app = express();
 app.use(express.json());
