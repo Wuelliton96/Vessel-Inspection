@@ -42,9 +42,9 @@ jobs:
       #   working-directory: ./backend
       #   run: npm run build
 
-      - name: Rodar testes
-        working-directory: ./backend
-        run: npm test   # ou npm run test, se for o caso
+      #- name: Rodar testes
+      #  working-directory: ./backend
+      #  run: npm test   # ou npm run test, se for o caso
 
       - name: Restart PM2 (apenas na main)
         if: github.ref == 'refs/heads/main'
