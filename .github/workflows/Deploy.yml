@@ -3,8 +3,6 @@ name: Node.js CI/CD
 on:
   push:
     branches: ["main"]
-  pull_request:
-    branches: ["main"]
   workflow_dispatch:
 
 jobs:
@@ -27,7 +25,7 @@ jobs:
 
       - name: Instalar dependências
         working-directory: ./backend
-        run: npm ci
+        run: npm install
 
       - name: Criar .env no backend
         working-directory: ./backend
