@@ -1,4 +1,4 @@
-name: Node.js CI/CD
+name: CI/CD BACKEND
 
 on:
   push:
@@ -46,7 +46,6 @@ jobs:
       #  working-directory: ./backend
       #  run: npm test   # ou npm run test, se for o caso
 
-      - name: Restart PM2 (apenas na main)
-        if: github.ref == 'refs/heads/main'
+      - name: Restart PM2 
         working-directory: ./backend
         run: pm2 restart BackendAPI
