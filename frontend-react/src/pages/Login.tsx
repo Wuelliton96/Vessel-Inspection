@@ -498,7 +498,7 @@ const Login: React.FC = () => {
             border: '1px solid rgba(59, 130, 246, 0.1)'
           }}>
             <div style={{ marginBottom: '0.75rem', fontWeight: '600', color: '#374151' }}>
-              Problemas para entrar??????
+              Problemas para entrar?
             </div>
             <div style={{ fontSize: '0.8rem' }}>
               <div style={{ marginBottom: '0.25rem' }}>• Verifique se o CPF está digitado corretamente</div>
