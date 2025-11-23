@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
@@ -11,13 +11,7 @@ import {
   ArrowRight,
   Search,
   Plus,
-  AlertCircle,
-  X,
-  Building2,
-  Phone,
-  Mail,
-  DollarSign,
-  Calendar
+  AlertCircle
 } from 'lucide-react';
 import ProgressBar from '../components/Wizard/ProgressBar';
 import { Cliente, Embarcacao, Local, Usuario, Seguradora, SeguradoraTipoEmbarcacao } from '../types';
@@ -434,8 +428,16 @@ const NovaVistoria: React.FC = () => {
   const [tiposEmbarcacao, setTiposEmbarcacao] = useState<SeguradoraTipoEmbarcacao[]>([]);
   const [carregandoTipos, setCarregandoTipos] = useState(false);
   const [embarcacoesEncontradas, setEmbarcacoesEncontradas] = useState<Embarcacao[]>([]);
-  const [locaisEncontrados, setLocaisEncontrados] = useState<Local[]>([]);
   const [buscando, setBuscando] = useState(false);
+  const [modoEmbarcacao, setModoEmbarcacao] = useState<'buscar' | 'criar'>('buscar');
+  const [modoLocal, setModoLocal] = useState<'buscar' | 'criar'>('buscar');
+  const [buscandoEmbarcacoes, setBuscandoEmbarcacoes] = useState(false);
+  const [buscandoLocais, setBuscandoLocais] = useState(false);
+  const [todasEmbarcacoes, setTodasEmbarcacoes] = useState<Embarcacao[]>([]);
+  const [locaisFiltrados, setLocaisFiltrados] = useState<Local[]>([]);
+  const [filtroBuscaEmbarcacao, setFiltroBuscaEmbarcacao] = useState('');
+  const [filtroBuscaLocal, setFiltroBuscaLocal] = useState('');
+  const [filtroBuscaVistoriador, setFiltroBuscaVistoriador] = useState('');
   const [mostrarFormCliente, setMostrarFormCliente] = useState(false);
   const [criandoCliente, setCriandoCliente] = useState(false);
   const [formCliente, setFormCliente] = useState({
@@ -598,24 +600,38 @@ const NovaVistoria: React.FC = () => {
     }
   };
 
+  // Estado para loading do CEP
+  const [loadingCEP, setLoadingCEP] = useState(false);
+
   // Buscar local por CEP
   const buscarLocalPorCEP = async (cep: string) => {
-    try {
-      const cepLimpo = cep.replace(/\D/g, '');
-      if (cepLimpo.length !== 8) return;
+    const cepLimpo = cep.replace(/\D/g, '');
+    if (cepLimpo.length !== 8) {
+      return;
+    }
 
+    setLoadingCEP(true);
+    setError('');
+
+    try {
       const endereco = await buscarCEP(cepLimpo);
-      if (endereco) {
+      
+      if (endereco && !endereco.erro) {
         setWizardData({
           ...wizardData,
-          local_logradouro: endereco.logradouro,
-          local_bairro: endereco.bairro,
-          local_cidade: endereco.localidade,
-          local_estado: endereco.uf
+          local_logradouro: endereco.logradouro || '',
+          local_bairro: endereco.bairro || '',
+          local_cidade: endereco.localidade || '',
+          local_estado: endereco.uf || ''
         });
+      } else {
+        setError('CEP não encontrado. Por favor, preencha os dados manualmente.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao buscar CEP:', err);
+      setError('Erro ao buscar CEP. Por favor, preencha os dados manualmente.');
+    } finally {
+      setLoadingCEP(false);
     }
   };
 
@@ -766,13 +782,17 @@ const NovaVistoria: React.FC = () => {
         setError('Tipo do local é obrigatório');
         return;
       }
-      if (wizardData.local_tipo === 'MARINA' && !wizardData.local_nome_local) {
-        setError('Nome do local é obrigatório para MARINA');
-        return;
-      }
-      if (!wizardData.local_cep || !wizardData.local_logradouro || !wizardData.local_cidade || !wizardData.local_estado) {
-        setError('Preencha o endereço completo do local');
-        return;
+      // Se tem local_id, significa que selecionou um local existente - não precisa validar campos individuais
+      if (!wizardData.local_id) {
+        // Se não tem local_id, precisa preencher os campos manualmente
+        if (wizardData.local_tipo === 'MARINA' && !wizardData.local_nome_local) {
+          setError('Nome do local é obrigatório para MARINA');
+          return;
+        }
+        if (!wizardData.local_cep || !wizardData.local_logradouro || !wizardData.local_cidade || !wizardData.local_estado) {
+          setError('Preencha o endereço completo do local');
+          return;
+        }
       }
     } else if (currentStep === 4) {
       if (!wizardData.vistoriador_id) {
@@ -1330,11 +1350,211 @@ const NovaVistoria: React.FC = () => {
     </StepContent>
   );
 
+  // Buscar todas as embarcações
+  const buscarTodasEmbarcacoes = useCallback(async () => {
+    setBuscandoEmbarcacoes(true);
+    try {
+      const embarcacoes = await embarcacaoService.getAll();
+      setTodasEmbarcacoes(embarcacoes);
+    } catch (err) {
+      console.error('Erro ao buscar embarcações:', err);
+      setError('Erro ao buscar embarcações');
+    } finally {
+      setBuscandoEmbarcacoes(false);
+    }
+  }, []);
+
+  // Carregar embarcações automaticamente quando entrar na etapa de embarcação
+  useEffect(() => {
+    if (currentStep === 2 && modoEmbarcacao === 'buscar' && todasEmbarcacoes.length === 0 && !buscandoEmbarcacoes) {
+      buscarTodasEmbarcacoes();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, modoEmbarcacao]);
+
+  // Buscar locais por tipo
+  const buscarLocaisPorTipo = async (tipo: 'MARINA' | 'RESIDENCIA') => {
+    setBuscandoLocais(true);
+    try {
+      const locais = await localService.getAll();
+      const filtrados = locais.filter(l => l.tipo === tipo);
+      setLocaisFiltrados(filtrados);
+    } catch (err) {
+      console.error('Erro ao buscar locais:', err);
+      setError('Erro ao buscar locais');
+    } finally {
+      setBuscandoLocais(false);
+    }
+  };
+
   // Renderizar Step 2: Embarcação
   const renderStepEmbarcacao = () => (
     <StepContent>
       {!wizardData.embarcacao_id ? (
         <>
+          {/* Opção: Buscar ou Criar */}
+          <div style={{ 
+            marginBottom: '1.5rem', 
+            padding: '1rem', 
+            background: '#f9fafb', 
+            borderRadius: '8px',
+            border: '1px solid #e5e7eb'
+          }}>
+            <Label style={{ marginBottom: '0.75rem', display: 'block' }}>
+              Como deseja prosseguir?
+            </Label>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <Button
+                type="button"
+                variant={modoEmbarcacao === 'buscar' ? 'primary' : 'secondary'}
+                onClick={() => {
+                  setModoEmbarcacao('buscar');
+                  setFiltroBuscaEmbarcacao('');
+                  buscarTodasEmbarcacoes();
+                }}
+                style={{ flex: 1 }}
+              >
+                <Search size={18} />
+                Buscar Embarcação Existente
+              </Button>
+              <Button
+                type="button"
+                variant={modoEmbarcacao === 'criar' ? 'primary' : 'secondary'}
+                onClick={() => {
+                  setModoEmbarcacao('criar');
+                  setTodasEmbarcacoes([]);
+                  setFiltroBuscaEmbarcacao('');
+                }}
+                style={{ flex: 1 }}
+              >
+                <Plus size={18} />
+                Criar Nova Embarcação
+              </Button>
+            </div>
+          </div>
+
+          {/* Lista de embarcações existentes */}
+          {modoEmbarcacao === 'buscar' && (
+            <div style={{ marginBottom: '2rem' }}>
+              {buscandoEmbarcacoes ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                  Buscando embarcações...
+                </div>
+              ) : todasEmbarcacoes.length > 0 ? (
+                <>
+                  <Label style={{ marginBottom: '0.75rem', display: 'block' }}>
+                    Selecione uma embarcação:
+                  </Label>
+                  
+                  {/* Campo de filtro/busca */}
+                  <div style={{ marginBottom: '1rem' }}>
+                    <Input
+                      type="text"
+                      value={filtroBuscaEmbarcacao}
+                      onChange={(e) => setFiltroBuscaEmbarcacao(e.target.value)}
+                      placeholder="Buscar por nome, número de inscrição ou tipo..."
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '2px solid #e5e7eb',
+                        borderRadius: '8px',
+                        fontSize: '0.9rem'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ 
+                    maxHeight: '300px', 
+                    overflowY: 'auto',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    padding: '0.5rem'
+                  }}>
+                    {todasEmbarcacoes
+                      .filter((emb) => {
+                        if (!filtroBuscaEmbarcacao.trim()) return true;
+                        const busca = filtroBuscaEmbarcacao.toLowerCase();
+                        return (
+                          emb.nome.toLowerCase().includes(busca) ||
+                          emb.nr_inscricao_barco.toLowerCase().includes(busca) ||
+                          (emb.tipo_embarcacao && emb.tipo_embarcacao.toLowerCase().replace(/_/g, ' ').includes(busca)) ||
+                          (emb.Cliente && emb.Cliente.nome.toLowerCase().includes(busca))
+                        );
+                      })
+                      .map((emb) => (
+                      <div
+                        key={emb.id}
+                        onClick={() => {
+                          setWizardData({
+                            ...wizardData,
+                            embarcacao_id: emb.id,
+                            embarcacao: emb,
+                            embarcacao_nome: emb.nome,
+                            embarcacao_nr_inscricao_barco: emb.nr_inscricao_barco,
+                            embarcacao_tipo: emb.tipo_embarcacao || undefined,
+                            embarcacao_porte: (emb as any).porte || undefined,
+                            embarcacao_ano_fabricacao: (emb as any).ano_fabricacao?.toString() || undefined,
+                            embarcacao_valor: (emb as any).valor_embarcacao ? mascaraValorMonetario((emb as any).valor_embarcacao.toString()) : undefined,
+                            seguradora_id: emb.seguradora_id || undefined,
+                            cliente_id_embarcacao: emb.cliente_id || undefined,
+                            // Preencher dados do proprietário
+                            embarcacao_proprietario_nome: emb.proprietario_nome || undefined,
+                            embarcacao_proprietario_cpf: emb.proprietario_cpf || undefined,
+                            embarcacao_proprietario_telefone_e164: emb.proprietario_telefone_e164 || undefined,
+                            embarcacao_proprietario_email: emb.proprietario_email || undefined
+                          });
+                        }}
+                        style={{
+                          padding: '1rem',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '6px',
+                          marginBottom: '0.5rem',
+                          cursor: 'pointer',
+                          background: 'white',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#3b82f6';
+                          e.currentTarget.style.background = '#f0f9ff';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = '#e5e7eb';
+                          e.currentTarget.style.background = 'white';
+                        }}
+                      >
+                        <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>
+                          {emb.nome}
+                        </div>
+                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                          Nº Inscrição: {emb.nr_inscricao_barco} | Tipo: {emb.tipo_embarcacao?.replace(/_/g, ' ') || 'N/A'}
+                        </div>
+                        {emb.Cliente && (
+                          <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+                            Cliente: {emb.Cliente.nome}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '2rem', 
+                  color: '#6b7280',
+                  background: '#f9fafb',
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb'
+                }}>
+                  Nenhuma embarcação encontrada. Clique em "Criar Nova Embarcação" para cadastrar.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Formulário de criação de nova embarcação */}
+          {modoEmbarcacao === 'criar' && (
+            <>
           <Grid cols={2}>
             <FormGroup>
               <Label>Nome da Embarcação</Label>
@@ -1507,6 +1727,8 @@ const NovaVistoria: React.FC = () => {
               />
             </FormGroup>
           </Grid>
+            </>
+          )}
         </>
       ) : (
         <InfoBox type="success">
@@ -1549,12 +1771,23 @@ const NovaVistoria: React.FC = () => {
   const renderStepLocal = () => (
     <StepContent>
       <FormGroup>
-        <Label>Tipo do Local</Label>
+        <Label>Tipo do Local *</Label>
         <Select
           value={wizardData.local_tipo || ''}
           onChange={(e) => {
             const tipo = e.target.value as 'MARINA' | 'RESIDENCIA';
-            setWizardData({ ...wizardData, local_tipo: tipo, local_nome_local: tipo === 'RESIDENCIA' ? undefined : wizardData.local_nome_local });
+            setWizardData({ 
+              ...wizardData, 
+              local_tipo: tipo, 
+              local_id: undefined,
+              local: undefined,
+              local_nome_local: tipo === 'RESIDENCIA' ? undefined : wizardData.local_nome_local 
+            });
+            setLocaisFiltrados([]);
+            setModoLocal('buscar');
+            if (tipo) {
+              buscarLocaisPorTipo(tipo);
+            }
           }}
         >
           <option value="">Selecione o tipo</option>
@@ -1563,38 +1796,336 @@ const NovaVistoria: React.FC = () => {
         </Select>
       </FormGroup>
 
-      {wizardData.local_tipo === 'MARINA' && (
-        <FormGroup>
-          <Label>Nome do Local</Label>
-          <Input
-            type="text"
-            value={wizardData.local_nome_local || ''}
-            onChange={(e) => setWizardData({ ...wizardData, local_nome_local: e.target.value })}
-            placeholder="Ex: Marina do Sol"
-          />
-        </FormGroup>
-      )}
+      {wizardData.local_tipo && (
+        <>
+          {/* Opção: Buscar ou Criar */}
+          <div style={{ 
+            marginBottom: '1.5rem', 
+            padding: '1rem', 
+            background: '#f9fafb', 
+            borderRadius: '8px',
+            border: '1px solid #e5e7eb'
+          }}>
+            <Label style={{ marginBottom: '0.75rem', display: 'block' }}>
+              Como deseja prosseguir?
+            </Label>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <Button
+                type="button"
+                variant={modoLocal === 'buscar' ? 'primary' : 'secondary'}
+                onClick={() => {
+                  setModoLocal('buscar');
+                  setFiltroBuscaLocal('');
+                  if (wizardData.local_tipo) {
+                    buscarLocaisPorTipo(wizardData.local_tipo);
+                  }
+                }}
+                style={{ flex: 1 }}
+              >
+                <Search size={18} />
+                {wizardData.local_tipo === 'MARINA' ? 'Buscar Marina Cadastrada' : 'Usar Endereço do Cliente'}
+              </Button>
+              <Button
+                type="button"
+                variant={modoLocal === 'criar' ? 'primary' : 'secondary'}
+                onClick={() => {
+                  setModoLocal('criar');
+                  setFiltroBuscaLocal('');
+                  setWizardData({
+                    ...wizardData,
+                    local_id: undefined,
+                    local: undefined
+                  });
+                }}
+                style={{ flex: 1 }}
+              >
+                <Plus size={18} />
+                Criar Novo Local
+              </Button>
+            </div>
+          </div>
 
+          {/* Lista de locais existentes */}
+          {modoLocal === 'buscar' && (
+            <div style={{ marginBottom: '2rem' }}>
+              {buscandoLocais ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                  Buscando locais...
+                </div>
+              ) : locaisFiltrados.length > 0 ? (
+                <>
+                  <Label style={{ marginBottom: '0.75rem', display: 'block' }}>
+                    {wizardData.local_tipo === 'MARINA' 
+                      ? 'Selecione uma marina:' 
+                      : 'Selecione o endereço do cliente:'}
+                  </Label>
+                  
+                  {/* Campo de filtro/busca */}
+                  <div style={{ marginBottom: '1rem' }}>
+                    <Input
+                      type="text"
+                      value={filtroBuscaLocal}
+                      onChange={(e) => setFiltroBuscaLocal(e.target.value)}
+                      placeholder="Buscar por nome, endereço, cidade..."
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '2px solid #e5e7eb',
+                        borderRadius: '8px',
+                        fontSize: '0.9rem'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ 
+                    maxHeight: '300px', 
+                    overflowY: 'auto',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    padding: '0.5rem'
+                  }}>
+                    {locaisFiltrados
+                      .filter((local) => {
+                        if (!filtroBuscaLocal.trim()) return true;
+                        const busca = filtroBuscaLocal.toLowerCase();
+                        return (
+                          (local.nome_local && local.nome_local.toLowerCase().includes(busca)) ||
+                          (local.logradouro && local.logradouro.toLowerCase().includes(busca)) ||
+                          (local.cidade && local.cidade.toLowerCase().includes(busca)) ||
+                          (local.bairro && local.bairro.toLowerCase().includes(busca)) ||
+                          (local.cep && local.cep.includes(busca))
+                        );
+                      })
+                      .map((local) => (
+                      <div
+                        key={local.id}
+                        onClick={() => {
+                          setWizardData({
+                            ...wizardData,
+                            local_id: local.id,
+                            local: local,
+                            local_nome_local: local.nome_local || undefined,
+                            local_cep: local.cep || '',
+                            local_logradouro: local.logradouro || '',
+                            local_numero: local.numero || '',
+                            local_complemento: local.complemento || '',
+                            local_bairro: local.bairro || '',
+                            local_cidade: local.cidade || '',
+                            local_estado: local.estado || ''
+                          });
+                        }}
+                        style={{
+                          padding: '1rem',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '6px',
+                          marginBottom: '0.5rem',
+                          cursor: 'pointer',
+                          background: wizardData.local_id === local.id ? '#f0f9ff' : 'white',
+                          borderColor: wizardData.local_id === local.id ? '#3b82f6' : '#e5e7eb',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (wizardData.local_id !== local.id) {
+                            e.currentTarget.style.borderColor = '#3b82f6';
+                            e.currentTarget.style.background = '#f0f9ff';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (wizardData.local_id !== local.id) {
+                            e.currentTarget.style.borderColor = '#e5e7eb';
+                            e.currentTarget.style.background = 'white';
+                          }
+                        }}
+                      >
+                        <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>
+                          {local.nome_local || local.tipo}
+                        </div>
+                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                          {local.logradouro}, {local.numero || 'S/N'}
+                          {local.bairro && ` - ${local.bairro}`}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+                          {local.cidade} - {local.estado} | CEP: {formatarCEP(local.cep || '')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : wizardData.local_tipo === 'RESIDENCIA' && wizardData.cliente ? (
+                <div style={{ 
+                  padding: '1.5rem', 
+                  background: '#f0fdf4',
+                  border: '1px solid #86efac',
+                  borderRadius: '8px',
+                  marginBottom: '1rem'
+                }}>
+                  <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>
+                    Endereço do Cliente: {wizardData.cliente.nome}
+                  </div>
+                  {wizardData.cliente.logradouro ? (
+                    <div style={{ fontSize: '0.875rem', color: '#374151' }}>
+                      {wizardData.cliente.logradouro}, {wizardData.cliente.numero || 'S/N'}
+                      {wizardData.cliente.bairro && ` - ${wizardData.cliente.bairro}`}
+                      <br />
+                      {wizardData.cliente.cidade} - {wizardData.cliente.estado} | CEP: {wizardData.cliente.cep ? formatarCEP(wizardData.cliente.cep) : 'N/A'}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                      Cliente não possui endereço cadastrado. Clique em "Criar Novo Local" para cadastrar.
+                    </div>
+                  )}
+                  {wizardData.cliente.logradouro && (
+                    <Button
+                      type="button"
+                      variant="primary"
+                      onClick={() => {
+                        // Usar endereço do cliente
+                        setWizardData({
+                          ...wizardData,
+                          local_cep: wizardData.cliente?.cep || '',
+                          local_logradouro: wizardData.cliente?.logradouro || '',
+                          local_numero: wizardData.cliente?.numero || '',
+                          local_complemento: wizardData.cliente?.complemento || '',
+                          local_bairro: wizardData.cliente?.bairro || '',
+                          local_cidade: wizardData.cliente?.cidade || '',
+                          local_estado: wizardData.cliente?.estado || ''
+                        });
+                      }}
+                      style={{ marginTop: '0.75rem' }}
+                    >
+                      Usar Este Endereço
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '2rem', 
+                  color: '#6b7280',
+                  background: '#f9fafb',
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb'
+                }}>
+                  {wizardData.local_tipo === 'MARINA' 
+                    ? 'Nenhuma marina encontrada. Clique em "Criar Novo Local" para cadastrar.'
+                    : 'Nenhum endereço disponível. Clique em "Criar Novo Local" para cadastrar.'}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Mostrar local selecionado */}
+          {wizardData.local_id && wizardData.local && (
+            <div style={{ 
+              padding: '1rem', 
+              background: '#f0fdf4',
+              border: '1px solid #86efac',
+              borderRadius: '8px',
+              marginBottom: '1.5rem'
+            }}>
+              <div style={{ fontWeight: '600', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <CheckCircle size={20} color="#10b981" />
+                Local selecionado: {wizardData.local.nome_local || wizardData.local.tipo}
+              </div>
+              <div style={{ fontSize: '0.875rem', color: '#374151' }}>
+                {wizardData.local.logradouro}, {wizardData.local.numero || 'S/N'}
+                {wizardData.local.bairro && ` - ${wizardData.local.bairro}`}
+                <br />
+                {wizardData.local.cidade} - {wizardData.local.estado} | CEP: {formatarCEP(wizardData.local.cep || '')}
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setWizardData({
+                    ...wizardData,
+                    local_id: undefined,
+                    local: undefined
+                  });
+                  setModoLocal('buscar');
+                }}
+                style={{ marginTop: '0.75rem' }}
+              >
+                Usar Outro Local
+              </Button>
+            </div>
+          )}
+
+          {/* Formulário de endereço (só aparece se não tiver local selecionado) */}
+          {!wizardData.local_id && modoLocal === 'criar' && (
+            <>
       <Grid cols={2}>
         <FormGroup>
-          <Label>CEP</Label>
-          <Input
-            type="text"
-            value={wizardData.local_cep ? formatarCEP(wizardData.local_cep) : ''}
-            onChange={(e) => {
-              const valor = e.target.value.replace(/\D/g, '');
-              // Limitar a 8 dígitos
-              const cepLimpo = valor.slice(0, 8);
-              setWizardData({ ...wizardData, local_cep: cepLimpo });
-              setError('');
-              // Buscar CEP automaticamente quando tiver 8 dígitos
-              if (cepLimpo.length === 8) {
-                buscarLocalPorCEP(cepLimpo);
-              }
-            }}
-            placeholder="00000-000"
-            maxLength={9}
-          />
+          <Label>CEP *</Label>
+          <div style={{ position: 'relative' }}>
+            <Input
+              type="text"
+              value={wizardData.local_cep ? formatarCEP(wizardData.local_cep) : ''}
+              onChange={(e) => {
+                const valor = e.target.value.replace(/\D/g, '');
+                // Limitar a 8 dígitos
+                const cepLimpo = valor.slice(0, 8);
+                setWizardData({ ...wizardData, local_cep: cepLimpo });
+                setError('');
+                
+                // Buscar CEP automaticamente quando tiver 8 dígitos
+                if (cepLimpo.length === 8) {
+                  buscarLocalPorCEP(cepLimpo);
+                } else {
+                  // Limpar campos se CEP incompleto
+                  if (cepLimpo.length < 8) {
+                    setWizardData({
+                      ...wizardData,
+                      local_cep: cepLimpo,
+                      local_logradouro: '',
+                      local_bairro: '',
+                      local_cidade: '',
+                      local_estado: ''
+                    });
+                  }
+                }
+              }}
+              onBlur={(e) => {
+                // Buscar novamente ao sair do campo se tiver 8 dígitos
+                const cepLimpo = e.target.value.replace(/\D/g, '');
+                if (cepLimpo.length === 8 && !loadingCEP) {
+                  buscarLocalPorCEP(cepLimpo);
+                }
+              }}
+              placeholder="00000-000"
+              maxLength={9}
+              disabled={loadingCEP}
+              style={{
+                paddingRight: loadingCEP ? '40px' : '12px'
+              }}
+            />
+            {loadingCEP && (
+              <div style={{
+                position: 'absolute',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '20px',
+                height: '20px',
+                border: '2px solid #e5e7eb',
+                borderTop: '2px solid #3b82f6',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }}>
+                <style>{`
+                  @keyframes spin {
+                    0% { transform: translateY(-50%) rotate(0deg); }
+                    100% { transform: translateY(-50%) rotate(360deg); }
+                  }
+                `}</style>
+              </div>
+            )}
+          </div>
+          {loadingCEP && (
+            <small style={{ color: '#3b82f6', marginTop: '4px', display: 'block' }}>
+              Buscando endereço...
+            </small>
+          )}
         </FormGroup>
         <FormGroup>
           <Label>Estado</Label>
@@ -1641,12 +2172,17 @@ const NovaVistoria: React.FC = () => {
           value={wizardData.local_logradouro || ''}
           onChange={(e) => setWizardData({ ...wizardData, local_logradouro: e.target.value })}
           placeholder="Ex: Rua, Avenida, etc."
+          readOnly={loadingCEP}
+          style={{
+            backgroundColor: loadingCEP ? '#f9fafb' : 'white',
+            cursor: loadingCEP ? 'not-allowed' : 'text'
+          }}
         />
       </FormGroup>
 
       <Grid cols={3}>
         <FormGroup>
-          <Label>Número</Label>
+          <Label>Número *</Label>
           <Input
             type="text"
             value={wizardData.local_numero || ''}
@@ -1664,25 +2200,39 @@ const NovaVistoria: React.FC = () => {
           />
         </FormGroup>
         <FormGroup>
-          <Label>Bairro</Label>
+          <Label>Bairro *</Label>
           <Input
             type="text"
             value={wizardData.local_bairro || ''}
             onChange={(e) => setWizardData({ ...wizardData, local_bairro: e.target.value })}
             placeholder="Ex: Centro"
+            readOnly={loadingCEP}
+            style={{
+              backgroundColor: loadingCEP ? '#f9fafb' : 'white',
+              cursor: loadingCEP ? 'not-allowed' : 'text'
+            }}
           />
         </FormGroup>
       </Grid>
 
       <FormGroup>
-        <Label>Cidade</Label>
+        <Label>Cidade *</Label>
         <Input
           type="text"
           value={wizardData.local_cidade || ''}
           onChange={(e) => setWizardData({ ...wizardData, local_cidade: e.target.value })}
           placeholder="Ex: São Paulo"
+          readOnly={loadingCEP}
+          style={{
+            backgroundColor: loadingCEP ? '#f9fafb' : 'white',
+            cursor: loadingCEP ? 'not-allowed' : 'text'
+          }}
         />
       </FormGroup>
+            </>
+          )}
+        </>
+      )}
 
       {error && currentStep === 3 && (
         <ErrorMessage>
@@ -1694,54 +2244,147 @@ const NovaVistoria: React.FC = () => {
   );
 
   // Renderizar Step 4: Informações
-  const renderStepInformacoes = () => (
-    <StepContent>
-      <FormGroup>
-        <Label>Vistoriador Responsável *</Label>
-        <Select
-          value={wizardData.vistoriador_id || ''}
-          onChange={(e) => {
-            const value = e.target.value;
-            if (value && value !== '') {
-              const vistoriadorId = parseInt(value, 10);
-              if (!isNaN(vistoriadorId)) {
-                setWizardData({ ...wizardData, vistoriador_id: vistoriadorId });
-                setError('');
-                console.log('Vistoriador selecionado:', vistoriadorId);
-              } else {
-                console.error('Erro ao parsear ID do vistoriador:', value);
-                setError('Erro ao selecionar vistoriador');
-              }
-            } else {
-              setWizardData({ ...wizardData, vistoriador_id: undefined });
-              setError('');
-            }
-          }}
-          required
-        >
-          <option value="">Selecione o vistoriador</option>
-          {vistoriadores.length === 0 ? (
-            <option value="" disabled>Nenhum vistoriador disponível</option>
+  const renderStepInformacoes = () => {
+    // Filtrar vistoriadores baseado no termo de busca
+    const vistoriadoresFiltrados = vistoriadores.filter((vist) => {
+      if (!filtroBuscaVistoriador.trim()) return true;
+      const busca = filtroBuscaVistoriador.toLowerCase();
+      const cpfLimpo = busca.replace(/\D/g, '');
+      return (
+        vist.nome.toLowerCase().includes(busca) ||
+        (vist.cpf && vist.cpf.replace(/\D/g, '').includes(cpfLimpo)) ||
+        (vist.email && vist.email.toLowerCase().includes(busca))
+      );
+    });
+
+    const vistoriadorSelecionado = vistoriadores.find(v => v.id === wizardData.vistoriador_id);
+
+    return (
+      <StepContent>
+        <FormGroup>
+          <Label>Vistoriador Responsável *</Label>
+          
+          {vistoriadorSelecionado ? (
+            <InfoBox type="success">
+              <CheckCircle size={20} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>
+                  Vistoriador selecionado: {vistoriadorSelecionado.nome}
+                </div>
+                <div style={{ fontSize: '0.875rem' }}>
+                  {vistoriadorSelecionado.cpf && `CPF: ${vistoriadorSelecionado.cpf}`}
+                  {vistoriadorSelecionado.email && ` | Email: ${vistoriadorSelecionado.email}`}
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setWizardData({ ...wizardData, vistoriador_id: undefined });
+                    setFiltroBuscaVistoriador('');
+                  }}
+                  style={{ marginTop: '0.5rem' }}
+                >
+                  Selecionar outro vistoriador
+                </Button>
+              </div>
+            </InfoBox>
           ) : (
-            vistoriadores.map((vist) => (
-              <option key={vist.id} value={vist.id}>
-                {vist.nome} {vist.cpf ? `(${vist.cpf})` : ''}
-              </option>
-            ))
+            <>
+              {/* Campo de busca */}
+              <div style={{ marginBottom: '1rem' }}>
+              <Input
+                type="text"
+                value={filtroBuscaVistoriador}
+                onChange={(e) => setFiltroBuscaVistoriador(e.target.value)}
+                placeholder="Buscar por nome, CPF ou email..."
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '2px solid #e5e7eb',
+                  borderRadius: '8px',
+                  fontSize: '0.9rem'
+                }}
+              />
+            </div>
+
+            {/* Lista de vistoriadores */}
+            {vistoriadores.length === 0 ? (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '2rem', 
+                color: '#6b7280',
+                background: '#f9fafb',
+                borderRadius: '8px',
+                border: '1px solid #e5e7eb'
+              }}>
+                Nenhum vistoriador cadastrado no sistema
+              </div>
+            ) : vistoriadoresFiltrados.length === 0 ? (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '2rem', 
+                color: '#6b7280',
+                background: '#f9fafb',
+                borderRadius: '8px',
+                border: '1px solid #e5e7eb'
+              }}>
+                Nenhum vistoriador encontrado com o termo "{filtroBuscaVistoriador}"
+              </div>
+            ) : (
+              <div style={{ 
+                maxHeight: '300px', 
+                overflowY: 'auto',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                padding: '0.5rem'
+              }}>
+                {vistoriadoresFiltrados.map((vist) => (
+                  <div
+                    key={vist.id}
+                    onClick={() => {
+                      setWizardData({ ...wizardData, vistoriador_id: vist.id });
+                      setFiltroBuscaVistoriador('');
+                      setError('');
+                    }}
+                    style={{
+                      padding: '1rem',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px',
+                      marginBottom: '0.5rem',
+                      cursor: 'pointer',
+                      background: 'white',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#3b82f6';
+                      e.currentTarget.style.background = '#f0f9ff';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#e5e7eb';
+                      e.currentTarget.style.background = 'white';
+                    }}
+                  >
+                    <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>
+                      {vist.nome}
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                      {vist.cpf && `CPF: ${vist.cpf}`}
+                      {vist.cpf && vist.email && ' | '}
+                      {vist.email && `Email: ${vist.email}`}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            </>
           )}
-        </Select>
-        {vistoriadores.length === 0 && !loading && (
-          <small style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
-            Nenhum vistoriador cadastrado no sistema
-          </small>
-        )}
-      </FormGroup>
+        </FormGroup>
 
-      <h3 style={{ marginTop: '2rem', marginBottom: '1rem', fontSize: '1.125rem', fontWeight: '600' }}>
-        Valores
-      </h3>
+        <h3 style={{ marginTop: '2rem', marginBottom: '1rem', fontSize: '1.125rem', fontWeight: '600' }}>
+          Valores
+        </h3>
 
-      <Grid cols={3}>
+        <Grid cols={3}>
         <FormGroup>
           <Label className="optional">Valor da Embarcação</Label>
           <Input
@@ -1778,26 +2421,66 @@ const NovaVistoria: React.FC = () => {
             placeholder="R$ 0,00"
           />
         </FormGroup>
-      </Grid>
+        </Grid>
 
-      <h3 style={{ marginTop: '2rem', marginBottom: '1rem', fontSize: '1.125rem', fontWeight: '600' }}>
-        Contato / Acompanhante
-      </h3>
+        <h3 style={{ marginTop: '2rem', marginBottom: '1rem', fontSize: '1.125rem', fontWeight: '600' }}>
+          Contato / Acompanhante
+        </h3>
 
-      <FormGroup>
+        <FormGroup>
         <Label className="optional">Tipo de Contato</Label>
         <Select
           value={wizardData.contato_acompanhante_tipo || ''}
-          onChange={(e) => setWizardData({ ...wizardData, contato_acompanhante_tipo: e.target.value })}
+          onChange={(e) => {
+            const tipo = e.target.value;
+            if (tipo === 'PROPRIETARIO') {
+              // Preencher automaticamente com dados do proprietário da embarcação
+              // Prioridade: dados salvos no wizardData > dados da embarcação selecionada > dados do cliente
+              const nomeProprietario = 
+                wizardData.embarcacao_proprietario_nome || 
+                wizardData.embarcacao?.proprietario_nome || 
+                wizardData.cliente?.nome || 
+                '';
+              
+              const telefoneProprietario = 
+                wizardData.embarcacao_proprietario_telefone_e164 || 
+                wizardData.embarcacao?.proprietario_telefone_e164 || 
+                wizardData.cliente?.telefone_e164 || 
+                '';
+              
+              const emailProprietario = 
+                wizardData.embarcacao_proprietario_email || 
+                wizardData.embarcacao?.proprietario_email || 
+                wizardData.cliente?.email || 
+                '';
+              
+              setWizardData({
+                ...wizardData,
+                contato_acompanhante_tipo: tipo,
+                contato_acompanhante_nome: nomeProprietario,
+                contato_acompanhante_telefone_e164: telefoneProprietario,
+                contato_acompanhante_email: emailProprietario
+              });
+            } else {
+              // Limpar campos se mudar para outro tipo
+              setWizardData({
+                ...wizardData,
+                contato_acompanhante_tipo: tipo,
+                contato_acompanhante_nome: '',
+                contato_acompanhante_telefone_e164: '',
+                contato_acompanhante_email: ''
+              });
+            }
+          }}
         >
           <option value="">Selecione</option>
           <option value="PROPRIETARIO">Proprietário</option>
           <option value="MARINA">Marina</option>
           <option value="TERCEIRO">Terceiro</option>
         </Select>
-      </FormGroup>
+        </FormGroup>
 
-      <Grid cols={2}>
+        <Grid cols={2}>
         <FormGroup>
           <Label className="optional">Nome do Contato</Label>
           <Input
@@ -1819,23 +2502,23 @@ const NovaVistoria: React.FC = () => {
             placeholder="(11) 99999-8888"
           />
         </FormGroup>
-      </Grid>
+        </Grid>
 
-      <FormGroup>
-        <Label className="optional">Email do Contato</Label>
+        <FormGroup>
+          <Label className="optional">Email do Contato</Label>
         <Input
           type="email"
           value={wizardData.contato_acompanhante_email || ''}
           onChange={(e) => setWizardData({ ...wizardData, contato_acompanhante_email: e.target.value })}
           placeholder="Ex: contato@email.com"
         />
-      </FormGroup>
+        </FormGroup>
 
-      <h3 style={{ marginTop: '2rem', marginBottom: '1rem', fontSize: '1.125rem', fontWeight: '600' }}>
-        Dados da Corretora (Opcional)
-      </h3>
+        <h3 style={{ marginTop: '2rem', marginBottom: '1rem', fontSize: '1.125rem', fontWeight: '600' }}>
+          Dados da Corretora (Opcional)
+        </h3>
 
-      <Grid cols={2}>
+        <Grid cols={2}>
         <FormGroup>
           <Label className="optional">Nome da Corretora</Label>
           <Input
@@ -1857,26 +2540,27 @@ const NovaVistoria: React.FC = () => {
             placeholder="(11) 99999-8888"
           />
         </FormGroup>
-      </Grid>
+        </Grid>
 
-      <FormGroup>
-        <Label className="optional">Email para Envio do Laudo</Label>
+        <FormGroup>
+          <Label className="optional">Email para Envio do Laudo</Label>
         <Input
           type="email"
           value={wizardData.corretora_email_laudo || ''}
           onChange={(e) => setWizardData({ ...wizardData, corretora_email_laudo: e.target.value })}
           placeholder="Ex: laudo@corretora.com"
         />
-      </FormGroup>
+        </FormGroup>
 
-      {error && currentStep === 4 && (
-        <ErrorMessage>
-          <AlertCircle size={16} />
-          {error}
-        </ErrorMessage>
-      )}
-    </StepContent>
-  );
+        {error && currentStep === 4 && (
+          <ErrorMessage>
+            <AlertCircle size={16} />
+            {error}
+          </ErrorMessage>
+        )}
+      </StepContent>
+    );
+  };
 
   // Renderizar Step 5: Revisão
   const renderStepRevisao = () => {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useAuth } from '../contexts/AuthContext';
-import { Ship, Eye, EyeOff, LogIn, AlertCircle, CheckCircle, Info } from 'lucide-react';
+import { Ship, Eye, EyeOff, LogIn, AlertCircle, CheckCircle, Info, Loader2 } from 'lucide-react';
 import { validarCPF, limparCPF, mascaraCPF } from '../utils/validators';
 
 const LoginContainer = styled.div`
@@ -481,9 +481,24 @@ const Login: React.FC = () => {
           </FormGroup>
 
           <Button type="submit" disabled={loading}>
-            <LogIn size={20} />
-            {loading ? 'Entrando...' : 'Entrar'}
+            {loading ? (
+              <>
+                <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+                Entrando...
+              </>
+            ) : (
+              <>
+                <LogIn size={20} />
+                Entrar
+              </>
+            )}
           </Button>
+          <style>{`
+            @keyframes spin {
+              from { transform: rotate(0deg); }
+              to { transform: rotate(360deg); }
+            }
+          `}</style>
           
           {/* Mensagem de ajuda */}
           <div style={{ 

@@ -8,7 +8,8 @@ import {
   User, 
   Mail, 
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Loader2
 } from 'lucide-react';
 import { Embarcacao, TipoEmbarcacao, Seguradora, TipoEmbarcacaoSeguradora, SeguradoraTipoEmbarcacao, Cliente } from '../types';
 import { embarcacaoService, seguradoraService, clienteService } from '../services/api';
@@ -400,6 +401,8 @@ const Embarcacoes: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [editingEmbarcacao, setEditingEmbarcacao] = useState<Embarcacao | null>(null);
   const [deletingEmbarcacao, setDeletingEmbarcacao] = useState<Embarcacao | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [formData, setFormData] = useState({
     nome: '',
     nr_inscricao_barco: '',
@@ -533,6 +536,7 @@ const Embarcacoes: React.FC = () => {
   const handleConfirmDelete = async () => {
     if (!deletingEmbarcacao) return;
 
+    setDeleting(true);
     try {
       await embarcacaoService.delete(deletingEmbarcacao.id);
       setSuccess('Embarcação excluída com sucesso!');
@@ -544,6 +548,8 @@ const Embarcacoes: React.FC = () => {
       setError('Erro ao excluir embarcação: ' + (err.response?.data?.error || err.message));
       setShowDeleteModal(false);
       setDeletingEmbarcacao(null);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -575,6 +581,7 @@ const Embarcacoes: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSubmitting(true);
     
     console.log('=== FRONTEND DEBUG - HANDLE SUBMIT ===');
     console.log('editingEmbarcacao:', editingEmbarcacao);
@@ -623,6 +630,8 @@ const Embarcacoes: React.FC = () => {
       console.error('Erro response:', err.response);
       console.error('Erro message:', err.message);
       setError('Erro ao salvar embarcação: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -999,8 +1008,15 @@ const Embarcacoes: React.FC = () => {
                 <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit" variant="primary">
-                  {editingEmbarcacao ? 'Atualizar' : 'Criar'}
+                <Button type="submit" variant="primary" disabled={submitting}>
+                  {submitting ? (
+                    <>
+                      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                      {editingEmbarcacao ? 'Atualizando...' : 'Criando...'}
+                    </>
+                  ) : (
+                    editingEmbarcacao ? 'Atualizar' : 'Criar'
+                  )}
                 </Button>
               </ModalButtons>
             </Form>
@@ -1028,6 +1044,7 @@ const Embarcacoes: React.FC = () => {
                   type="button"
                   onClick={() => setShowDeleteModal(false)}
                   style={{ background: '#6b7280' }}
+                  disabled={deleting}
                 >
                   Cancelar
                 </Button>
@@ -1035,14 +1052,28 @@ const Embarcacoes: React.FC = () => {
                   type="button"
                   onClick={handleConfirmDelete}
                   style={{ background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)' }}
+                  disabled={deleting}
                 >
-                  Excluir
+                  {deleting ? (
+                    <>
+                      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                      Excluindo...
+                    </>
+                  ) : (
+                    'Excluir'
+                  )}
                 </Button>
               </ModalButtons>
             </div>
           </ModalContent>
         </ModalOverlay>
       )}
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </Container>
   );
 };

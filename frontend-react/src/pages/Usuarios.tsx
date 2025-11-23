@@ -13,7 +13,9 @@ import {
   Eye,
   EyeOff,
   Phone,
-  MapPin
+  MapPin,
+  Loader2,
+  CheckCircle
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { usuarioService } from '../services/api';
@@ -456,6 +458,8 @@ const Usuarios: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [cpfError, setCpfError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   // Função para validar email
   const validateEmail = (email: string): boolean => {
@@ -617,6 +621,9 @@ const Usuarios: React.FC = () => {
       return;
     }
     
+    setSubmitting(true);
+    setSuccessMessage('');
+    
     try {
       // Preparar dados para envio
       const userData: any = { ...formData };
@@ -647,21 +654,31 @@ const Usuarios: React.FC = () => {
         // Remover senha dos dados para criação (senha padrão será usada)
         const { senha, ...createData } = userData;
         await usuarioService.create(createData);
-        console.log('Usuário criado com sucesso');
+        setSuccessMessage('Usuário criado com sucesso!');
+        
+        // Aguardar um pouco para mostrar a mensagem de sucesso
+        await new Promise(resolve => setTimeout(resolve, 1500));
       } else if (modalType === 'edit' && selectedUser) {
         // Remover senha dos dados para edição (senha não é editada aqui)
         const { senha, ...updateData } = userData;
         await usuarioService.update(selectedUser.id, updateData);
-        console.log('Usuário atualizado com sucesso');
+        setSuccessMessage('Usuário atualizado com sucesso!');
+        
+        // Aguardar um pouco para mostrar a mensagem de sucesso
+        await new Promise(resolve => setTimeout(resolve, 1500));
       } else if (modalType === 'password' && selectedUser) {
         await usuarioService.resetPassword(selectedUser.id, { novaSenha: formData.senha });
-        console.log('Senha redefinida com sucesso');
+        setSuccessMessage('Senha redefinida com sucesso!');
+        
+        // Aguardar um pouco para mostrar a mensagem de sucesso
+        await new Promise(resolve => setTimeout(resolve, 1500));
       }
       
       // Recarregar lista de usuários
       const usuariosData = await usuarioService.getAll();
       setUsuarios(usuariosData);
       setShowModal(false);
+      setSuccessMessage('');
     } catch (error: any) {
       console.error('Erro ao processar usuário:', error);
       
@@ -678,6 +695,8 @@ const Usuarios: React.FC = () => {
         // Mostrar erro geral
         alert(errorMessage);
       }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -1026,14 +1045,58 @@ const Usuarios: React.FC = () => {
                 </Label>
               </FormGroup>
 
+              {successMessage && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem',
+                  background: '#d1fae5',
+                  border: '1px solid #10b981',
+                  borderRadius: '8px',
+                  color: '#065f46',
+                  marginBottom: '1rem'
+                }}>
+                  <CheckCircle size={18} />
+                  <span>{successMessage}</span>
+                </div>
+              )}
+
               <ButtonGroup>
-                <Button variant="secondary" type="button" onClick={() => setShowModal(false)}>
+                <Button 
+                  variant="secondary" 
+                  type="button" 
+                  onClick={() => {
+                    setShowModal(false);
+                    setSuccessMessage('');
+                    setSubmitting(false);
+                  }}
+                  disabled={submitting}
+                >
                   Cancelar
                 </Button>
-                <Button variant="primary" type="submit">
-                  {modalType === 'create' ? 'Criar' : modalType === 'edit' ? 'Salvar' : 'Redefinir'}
+                <Button 
+                  variant="primary" 
+                  type="submit"
+                  disabled={submitting}
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                      {modalType === 'create' ? 'Criando...' : modalType === 'edit' ? 'Salvando...' : 'Redefinindo...'}
+                    </>
+                  ) : (
+                    modalType === 'create' ? 'Criar' : modalType === 'edit' ? 'Salvar' : 'Redefinir'
+                  )}
                 </Button>
               </ButtonGroup>
+              
+              <style>{`
+                @keyframes spin {
+                  from { transform: rotate(0deg); }
+                  to { transform: rotate(360deg); }
+                }
+              `}</style>
             </Form>
           )}
         </ModalContent>

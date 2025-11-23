@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Users, Plus, Edit2, Trash2, Search, X, Building2, User, MapPin, Phone, Mail, FileText, ToggleLeft, ToggleRight, AlertCircle } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, Search, X, Building2, User, MapPin, Phone, Mail, FileText, ToggleLeft, ToggleRight, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 import { clienteService } from '../services/api';
 import { Cliente, TipoPessoa } from '../types';
 import { validarCPF, formatarCPF, mascaraCPF, validarCNPJ, formatarCNPJ, mascaraCNPJ, mascaraTelefone } from '../utils/validators';
+import { buscarCEP, formatarCEP, validarCEP } from '../utils/cepUtils';
 
 const Container = styled.div`
   padding: 2rem;
@@ -27,6 +28,44 @@ const Title = styled.h1`
   align-items: center;
   gap: 0.75rem;
   margin: 0;
+`;
+
+const Button = styled.button<{ variant?: 'primary' | 'secondary' | 'danger' | 'success' }>`
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  border: none;
+  
+  ${props => {
+    switch (props.variant) {
+      case 'primary':
+        return 'background: #3b82f6; color: white;';
+      case 'secondary':
+        return 'background: #6b7280; color: white;';
+      case 'danger':
+        return 'background: #ef4444; color: white;';
+      case 'success':
+        return 'background: #10b981; color: white;';
+      default:
+        return 'background: #f3f4f6; color: #374151; border: 1px solid #d1d5db;';
+    }
+  }}
+  
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    opacity: 0.9;
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 const ButtonPrimary = styled.button`
@@ -204,8 +243,14 @@ const IconButton = styled.button<{ variant?: string }>`
     }
   }};
 
-  &:hover {
+  &:hover:not(:disabled) {
     transform: scale(1.1);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
   }
 `;
 
@@ -361,9 +406,22 @@ const InfoText = styled.p`
 const Clientes: React.FC = () => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [cepLoading, setCepLoading] = useState(false);
+  const [camposBloqueados, setCamposBloqueados] = useState({
+    logradouro: false,
+    bairro: false,
+    cidade: false,
+    estado: false
+  });
   const [showModal, setShowModal] = useState(false);
+  const [modalType, setModalType] = useState<'create' | 'edit' | 'delete'>('create');
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
+  const [deletingCliente, setDeletingCliente] = useState<Cliente | null>(null);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   
   // Filtros
   const [filtroTipoPessoa, setFiltroTipoPessoa] = useState<string>('');
@@ -407,6 +465,7 @@ const Clientes: React.FC = () => {
 
   const handleOpenModal = (cliente?: Cliente) => {
     if (cliente) {
+      setModalType('edit');
       setEditingCliente(cliente);
       setFormData({
         tipo_pessoa: cliente.tipo_pessoa,
@@ -425,6 +484,7 @@ const Clientes: React.FC = () => {
         observacoes: cliente.observacoes || ''
       });
     } else {
+      setModalType('create');
       setEditingCliente(null);
       setFormData({
         tipo_pessoa: 'FISICA',
@@ -450,7 +510,61 @@ const Clientes: React.FC = () => {
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingCliente(null);
+    setDeletingCliente(null);
+    setModalType('create');
     setError('');
+    setCamposBloqueados({
+      logradouro: false,
+      bairro: false,
+      cidade: false,
+      estado: false
+    });
+  };
+
+  const handleCepChange = async (cep: string) => {
+    // Formatar CEP enquanto digita
+    const cepFormatado = formatarCEP(cep);
+    setFormData({ ...formData, cep: cepFormatado });
+
+    // Buscar CEP automaticamente quando tiver 8 dígitos
+    if (validarCEP(cep)) {
+      setCepLoading(true);
+      try {
+        const cepData = await buscarCEP(cep);
+        if (cepData) {
+          setFormData(prev => ({
+            ...prev,
+            cep: cepData.cep,
+            logradouro: cepData.logradouro || prev.logradouro,
+            bairro: cepData.bairro || prev.bairro,
+            cidade: cepData.localidade || prev.cidade,
+            estado: cepData.uf || prev.estado
+          }));
+          
+          // Bloquear campos preenchidos automaticamente
+          setCamposBloqueados({
+            logradouro: !!cepData.logradouro,
+            bairro: !!cepData.bairro,
+            cidade: !!cepData.localidade,
+            estado: !!cepData.uf
+          });
+        }
+      } catch (error: any) {
+        setError('CEP não encontrado: ' + error.message);
+        setTimeout(() => setError(''), 5000);
+      } finally {
+        setCepLoading(false);
+      }
+    }
+  };
+
+  const desbloquearCampos = () => {
+    setCamposBloqueados({
+      logradouro: false,
+      bairro: false,
+      cidade: false,
+      estado: false
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -475,6 +589,7 @@ const Clientes: React.FC = () => {
       }
     }
 
+    setSubmitting(true);
     try {
       const payload = {
         tipo_pessoa: formData.tipo_pessoa,
@@ -504,26 +619,49 @@ const Clientes: React.FC = () => {
     } catch (err: any) {
       console.error('Erro ao salvar cliente:', err);
       setError(err.response?.data?.error || 'Erro ao salvar cliente');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('Tem certeza que deseja excluir este cliente?')) return;
+  const handleDeleteClick = (cliente: Cliente) => {
+    setModalType('delete');
+    setDeletingCliente(cliente);
+    setShowModal(true);
+  };
 
+  const handleConfirmDelete = async () => {
+    if (!deletingCliente) return;
+
+    setDeletingId(deletingCliente.id);
     try {
-      await clienteService.delete(id);
+      await clienteService.delete(deletingCliente.id);
       await loadClientes();
+      setShowModal(false);
+      setDeletingCliente(null);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Erro ao excluir cliente');
+      setError(err.response?.data?.error || 'Erro ao excluir cliente');
+    } finally {
+      setDeletingId(null);
     }
   };
 
   const handleToggleStatus = async (id: number) => {
+    setTogglingId(id);
+    setError('');
+    setSuccess('');
     try {
       await clienteService.toggleStatus(id);
+      const cliente = clientes.find(c => c.id === id);
+      setSuccess(`Cliente ${cliente?.ativo ? 'desativado' : 'ativado'} com sucesso!`);
+      setTimeout(() => setSuccess(''), 3000);
       await loadClientes();
-    } catch (err) {
-      alert('Erro ao alterar status do cliente');
+    } catch (err: any) {
+      console.error('Erro ao alterar status do cliente:', err);
+      setError(err.response?.data?.error || 'Erro ao alterar status do cliente');
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -544,6 +682,38 @@ const Clientes: React.FC = () => {
 
   return (
     <Container>
+      {error && (
+        <div style={{
+          padding: '1rem',
+          marginBottom: '1rem',
+          background: '#fee2e2',
+          border: '1px solid #ef4444',
+          borderRadius: '8px',
+          color: '#991b1b',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          <AlertCircle size={20} />
+          {error}
+        </div>
+      )}
+      {success && (
+        <div style={{
+          padding: '1rem',
+          marginBottom: '1rem',
+          background: '#d1fae5',
+          border: '1px solid #10b981',
+          borderRadius: '8px',
+          color: '#065f46',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          <CheckCircle size={20} />
+          {success}
+        </div>
+      )}
       <Header>
         <Title>
           <Users size={32} />
@@ -657,13 +827,25 @@ const Clientes: React.FC = () => {
                 </TableCell>
                 <TableCell>
                   <ActionsContainer>
-                    <IconButton onClick={() => handleToggleStatus(cliente.id)}>
-                      {cliente.ativo ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                    <IconButton 
+                      onClick={() => handleToggleStatus(cliente.id)}
+                      disabled={togglingId === cliente.id}
+                      title={togglingId === cliente.id ? 'Alterando...' : cliente.ativo ? 'Desativar' : 'Ativar'}
+                    >
+                      {togglingId === cliente.id ? (
+                        <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                      ) : (
+                        cliente.ativo ? <ToggleRight size={18} /> : <ToggleLeft size={18} />
+                      )}
                     </IconButton>
-                    <IconButton onClick={() => handleOpenModal(cliente)}>
+                    <IconButton onClick={() => handleOpenModal(cliente)} title="Editar">
                       <Edit2 size={18} />
                     </IconButton>
-                    <IconButton variant="danger" onClick={() => handleDelete(cliente.id)}>
+                    <IconButton 
+                      variant="danger" 
+                      onClick={() => handleDeleteClick(cliente)}
+                      title="Excluir"
+                    >
                       <Trash2 size={18} />
                     </IconButton>
                   </ActionsContainer>
@@ -679,7 +861,13 @@ const Clientes: React.FC = () => {
           <ModalContent onClick={(e) => e.stopPropagation()}>
             <ModalHeader>
               <ModalTitle>
-                {editingCliente ? <><Edit2 size={24} /> Editar Cliente</> : <><Plus size={24} /> Novo Cliente</>}
+                {modalType === 'delete' ? (
+                  <>Excluir Cliente</>
+                ) : editingCliente ? (
+                  <><Edit2 size={24} /> Editar Cliente</>
+                ) : (
+                  <><Plus size={24} /> Novo Cliente</>
+                )}
               </ModalTitle>
               <IconButton onClick={handleCloseModal}>
                 <X size={20} />
@@ -693,7 +881,45 @@ const Clientes: React.FC = () => {
               </ErrorMessage>
             )}
 
-            <Form onSubmit={handleSubmit}>
+            {modalType === 'delete' ? (
+              <div style={{ padding: '1.5rem' }}>
+                <p style={{ marginBottom: '1rem', fontSize: '1.05rem' }}>
+                  Tem certeza que deseja excluir o cliente <strong>{deletingCliente?.nome}</strong>?
+                </p>
+                <p style={{ color: '#dc2626', marginBottom: '1.5rem' }}>
+                  Esta ação não pode ser desfeita.
+                </p>
+                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                  <Button 
+                    variant="secondary" 
+                    type="button" 
+                    onClick={handleCloseModal}
+                    disabled={deletingId === deletingCliente?.id}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    variant="danger" 
+                    type="button" 
+                    onClick={handleConfirmDelete}
+                    disabled={deletingId === deletingCliente?.id}
+                  >
+                    {deletingId === deletingCliente?.id ? (
+                      <>
+                        <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                        Excluindo...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 size={18} />
+                        Excluir
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Form onSubmit={handleSubmit}>
               <FormGroup>
                 <Label>Tipo de Pessoa *</Label>
                 <RadioGroup>
@@ -798,14 +1024,15 @@ const Clientes: React.FC = () => {
 
               <FormRow>
                 <FormGroup>
-                  <Label htmlFor="cep">CEP</Label>
+                  <Label htmlFor="cep">CEP {cepLoading && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite', display: 'inline-block', marginLeft: '0.5rem' }} />}</Label>
                   <Input
                     id="cep"
                     type="text"
                     value={formData.cep}
-                    onChange={(e) => setFormData({ ...formData, cep: e.target.value.replace(/\D/g, '').slice(0, 8) })}
-                    placeholder="00000000"
-                    maxLength={8}
+                    onChange={(e) => handleCepChange(e.target.value)}
+                    placeholder="00000-000"
+                    maxLength={9}
+                    disabled={cepLoading}
                   />
                 </FormGroup>
                 
@@ -822,13 +1049,38 @@ const Clientes: React.FC = () => {
               </FormRow>
 
               <FormGroup>
-                <Label htmlFor="logradouro">Rua/Avenida</Label>
+                <Label htmlFor="logradouro">
+                  Rua/Avenida
+                  {camposBloqueados.logradouro && (
+                    <button
+                      type="button"
+                      onClick={desbloquearCampos}
+                      style={{
+                        marginLeft: '0.5rem',
+                        background: 'none',
+                        border: 'none',
+                        color: '#3b82f6',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        textDecoration: 'underline'
+                      }}
+                      title="Desbloquear campos para edição"
+                    >
+                      (Editar)
+                    </button>
+                  )}
+                </Label>
                 <Input
                   id="logradouro"
                   type="text"
                   value={formData.logradouro}
                   onChange={(e) => setFormData({ ...formData, logradouro: e.target.value })}
                   placeholder="Ex: Av. Paulista"
+                  readOnly={camposBloqueados.logradouro}
+                  style={{
+                    backgroundColor: camposBloqueados.logradouro ? '#f1f5f9' : 'white',
+                    cursor: camposBloqueados.logradouro ? 'not-allowed' : 'text'
+                  }}
                 />
               </FormGroup>
 
@@ -843,7 +1095,7 @@ const Clientes: React.FC = () => {
                     placeholder="Ex: Apto 501"
                   />
                 </FormGroup>
-                
+
                 <FormGroup>
                   <Label htmlFor="bairro">Bairro</Label>
                   <Input
@@ -852,6 +1104,11 @@ const Clientes: React.FC = () => {
                     value={formData.bairro}
                     onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
                     placeholder="Ex: Centro"
+                    readOnly={camposBloqueados.bairro}
+                    style={{
+                      backgroundColor: camposBloqueados.bairro ? '#f1f5f9' : 'white',
+                      cursor: camposBloqueados.bairro ? 'not-allowed' : 'text'
+                    }}
                   />
                 </FormGroup>
               </FormRow>
@@ -865,9 +1122,14 @@ const Clientes: React.FC = () => {
                     value={formData.cidade}
                     onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
                     placeholder="Ex: São Paulo"
+                    readOnly={camposBloqueados.cidade}
+                    style={{
+                      backgroundColor: camposBloqueados.cidade ? '#f1f5f9' : 'white',
+                      cursor: camposBloqueados.cidade ? 'not-allowed' : 'text'
+                    }}
                   />
                 </FormGroup>
-                
+
                 <FormGroup>
                   <Label htmlFor="estado">Estado (UF)</Label>
                   <Input
@@ -877,6 +1139,11 @@ const Clientes: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, estado: e.target.value.toUpperCase().slice(0, 2) })}
                     placeholder="Ex: SP"
                     maxLength={2}
+                    readOnly={camposBloqueados.estado}
+                    style={{
+                      backgroundColor: camposBloqueados.estado ? '#f1f5f9' : 'white',
+                      cursor: camposBloqueados.estado ? 'not-allowed' : 'text'
+                    }}
                   />
                 </FormGroup>
               </FormRow>
@@ -892,14 +1159,33 @@ const Clientes: React.FC = () => {
               </FormGroup>
 
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                <IconButton type="button" onClick={handleCloseModal} style={{ padding: '0.75rem 1.5rem' }}>
+                <IconButton 
+                  type="button" 
+                  onClick={handleCloseModal} 
+                  style={{ padding: '0.75rem 1.5rem' }}
+                  disabled={submitting}
+                >
                   Cancelar
                 </IconButton>
-                <ButtonPrimary type="submit">
-                  {editingCliente ? 'Atualizar' : 'Cadastrar'}
+                <ButtonPrimary type="submit" disabled={submitting}>
+                  {submitting ? (
+                    <>
+                      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                      {editingCliente ? 'Atualizando...' : 'Cadastrando...'}
+                    </>
+                  ) : (
+                    editingCliente ? 'Atualizar' : 'Cadastrar'
+                  )}
                 </ButtonPrimary>
               </div>
-            </Form>
+              <style>{`
+                @keyframes spin {
+                  from { transform: rotate(0deg); }
+                  to { transform: rotate(360deg); }
+                }
+              `}</style>
+              </Form>
+            )}
           </ModalContent>
         </Modal>
       )}

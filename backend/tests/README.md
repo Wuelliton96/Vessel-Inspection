@@ -2,7 +2,7 @@
 
 Este diretório contém todos os testes automatizados para o backend do Sistema de Gerenciamento de Vistorias Náuticas (SGVN).
 
-## 📁 Estrutura dos Testes
+## Estrutura dos Testes
 
 ```
 tests/
@@ -29,16 +29,54 @@ tests/
 └── README.md            # Este arquivo
 ```
 
-## 🚀 Como Executar os Testes
+## Seguranca: Protecao do Banco de Dados de Producao
+
+**IMPORTANTE**: Os testes estão configurados para **NUNCA** apagar dados de produção.
+
+### Proteções Implementadas:
+
+1. **Detecção Automática de Ambiente de Teste**
+   - Quando `NODE_ENV=test`, o sistema automaticamente usa `TEST_DATABASE_URL` em vez de `DATABASE_URL`
+   - Isso garante que testes sempre usem um banco de dados separado
+
+2. **Validação no Setup de Testes**
+   - O arquivo `tests/setup.js` valida que `TEST_DATABASE_URL` está configurado
+   - Emite avisos se estiver usando `DATABASE_URL` em vez de `TEST_DATABASE_URL`
+
+3. **Alertas de Segurança**
+   - O sistema detecta se a URL do banco contém palavras-chave de produção
+   - Emite alertas críticos se detectar possível uso de banco de produção em testes
+
+4. **Configuração no CI/CD**
+   - O workflow GitHub Actions está configurado para usar `TEST_DATABASE_URL` quando executar testes
+   - Garante que testes no CI/CD nunca afetem produção
+
+### Configuracao Obrigatoria:
+
+**Configure `TEST_DATABASE_URL` no seu `.env` ou variáveis de ambiente:**
+
+```bash
+# Banco de PRODUÇÃO (nunca usado em testes)
+DATABASE_URL=postgresql://user:pass@host:5432/production_db
+
+# Banco de TESTE (usado automaticamente quando NODE_ENV=test)
+TEST_DATABASE_URL=postgresql://user:pass@host:5432/test_db
+```
+
+**NUNCA** use o mesmo banco para produção e testes!
+
+## Como Executar os Testes
 
 ### Pré-requisitos
 
 1. **Banco de dados PostgreSQL** rodando localmente
-2. **Banco de dados de teste** criado:
+2. **Banco de dados de teste** criado (SEPARADO do banco de produção):
    ```sql
    CREATE DATABASE sgvn_test;
    ```
-3. **Variáveis de ambiente** configuradas (veja `tests/config/test.env`)
+3. **Variáveis de ambiente** configuradas:
+   - `TEST_DATABASE_URL` apontando para o banco de teste
+   - `DATABASE_URL` apontando para o banco de produção (não usado em testes)
 
 ### Comandos Disponíveis
 
@@ -87,7 +125,7 @@ npx jest --testNamePattern="deve criar"
 - **Cobertura**: Rotas principais, middleware, tratamento de erros
 - **Localização**: `tests/server.test.js`
 
-## 🔧 Configuração
+## Configuracao
 
 ### Jest Configuration (`jest.config.js`)
 ```javascript
@@ -119,7 +157,7 @@ module.exports = {
 - Limpeza de dados
 - Mocks reutilizáveis
 
-## 📊 Cobertura de Testes
+## Cobertura de Testes
 
 O projeto mantém uma cobertura de testes abrangente:
 
@@ -134,7 +172,7 @@ Após executar `npm run test:coverage`, o relatório estará disponível em:
 - **Terminal**: Saída no console
 - **LCOV**: `backend/coverage/lcov.info`
 
-## 🐛 Debugging
+## Debugging
 
 ### Executar Testes em Modo Debug
 ```bash
@@ -157,7 +195,7 @@ npx jest tests/models/Usuario.test.js --verbose
 npx jest --testNamePattern="deve criar usuário" --verbose
 ```
 
-## 🔄 CI/CD
+## CI/CD
 
 ### GitHub Actions
 Os testes são executados automaticamente em:
@@ -173,7 +211,7 @@ Os testes são executados automaticamente em:
     npm run test:coverage
 ```
 
-## 📝 Convenções
+## Convencoes
 
 ### Nomenclatura
 - **Arquivos de teste**: `*.test.js`
@@ -231,7 +269,7 @@ DEBUG=sequelize* npm test
 DEBUG=supertest* npm test
 ```
 
-## 📚 Recursos Adicionais
+## Recursos Adicionais
 
 - [Documentação do Jest](https://jestjs.io/docs/getting-started)
 - [Documentação do Supertest](https://github.com/visionmedia/supertest)

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { ClipboardList, Plus, Edit2, Trash2, Save, X, CheckCircle, AlertCircle, Video } from 'lucide-react';
+import { ClipboardList, Plus, Edit2, Trash2, Save, X, CheckCircle, AlertCircle, Video, Loader2 } from 'lucide-react';
 import { checklistService } from '../services/api';
 import { ChecklistTemplate, ChecklistTemplateItem } from '../types';
 
@@ -281,6 +281,44 @@ const Select = styled.select`
   }
 `;
 
+const Button = styled.button<{ variant?: 'primary' | 'secondary' | 'danger' | 'success' }>`
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  border: none;
+  
+  ${props => {
+    switch (props.variant) {
+      case 'primary':
+        return 'background: #3b82f6; color: white;';
+      case 'secondary':
+        return 'background: #6b7280; color: white;';
+      case 'danger':
+        return 'background: #ef4444; color: white;';
+      case 'success':
+        return 'background: #10b981; color: white;';
+      default:
+        return 'background: #f3f4f6; color: #374151; border: 1px solid #d1d5db;';
+    }
+  }}
+  
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    opacity: 0.9;
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
 const ButtonPrimary = styled.button`
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
@@ -372,6 +410,13 @@ const ChecklistTemplates: React.FC = () => {
     obrigatorio: true,
     permite_video: false
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [savingId, setSavingId] = useState<number | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<{ id: number; nome: string } | null>(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
     loadTemplates();
@@ -395,23 +440,42 @@ const ChecklistTemplates: React.FC = () => {
   };
 
   const handleSave = async (itemId: number) => {
+    setSavingId(itemId);
     try {
       await checklistService.updateItem(itemId, editForm);
       setEditingItemId(null);
+      setSuccess('Item salvo com sucesso!');
+      setTimeout(() => setSuccess(''), 3000);
       loadTemplates();
     } catch (err) {
-      alert('Erro ao salvar item');
+      setError('Erro ao salvar item');
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setSavingId(null);
     }
   };
 
-  const handleDelete = async (itemId: number) => {
-    if (!window.confirm('Tem certeza que deseja excluir este item?')) return;
+  const handleDeleteClick = (item: ChecklistTemplateItem) => {
+    setItemToDelete({ id: item.id, nome: item.nome });
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!itemToDelete) return;
     
+    setDeletingId(itemToDelete.id);
     try {
-      await checklistService.deleteItem(itemId);
+      await checklistService.deleteItem(itemToDelete.id);
+      setSuccess('Item excluído com sucesso!');
+      setTimeout(() => setSuccess(''), 3000);
+      setShowDeleteModal(false);
+      setItemToDelete(null);
       loadTemplates();
     } catch (err) {
-      alert('Erro ao excluir item');
+      setError('Erro ao excluir item');
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -419,10 +483,12 @@ const ChecklistTemplates: React.FC = () => {
     e.preventDefault();
     
     if (!newTemplateForm.tipo_embarcacao || !newTemplateForm.nome) {
-      alert('Preencha tipo e nome do checklist');
+      setError('Preencha tipo e nome do checklist');
+      setTimeout(() => setError(''), 5000);
       return;
     }
     
+    setSubmitting(true);
     try {
       await checklistService.createTemplate({
         tipo_embarcacao: newTemplateForm.tipo_embarcacao,
@@ -431,11 +497,16 @@ const ChecklistTemplates: React.FC = () => {
         ativo: true
       });
       
+      setSuccess('Template criado com sucesso!');
+      setTimeout(() => setSuccess(''), 3000);
       setShowNewTemplateModal(false);
       setNewTemplateForm({ tipo_embarcacao: '', nome: '', descricao: '' });
       loadTemplates();
     } catch (err: any) {
-      alert('Erro ao criar template: ' + (err.response?.data?.error || 'Erro desconhecido'));
+      setError('Erro ao criar template: ' + (err.response?.data?.error || 'Erro desconhecido'));
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -443,13 +514,17 @@ const ChecklistTemplates: React.FC = () => {
     e.preventDefault();
     
     if (!selectedTemplateId || !newItemForm.nome) {
-      alert('Preencha o nome do item');
+      setError('Preencha o nome do item');
+      setTimeout(() => setError(''), 5000);
       return;
     }
     
+    setSubmitting(true);
     try {
       await checklistService.addItemToTemplate(selectedTemplateId, newItemForm);
       
+      setSuccess('Item adicionado com sucesso!');
+      setTimeout(() => setSuccess(''), 3000);
       setShowNewItemModal(false);
       setNewItemForm({
         ordem: 1,
@@ -460,7 +535,10 @@ const ChecklistTemplates: React.FC = () => {
       });
       loadTemplates();
     } catch (err: any) {
-      alert('Erro ao adicionar item: ' + (err.response?.data?.error || 'Erro desconhecido'));
+      setError('Erro ao adicionar item: ' + (err.response?.data?.error || 'Erro desconhecido'));
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -482,6 +560,38 @@ const ChecklistTemplates: React.FC = () => {
 
   return (
     <Container>
+      {error && (
+        <div style={{
+          padding: '1rem',
+          marginBottom: '1rem',
+          background: '#fee2e2',
+          border: '1px solid #ef4444',
+          borderRadius: '8px',
+          color: '#991b1b',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          <AlertCircle size={20} />
+          {error}
+        </div>
+      )}
+      {success && (
+        <div style={{
+          padding: '1rem',
+          marginBottom: '1rem',
+          background: '#d1fae5',
+          border: '1px solid #10b981',
+          borderRadius: '8px',
+          color: '#065f46',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          <CheckCircle size={20} />
+          {success}
+        </div>
+      )}
       <Header>
         <Title>
           <ClipboardList size={32} />
@@ -525,10 +635,22 @@ const ChecklistTemplates: React.FC = () => {
                           style={{ marginTop: '0.5rem' }}
                         />
                       </ItemContent>
-                      <IconButton variant="success" onClick={() => handleSave(item.id)}>
-                        <Save size={16} />
+                      <IconButton 
+                        variant="success" 
+                        onClick={() => handleSave(item.id)}
+                        disabled={savingId === item.id}
+                        title={savingId === item.id ? 'Salvando...' : 'Salvar'}
+                      >
+                        {savingId === item.id ? (
+                          <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                        ) : (
+                          <Save size={16} />
+                        )}
                       </IconButton>
-                      <IconButton onClick={() => setEditingItemId(null)}>
+                      <IconButton 
+                        onClick={() => setEditingItemId(null)}
+                        disabled={savingId === item.id}
+                      >
                         <X size={16} />
                       </IconButton>
                     </>
@@ -556,7 +678,11 @@ const ChecklistTemplates: React.FC = () => {
                       <IconButton onClick={() => handleEdit(item)}>
                         <Edit2 size={16} />
                       </IconButton>
-                      <IconButton variant="danger" onClick={() => handleDelete(item.id)}>
+                      <IconButton 
+                        variant="danger" 
+                        onClick={() => handleDeleteClick(item)}
+                        title="Excluir"
+                      >
                         <Trash2 size={16} />
                       </IconButton>
                     </>
@@ -639,8 +765,15 @@ const ChecklistTemplates: React.FC = () => {
                 <ButtonSecondary type="button" onClick={() => setShowNewTemplateModal(false)}>
                   Cancelar
                 </ButtonSecondary>
-                <ButtonPrimary type="submit">
-                  Criar Checklist
+                <ButtonPrimary type="submit" disabled={submitting}>
+                  {submitting ? (
+                    <>
+                      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                      Criando...
+                    </>
+                  ) : (
+                    'Criar Checklist'
+                  )}
                 </ButtonPrimary>
               </div>
             </form>
@@ -726,14 +859,81 @@ const ChecklistTemplates: React.FC = () => {
                 <ButtonSecondary type="button" onClick={() => setShowNewItemModal(false)}>
                   Cancelar
                 </ButtonSecondary>
-                <ButtonPrimary type="submit">
-                  Adicionar Item
+                <ButtonPrimary type="submit" disabled={submitting}>
+                  {submitting ? (
+                    <>
+                      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                      Adicionando...
+                    </>
+                  ) : (
+                    'Adicionar Item'
+                  )}
                 </ButtonPrimary>
               </div>
             </form>
           </ModalContent>
         </Modal>
       )}
+
+      {/* Modal de Confirmação de Exclusão */}
+      {showDeleteModal && (
+        <Modal onClick={() => setShowDeleteModal(false)}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <ModalHeader>
+              <ModalTitle>Excluir Item</ModalTitle>
+              <IconButton onClick={() => setShowDeleteModal(false)}>
+                <X size={20} />
+              </IconButton>
+            </ModalHeader>
+            <div style={{ padding: '1.5rem' }}>
+              <p style={{ marginBottom: '1rem', fontSize: '1.05rem' }}>
+                Tem certeza que deseja excluir o item <strong>{itemToDelete?.nome}</strong>?
+              </p>
+              <p style={{ color: '#dc2626', marginBottom: '1.5rem' }}>
+                Esta ação não pode ser desfeita.
+              </p>
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                <Button 
+                  variant="secondary" 
+                  type="button" 
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setItemToDelete(null);
+                  }}
+                  disabled={deletingId === itemToDelete?.id}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  variant="danger" 
+                  type="button" 
+                  onClick={handleConfirmDelete}
+                  disabled={deletingId === itemToDelete?.id}
+                >
+                  {deletingId === itemToDelete?.id ? (
+                    <>
+                      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                      Excluindo...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={18} />
+                      Excluir
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </ModalContent>
+        </Modal>
+      )}
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </Container>
   );
 };

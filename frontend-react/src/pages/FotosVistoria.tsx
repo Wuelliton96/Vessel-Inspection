@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
-import { Camera, Download, Trash2, Image as ImageIcon, ArrowLeft, RefreshCw, ZoomIn, X } from 'lucide-react';
+import { Camera, Download, Image as ImageIcon, ArrowLeft, RefreshCw, ZoomIn, X } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { checklistService, vistoriaService } from '../services/api';
 import { VistoriaChecklistItem, Vistoria } from '../types';
 import { API_CONFIG } from '../config/api';
+import { mascaraCPF } from '../utils/validators';
 
 const Container = styled.div`
   padding: 2rem;
@@ -286,11 +287,7 @@ const FotosVistoria: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [imagemAmpliada, setImagemAmpliada] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadDados();
-  }, [id]);
-
-  const loadDados = async () => {
+  const loadDados = useCallback(async () => {
     if (!id) return;
     
     try {
@@ -308,7 +305,11 @@ const FotosVistoria: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    loadDados();
+  }, [loadDados]);
 
   const handleDownload = async (fotoId: number | undefined, nomeItem: string) => {
     if (!fotoId) return;
@@ -390,7 +391,14 @@ const FotosVistoria: React.FC = () => {
           </InfoItem>
           <InfoItem>
             <InfoLabel>Vistoriador</InfoLabel>
-            <InfoValue>{vistoria.vistoriador?.nome || 'N/A'}</InfoValue>
+            <InfoValue>
+              {vistoria.vistoriador?.nome || 'N/A'}
+              {vistoria.vistoriador?.cpf && (
+                <span style={{ fontSize: '0.875rem', color: '#64748b', marginLeft: '0.5rem', fontWeight: '400' }}>
+                  (CPF: {mascaraCPF(vistoria.vistoriador.cpf)})
+                </span>
+              )}
+            </InfoValue>
           </InfoItem>
           <InfoItem>
             <InfoLabel>Fotos Enviadas</InfoLabel>

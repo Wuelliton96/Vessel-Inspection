@@ -8,33 +8,64 @@ require('dotenv').config({ path: ENV_PATH });
 
 const redact = (s) => (s ? s.replace(/:\/\/(.*?):(.*?)@/, '://****:****@') : s);
 
-if (!process.env.DATABASE_URL) {
-  // Em produção, não expor conteúdo do .env
-  if (process.env.NODE_ENV !== 'production') {
-    const sample = fs.existsSync(ENV_PATH) ? fs.readFileSync(ENV_PATH, 'utf8') : '(arquivo não encontrado)';
-    logger.error('[config/database] .env (primeiras linhas):\n', sample.split('\n').slice(0, 6).join('\n'));
+// PROTEÇÃO CRÍTICA: Em ambiente de teste, SEMPRE usar banco de teste
+// Isso previne que testes apaguem dados de produção
+const isTestEnv = process.env.NODE_ENV === 'test';
+let databaseUrl;
+
+if (isTestEnv) {
+  // Em testes, usar TEST_DATABASE_URL ou fallback para banco local de teste
+  databaseUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
+  
+  if (!databaseUrl) {
+    throw new Error('TEST_DATABASE_URL ou DATABASE_URL deve ser definida para ambiente de teste');
   }
-  throw new Error('DATABASE_URL não definida em backend/.env');
+  
+  // Log de segurança para garantir que estamos usando banco de teste
+  if (process.env.TEST_DATABASE_URL) {
+    logger.warn('[config/database] AVISO: AMBIENTE DE TESTE: Usando TEST_DATABASE_URL');
+  } else {
+    logger.warn('[config/database] AVISO: AMBIENTE DE TESTE: Usando DATABASE_URL (considere usar TEST_DATABASE_URL)');
+  }
+  
+  // Verificação adicional: se DATABASE_URL contém palavras-chave de produção, alertar
+  const prodKeywords = ['prod', 'production', 'main', 'master'];
+  if (databaseUrl && prodKeywords.some(keyword => databaseUrl.toLowerCase().includes(keyword))) {
+    logger.error('[config/database] ALERTA DE SEGURANCA: URL de banco parece ser de PRODUCAO em ambiente de TESTE!');
+    logger.error('[config/database] Configure TEST_DATABASE_URL com um banco de teste separado!');
+  }
+} else {
+  // Em produção/desenvolvimento, usar DATABASE_URL normal
+  databaseUrl = process.env.DATABASE_URL;
+  
+  if (!databaseUrl) {
+    // Em produção, não expor conteúdo do .env
+    if (process.env.NODE_ENV !== 'production') {
+      const sample = fs.existsSync(ENV_PATH) ? fs.readFileSync(ENV_PATH, 'utf8') : '(arquivo não encontrado)';
+      logger.error('[config/database] .env (primeiras linhas):\n', sample.split('\n').slice(0, 6).join('\n'));
+    }
+    throw new Error('DATABASE_URL não definida em backend/.env');
+  }
 }
 
 const DB_SSL = String(process.env.DB_SSL || '').trim().toLowerCase() === 'true';
 
 // Detecta se a URL requer SSL (verifica se contém ?sslmode= ou similar)
-const urlRequiresSSL = process.env.DATABASE_URL && (
-  process.env.DATABASE_URL.includes('?sslmode=') ||
-  process.env.DATABASE_URL.includes('?ssl=true') ||
-  process.env.DATABASE_URL.includes('&sslmode=')
+const urlRequiresSSL = databaseUrl && (
+  databaseUrl.includes('?sslmode=') ||
+  databaseUrl.includes('?ssl=true') ||
+  databaseUrl.includes('&sslmode=')
 );
 
 // Detecta se é uma URL de produção que geralmente requer SSL
-const isProductionLike = process.env.DATABASE_URL && (
-  process.env.DATABASE_URL.includes('amazonaws.com') ||
-  process.env.DATABASE_URL.includes('heroku.com') ||
-  process.env.DATABASE_URL.includes('render.com') ||
-  process.env.DATABASE_URL.includes('railway.app') ||
-  process.env.DATABASE_URL.includes('supabase.co') ||
-  process.env.DATABASE_URL.includes('neon.tech') ||
-  process.env.DATABASE_URL.includes('planetscale.com')
+const isProductionLike = databaseUrl && (
+  databaseUrl.includes('amazonaws.com') ||
+  databaseUrl.includes('heroku.com') ||
+  databaseUrl.includes('render.com') ||
+  databaseUrl.includes('railway.app') ||
+  databaseUrl.includes('supabase.co') ||
+  databaseUrl.includes('neon.tech') ||
+  databaseUrl.includes('planetscale.com')
 );
 
 // Se DB_SSL estiver true OU a URL exigir SSL OU for uma URL de produção, configura SSL
@@ -43,7 +74,7 @@ const useSSL = DB_SSL || urlRequiresSSL || isProductionLike;
 
 // Remove parâmetros SSL da URL para evitar conflito com dialectOptions
 // O Sequelize deve usar apenas a configuração via dialectOptions
-let cleanDatabaseUrl = process.env.DATABASE_URL;
+let cleanDatabaseUrl = databaseUrl;
 if (useSSL) {
   // Remove ?sslmode=require ou similar da URL usando regex
   // Isso garante que não haja conflito entre o parâmetro da URL e dialectOptions
@@ -92,9 +123,10 @@ const options = {
     : { ssl: false },
 };
 
-// Logs de configuração apenas em desenvolvimento
+// Logs de configuração apenas em desenvolvimento/teste
 if (process.env.NODE_ENV !== 'production') {
-  logger.debug('[config/database] DATABASE_URL original =', redact(process.env.DATABASE_URL));
+  logger.debug('[config/database] Ambiente =', process.env.NODE_ENV);
+  logger.debug('[config/database] DATABASE_URL original =', redact(databaseUrl));
   logger.debug('[config/database] DATABASE_URL limpa =', redact(cleanDatabaseUrl));
   logger.debug('[config/database] DB_SSL =', DB_SSL);
   logger.debug('[config/database] URL requires SSL =', urlRequiresSSL);

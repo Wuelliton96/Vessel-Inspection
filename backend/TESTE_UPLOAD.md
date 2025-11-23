@@ -19,19 +19,19 @@ npm run test:upload-validacao
 ```
 
 **O que este teste faz:**
-- ✅ Cria dados de teste (vistoria, checklist item, tipo de foto)
-- ✅ Faz login como vistoriador
-- ✅ Faz upload de uma foto com `checklist_item_id`
-- ✅ Verifica se a foto foi salva no banco de dados
-- ✅ Verifica se o nome do arquivo contém o `checklist_item_id`
-- ✅ Verifica se o checklist foi marcado como CONCLUIDO
-- ✅ Verifica se a foto foi vinculada ao checklist
-- ✅ Valida tudo diretamente no banco de dados
-- ✅ Limpa os dados de teste
+- Cria dados de teste (vistoria, checklist item, tipo de foto)
+- Faz login como vistoriador
+- Faz upload de uma foto com `checklist_item_id`
+- Verifica se a foto foi salva no banco de dados
+- Verifica se o nome do arquivo contém o `checklist_item_id`
+- Verifica se o checklist foi marcado como CONCLUIDO
+- Verifica se a foto foi vinculada ao checklist
+- Valida tudo diretamente no banco de dados
+- Limpa os dados de teste
 
 **Resultado esperado:**
 ```
-✓ TODAS AS VALIDAÇÕES PASSARAM!
+TODAS AS VALIDACOES PASSARAM!
 O sistema está funcionando corretamente!
 ```
 
@@ -59,7 +59,7 @@ Os logs do backend mostram:
    ```
    [CHECKLIST] === INICIANDO BUSCA DO ITEM DO CHECKLIST ===
    [CHECKLIST] checklist_item_id recebido: 555
-   [CHECKLIST] ✓ Item do checklist encontrado por ID:
+   [CHECKLIST] Item do checklist encontrado por ID:
      - ID: 555
      - Nome: "Confirmação do nº de inscrição e nome"
      - Status atual: PENDENTE
@@ -68,7 +68,7 @@ Os logs do backend mostram:
 3. **Atualização do checklist:**
    ```
    [CHECKLIST] === ATUALIZANDO ITEM DO CHECKLIST ===
-   [CHECKLIST] ✓ Item do checklist atualizado:
+   [CHECKLIST] Item do checklist atualizado:
      - Item ID: 555
      - Foto ID vinculada: 123
      - Status: CONCLUIDO
@@ -99,7 +99,7 @@ Os logs do frontend mostram:
    [FRONTEND]   - Foto ID: 123
    [FRONTEND]   - checklist_item_id_enviado: 555
    [FRONTEND]   - checklist_atualizado: sim
-   [FRONTEND] ✓ IDs correspondem: 555 === 555
+   [FRONTEND] IDs correspondem: 555 === 555
    ```
 
 ## Verificação Manual no Banco

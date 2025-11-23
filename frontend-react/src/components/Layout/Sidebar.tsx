@@ -123,7 +123,7 @@ const Sidebar: React.FC = () => {
   return (
     <>
       <MobileMenuButton onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-        ☰
+        Menu
       </MobileMenuButton>
       
       <SidebarContainer className={isMobileMenuOpen ? 'open' : ''}>

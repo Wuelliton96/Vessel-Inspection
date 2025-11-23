@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { FileText, Download, Plus, Edit2, Trash2, Eye, CheckCircle, AlertCircle } from 'lucide-react';
+import { FileText, Download, Plus, Edit2, Trash2, Eye, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
 import { laudoService } from '../services/api';
 import { Laudo } from '../types';
 
@@ -117,7 +117,11 @@ const Laudos: React.FC = () => {
   const [laudos, setLaudos] = useState<Laudo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [laudoToDelete, setLaudoToDelete] = useState<Laudo | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     carregarLaudos();

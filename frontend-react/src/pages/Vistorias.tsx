@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Plus, 
   Edit, 
@@ -15,6 +16,7 @@ import {
   XCircle,
   Search,
   ClipboardCheck,
+  Loader2,
   DollarSign,
   Mail,
   X,
@@ -28,6 +30,7 @@ import { Vistoria, Usuario, Embarcacao, Cliente, TipoPessoa } from '../types';
 import { vistoriaService, usuarioService, embarcacaoService, clienteService } from '../services/api';
 import { useAccessControl } from '../hooks/useAccessControl';
 import { buscarCEP, formatarCEP, validarCEP } from '../utils/cepUtils';
+import { useDebounce } from '../utils/debounce';
 import { 
   mascaraValorMonetario, 
   limparValorMonetario, 
@@ -494,19 +497,49 @@ const Vistorias: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { isAdmin } = useAccessControl();
-  const [vistorias, setVistorias] = useState<Vistoria[]>([]);
-  const [vistoriadores, setVistoriadores] = useState<Usuario[]>([]);
-  const [seguradoras, setSeguradoras] = useState<any[]>([]);
-  const [tiposPermitidos, setTiposPermitidos] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  
+  // Estados locais
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filtroCPF, setFiltroCPF] = useState('');
   const [filtroVistoriador, setFiltroVistoriador] = useState('');
+  const [tiposPermitidos, setTiposPermitidos] = useState<string[]>([]);
+  
+  // Debounce na busca para evitar requisições excessivas
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+  
+  // Usar React Query para cache de dados
+  const { data: vistorias = [], isLoading: loadingVistorias } = useQuery({
+    queryKey: ['vistorias', isAdmin],
+    queryFn: () => isAdmin ? vistoriaService.getAll() : vistoriaService.getByVistoriador(),
+    staleTime: 2 * 60 * 1000, // Cache por 2 minutos
+    gcTime: 5 * 60 * 1000,
+  });
+  
+  const { data: vistoriadores = [] } = useQuery({
+    queryKey: ['vistoriadores'],
+    queryFn: () => usuarioService.getAll(),
+    enabled: isAdmin, // Só carrega se for admin
+    staleTime: 10 * 60 * 1000, // Cache por 10 minutos (muda pouco)
+    select: (data) => data.filter(u => u.nivelAcessoId === 2), // Filtrar apenas vistoriadores
+  });
+  
+  const { data: seguradoras = [] } = useQuery({
+    queryKey: ['seguradoras'],
+    queryFn: async () => {
+      const { seguradoraService } = await import('../services/api');
+      return seguradoraService.getAll();
+    },
+    staleTime: 10 * 60 * 1000, // Cache por 10 minutos
+  });
+  
+  const loading = loadingVistorias;
   const [showModal, setShowModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showClienteModal, setShowClienteModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [editingVistoria, setEditingVistoria] = useState<Vistoria | null>(null);
   const [deletingVistoria, setDeletingVistoria] = useState<Vistoria | null>(null);
   
@@ -610,54 +643,10 @@ const Vistorias: React.FC = () => {
     }
   }, [searchParams, setSearchParams]);
 
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      
-      // Carregar seguradoras
-      try {
-        const { seguradoraService } = await import('../services/api');
-        const segs = await seguradoraService.getAll();
-        setSeguradoras(segs || []);
-      } catch (err) {
-        // Erro silencioso em produção
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Erro ao carregar seguradoras:', err);
-        }
-      }
-      
-      // Carregar vistorias baseado no nível de acesso
-      const vistoriasData = isAdmin 
-        ? await vistoriaService.getAll() 
-        : await vistoriaService.getByVistoriador();
-      
-      setVistorias(vistoriasData);
-      
-      // Carregar vistoriadores apenas se for admin
-      if (isAdmin) {
-        const vistoriadoresData = await usuarioService.getAll();
-        
-        // Filtrar apenas vistoriadores (nivelAcessoId === 2)
-        const vistoriadoresFiltrados = vistoriadoresData.filter(u => u.nivelAcessoId === 2);
-        
-        setVistoriadores(vistoriadoresFiltrados);
-      } else {
-        setVistoriadores([]);
-      }
-    } catch (err: any) {
-      // Em produção, mostrar apenas mensagem genérica
-      const errorMessage = process.env.NODE_ENV === 'development' 
-        ? 'Erro ao carregar dados: ' + (err.response?.data?.error || err.message)
-        : 'Erro ao carregar dados. Tente novamente.';
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  }, [isAdmin]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  // Função para invalidar cache quando necessário (após criar/editar/deletar)
+  const invalidateVistorias = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['vistorias'] });
+  }, [queryClient]);
 
   // Buscar CLIENTE por CPF/CNPJ
   const buscarPorCPF = async () => {
@@ -985,7 +974,7 @@ const Vistorias: React.FC = () => {
       setSuccess('Vistoria excluída com sucesso!');
       setShowDeleteModal(false);
       setDeletingVistoria(null);
-      loadData();
+      invalidateVistorias(); // Atualiza cache
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       setError('Erro ao excluir vistoria: ' + (err.response?.data?.error || err.message));
@@ -1048,6 +1037,7 @@ const Vistorias: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSubmitting(true);
 
     try {
       console.log('=== INICIANDO ATUALIZAÇÃO DE VISTORIA ===');
@@ -1091,7 +1081,7 @@ const Vistorias: React.FC = () => {
       }
       
       setShowModal(false);
-      loadData();
+      invalidateVistorias(); // Atualiza cache
       setTimeout(() => setSuccess(''), 3000);
       
       console.log('=== ATUALIZAÇÃO CONCLUÍDA COM SUCESSO ===');
@@ -1102,6 +1092,8 @@ const Vistorias: React.FC = () => {
       console.error('Response status:', err.response?.status);
       
       setError('Erro ao salvar vistoria: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -1117,33 +1109,36 @@ const Vistorias: React.FC = () => {
     }
   };
 
-  const filteredVistorias = vistorias.filter(vistoria => {
-    const searchLower = searchTerm.toLowerCase();
-    const embarcacaoNome = (vistoria.Embarcacao?.nome || vistoria.embarcacao?.nome || '').toLowerCase();
-    const embarcacaoNumero = (vistoria.Embarcacao?.nr_inscricao_barco || vistoria.embarcacao?.nr_inscricao_barco || '').toLowerCase();
-    const proprietarioCPF = (vistoria.Embarcacao?.proprietario_cpf || vistoria.embarcacao?.proprietario_cpf || '');
-    const localNome = (vistoria.Local?.nome_local || vistoria.local?.nome_local || '').toLowerCase();
-    const vistoriadorNome = vistoria.vistoriador?.nome?.toLowerCase() || '';
-    const vistoriadorId = vistoria.vistoriador_id?.toString() || '';
-    const statusNome = (vistoria.StatusVistoria?.nome || vistoria.statusVistoria?.nome || '').toLowerCase();
-    
-    // Filtro de texto geral
-    const matchSearch = !searchTerm || (
-      embarcacaoNome.includes(searchLower) ||
-      embarcacaoNumero.includes(searchLower) ||
-      localNome.includes(searchLower) ||
-      vistoriadorNome.includes(searchLower) ||
-      statusNome.includes(searchLower)
-    );
-    
-    // Filtro de CPF do proprietário
-    const matchCPF = !filtroCPF || proprietarioCPF.includes(filtroCPF.replace(/\D/g, ''));
-    
-    // Filtro de vistoriador
-    const matchVistoriador = !filtroVistoriador || vistoriadorId === filtroVistoriador;
-    
-    return matchSearch && matchCPF && matchVistoriador;
-  });
+  // Memoizar filtro de vistorias para melhor performance
+  const filteredVistorias = useMemo(() => {
+    return vistorias.filter(vistoria => {
+      const searchLower = debouncedSearchTerm.toLowerCase();
+      const embarcacaoNome = (vistoria.Embarcacao?.nome || vistoria.embarcacao?.nome || '').toLowerCase();
+      const embarcacaoNumero = (vistoria.Embarcacao?.nr_inscricao_barco || vistoria.embarcacao?.nr_inscricao_barco || '').toLowerCase();
+      const proprietarioCPF = (vistoria.Embarcacao?.proprietario_cpf || vistoria.embarcacao?.proprietario_cpf || '');
+      const localNome = (vistoria.Local?.nome_local || vistoria.local?.nome_local || '').toLowerCase();
+      const vistoriadorNome = vistoria.vistoriador?.nome?.toLowerCase() || '';
+      const vistoriadorId = vistoria.vistoriador_id?.toString() || '';
+      const statusNome = (vistoria.StatusVistoria?.nome || vistoria.statusVistoria?.nome || '').toLowerCase();
+      
+      // Filtro de texto geral (usa debouncedSearchTerm)
+      const matchSearch = !debouncedSearchTerm || (
+        embarcacaoNome.includes(searchLower) ||
+        embarcacaoNumero.includes(searchLower) ||
+        localNome.includes(searchLower) ||
+        vistoriadorNome.includes(searchLower) ||
+        statusNome.includes(searchLower)
+      );
+      
+      // Filtro de CPF do proprietário
+      const matchCPF = !filtroCPF || proprietarioCPF.includes(filtroCPF.replace(/\D/g, ''));
+      
+      // Filtro de vistoriador
+      const matchVistoriador = !filtroVistoriador || vistoriadorId === filtroVistoriador;
+      
+      return matchSearch && matchCPF && matchVistoriador;
+    });
+  }, [vistorias, debouncedSearchTerm, filtroCPF, filtroVistoriador]);
 
   if (loading) {
     return (
@@ -2279,8 +2274,15 @@ const Vistorias: React.FC = () => {
                 <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit" variant="primary">
-                  {editingVistoria ? 'Atualizar' : 'Criar'}
+                <Button type="submit" variant="primary" disabled={submitting}>
+                  {submitting ? (
+                    <>
+                      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                      {editingVistoria ? 'Atualizando...' : 'Criando...'}
+                    </>
+                  ) : (
+                    editingVistoria ? 'Atualizar' : 'Criar'
+                  )}
                 </Button>
               </ModalButtons>
             </Form>
@@ -2511,7 +2513,7 @@ const Vistorias: React.FC = () => {
                   Rua/Avenida
                   {clienteFormData.logradouro && clienteFormData.cep.length === 8 && (
                     <span style={{ marginLeft: '0.5rem', color: '#10b981', fontSize: '0.85rem' }}>
-                      ✓ Preenchido pelo CEP
+                      Preenchido pelo CEP
                     </span>
                   )}
                 </Label>
@@ -2546,7 +2548,7 @@ const Vistorias: React.FC = () => {
                     Bairro
                     {clienteFormData.bairro && clienteFormData.cep.length === 8 && (
                       <span style={{ marginLeft: '0.5rem', color: '#10b981', fontSize: '0.85rem' }}>
-                        ✓
+                        OK
                       </span>
                     )}
                   </Label>
@@ -2571,7 +2573,7 @@ const Vistorias: React.FC = () => {
                     Cidade
                     {clienteFormData.cidade && clienteFormData.cep.length === 8 && (
                       <span style={{ marginLeft: '0.5rem', color: '#10b981', fontSize: '0.85rem' }}>
-                        ✓
+                        OK
                       </span>
                     )}
                   </Label>
@@ -2593,7 +2595,7 @@ const Vistorias: React.FC = () => {
                     Estado (UF)
                     {clienteFormData.estado && clienteFormData.cep.length === 8 && (
                       <span style={{ marginLeft: '0.5rem', color: '#10b981', fontSize: '0.85rem' }}>
-                        ✓
+                        OK
                       </span>
                     )}
                   </Label>
@@ -2644,6 +2646,12 @@ const Vistorias: React.FC = () => {
           </ModalContent>
         </ModalOverlay>
       )}
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </Container>
   );
 };

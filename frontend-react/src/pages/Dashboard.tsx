@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback } from 'react';
 import styled from 'styled-components';
+import { useQuery } from '@tanstack/react-query';
 import { 
   Ship, 
   MapPin, 
@@ -308,29 +309,37 @@ const ErrorMessage = styled.div`
 
 const Dashboard: React.FC = () => {
   const { isAdmin, isVistoriador } = useAccessControl();
-  const [estatisticas, setEstatisticas] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  
+  // Usar React Query para cache e gerenciamento de estado
+  const { data: estatisticas, isLoading: loading, error: queryError } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: () => dashboardService.getEstatisticas(),
+    enabled: isAdmin, // Só executa se for admin
+    staleTime: 5 * 60 * 1000, // Cache por 5 minutos
+    gcTime: 10 * 60 * 1000, // Mantém em cache por 10 minutos
+    refetchOnWindowFocus: false, // Não recarrega ao focar janela
+  });
 
-  useEffect(() => {
-    const loadEstatisticas = async () => {
-      if (!isAdmin) return;
-      
-      try {
-        setLoading(true);
-        setError('');
-        const data = await dashboardService.getEstatisticas();
-        setEstatisticas(data);
-      } catch (err: any) {
-        console.error('Erro ao carregar estatísticas:', err);
-        setError('Erro ao carregar estatísticas: ' + (err.response?.data?.error || err.message));
-      } finally {
-        setLoading(false);
-      }
-    };
+  const error = queryError ? (queryError as any).response?.data?.error || (queryError as any).message : '';
 
-    loadEstatisticas();
-  }, [isAdmin]);
+  // Memoizar funções para evitar recriação a cada render
+  // IMPORTANTE: Hooks devem ser chamados ANTES de qualquer early return
+  const getTrendIcon = useCallback((percentual: number) => {
+    if (percentual > 0) return <ArrowUp size={16} />;
+    if (percentual < 0) return <ArrowDown size={16} />;
+    return <Minus size={16} />;
+  }, []);
+
+  const getTrendColor = useCallback((percentual: number, inverso = false) => {
+    if (inverso) {
+      if (percentual > 0) return '#ef4444'; // Vermelho se aumentou despesa
+      if (percentual < 0) return '#10b981'; // Verde se diminuiu despesa
+    } else {
+      if (percentual > 0) return '#10b981'; // Verde se aumentou
+      if (percentual < 0) return '#ef4444'; // Vermelho se diminuiu
+    }
+    return '#6b7280'; // Neutro
+  }, []);
 
   // Se for vistoriador, mostrar dashboard personalizado
   if (isVistoriador) {
@@ -373,23 +382,6 @@ const Dashboard: React.FC = () => {
       </Container>
     );
   }
-
-  const getTrendIcon = (percentual: number) => {
-    if (percentual > 0) return <ArrowUp size={16} />;
-    if (percentual < 0) return <ArrowDown size={16} />;
-    return <Minus size={16} />;
-  };
-
-  const getTrendColor = (percentual: number, inverso = false) => {
-    if (inverso) {
-      if (percentual > 0) return '#ef4444'; // Vermelho se aumentou despesa
-      if (percentual < 0) return '#10b981'; // Verde se diminuiu despesa
-    } else {
-      if (percentual > 0) return '#10b981'; // Verde se aumentou
-      if (percentual < 0) return '#ef4444'; // Vermelho se diminuiu
-    }
-    return '#6b7280'; // Neutro
-  };
 
   return (
     <Container>

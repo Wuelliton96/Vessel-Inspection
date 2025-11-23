@@ -9,7 +9,8 @@ import {
   Home, 
   AlertCircle,
   Search,
-  CheckCircle
+  CheckCircle,
+  Loader2
 } from 'lucide-react';
 import { Local } from '../types';
 import { localService } from '../services/api';
@@ -445,6 +446,8 @@ const Locais: React.FC = () => {
   const [editingLocal, setEditingLocal] = useState<Local | null>(null);
   const [deletingLocal, setDeletingLocal] = useState<Local | null>(null);
   const [cepLoading, setCepLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [camposBloqueados, setCamposBloqueados] = useState({
     logradouro: false,
     bairro: false,
@@ -531,6 +534,7 @@ const Locais: React.FC = () => {
   const handleConfirmDelete = async () => {
     if (!deletingLocal) return;
 
+    setDeleting(true);
     try {
       await localService.delete(deletingLocal.id);
       setSuccess('Local excluído com sucesso!');
@@ -542,6 +546,8 @@ const Locais: React.FC = () => {
       setError('Erro ao excluir local: ' + (err.response?.data?.error || err.message));
       setShowDeleteModal(false);
       setDeletingLocal(null);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -599,6 +605,7 @@ const Locais: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSubmitting(true);
 
     try {
       console.log('=== INICIANDO ATUALIZAÇÃO DE LOCAL ===');
@@ -635,6 +642,8 @@ const Locais: React.FC = () => {
       console.error('Response status:', err.response?.status);
       
       setError('Erro ao salvar local: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -979,8 +988,15 @@ const Locais: React.FC = () => {
                 <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit" variant="primary">
-                  {editingLocal ? 'Atualizar' : 'Criar'}
+                <Button type="submit" variant="primary" disabled={submitting}>
+                  {submitting ? (
+                    <>
+                      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                      {editingLocal ? 'Atualizando...' : 'Criando...'}
+                    </>
+                  ) : (
+                    editingLocal ? 'Atualizar' : 'Criar'
+                  )}
                 </Button>
               </ModalButtons>
             </Form>
@@ -1008,6 +1024,7 @@ const Locais: React.FC = () => {
                   type="button"
                   onClick={() => setShowDeleteModal(false)}
                   style={{ background: '#6b7280' }}
+                  disabled={deleting}
                 >
                   Cancelar
                 </Button>
@@ -1015,14 +1032,28 @@ const Locais: React.FC = () => {
                   type="button"
                   onClick={handleConfirmDelete}
                   style={{ background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)' }}
+                  disabled={deleting}
                 >
-                  Excluir
+                  {deleting ? (
+                    <>
+                      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                      Excluindo...
+                    </>
+                  ) : (
+                    'Excluir'
+                  )}
                 </Button>
               </ModalButtons>
             </div>
           </ModalContent>
         </ModalOverlay>
       )}
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </Container>
   );
 };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Shield, Plus, Edit, Trash2, Power, X, Check, AlertCircle } from 'lucide-react';
+import { Shield, Plus, Edit, Trash2, Power, X, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { Seguradora, TipoEmbarcacaoSeguradora } from '../types';
 import { seguradoraService } from '../services/api';
 import { TIPOS_EMBARCACAO_SEGURADORA, getLabelTipoEmbarcacaoSeguradora } from '../utils/validators';
@@ -273,6 +273,9 @@ const Seguradoras: React.FC = () => {
   // Modal de confirmação de exclusão
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [seguradoraParaExcluir, setSeguradoraParaExcluir] = useState<Seguradora | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
 
   const loadSeguradoras = async () => {
     try {
@@ -333,17 +336,18 @@ const Seguradoras: React.FC = () => {
   };
 
   const handleSalvar = async () => {
+    if (!formData.nome.trim()) {
+      setError('Nome da seguradora é obrigatório');
+      return;
+    }
+
+    if (formData.tipos_permitidos.length === 0) {
+      setError('Selecione pelo menos um tipo de embarcação');
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      if (!formData.nome.trim()) {
-        setError('Nome da seguradora é obrigatório');
-        return;
-      }
-
-      if (formData.tipos_permitidos.length === 0) {
-        setError('Selecione pelo menos um tipo de embarcação');
-        return;
-      }
-
       if (editando) {
         await seguradoraService.update(editando.id, formData);
         setSuccess('Seguradora atualizada com sucesso!');
@@ -357,10 +361,13 @@ const Seguradoras: React.FC = () => {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       setError('Erro ao salvar: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleToggleStatus = async (seguradora: Seguradora) => {
+    setTogglingId(seguradora.id);
     try {
       await seguradoraService.toggleStatus(seguradora.id);
       setSuccess(`Seguradora ${seguradora.ativo ? 'desativada' : 'ativada'} com sucesso!`);
@@ -368,6 +375,8 @@ const Seguradoras: React.FC = () => {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       setError('Erro ao alterar status: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -379,6 +388,7 @@ const Seguradoras: React.FC = () => {
   const handleConfirmarExclusao = async () => {
     if (!seguradoraParaExcluir) return;
 
+    setDeleting(true);
     try {
       await seguradoraService.delete(seguradoraParaExcluir.id);
       setSuccess('Seguradora excluída com sucesso!');
@@ -389,6 +399,8 @@ const Seguradoras: React.FC = () => {
     } catch (err: any) {
       setError('Erro ao excluir: ' + (err.response?.data?.error || err.message));
       setShowDeleteModal(false);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -480,9 +492,14 @@ const Seguradoras: React.FC = () => {
                     <IconButton 
                       variant="warning" 
                       onClick={() => handleToggleStatus(seguradora)}
-                      title={seguradora.ativo ? 'Desativar' : 'Ativar'}
+                      title={togglingId === seguradora.id ? 'Alterando...' : seguradora.ativo ? 'Desativar' : 'Ativar'}
+                      disabled={togglingId === seguradora.id}
                     >
-                      <Power size={18} />
+                      {togglingId === seguradora.id ? (
+                        <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                      ) : (
+                        <Power size={18} />
+                      )}
                     </IconButton>
                     <IconButton 
                       variant="danger" 
@@ -555,12 +572,21 @@ const Seguradoras: React.FC = () => {
           </FormGroup>
 
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-            <Button variant="secondary" onClick={handleFecharModal}>
+            <Button variant="secondary" onClick={handleFecharModal} disabled={submitting}>
               Cancelar
             </Button>
-            <Button variant="success" onClick={handleSalvar}>
-              <Check size={18} />
-              {editando ? 'Salvar Alterações' : 'Criar Seguradora'}
+            <Button variant="success" onClick={handleSalvar} disabled={submitting}>
+              {submitting ? (
+                <>
+                  <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                  {editando ? 'Salvando...' : 'Criando...'}
+                </>
+              ) : (
+                <>
+                  <Check size={18} />
+                  {editando ? 'Salvar Alterações' : 'Criar Seguradora'}
+                </>
+              )}
             </Button>
           </div>
         </ModalContent>
@@ -585,16 +611,31 @@ const Seguradoras: React.FC = () => {
           </p>
 
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-            <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
+            <Button variant="secondary" onClick={() => setShowDeleteModal(false)} disabled={deleting}>
               Cancelar
             </Button>
-            <Button variant="danger" onClick={handleConfirmarExclusao}>
-              <Trash2 size={18} />
-              Confirmar Exclusão
+            <Button variant="danger" onClick={handleConfirmarExclusao} disabled={deleting}>
+              {deleting ? (
+                <>
+                  <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                  Excluindo...
+                </>
+              ) : (
+                <>
+                  <Trash2 size={18} />
+                  Confirmar Exclusão
+                </>
+              )}
             </Button>
           </div>
         </ModalContent>
       </Modal>
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </Container>
   );
 };

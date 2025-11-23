@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { Eye, EyeOff, Lock, AlertCircle, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Lock, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Container = styled.div`
@@ -493,11 +493,25 @@ const PasswordUpdate: React.FC = () => {
               variant="primary"
               disabled={loading || !passwordValidation.isValid || password !== confirmPassword}
             >
+              {loading ? (
+                <>
+                  <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                  Atualizando...
+                </>
+              ) : (
+                'Atualizar Senha'
+              )}
               {loading ? 'Atualizando...' : 'Atualizar Senha'}
             </Button>
           </ButtonGroup>
         </Form>
       </Card>
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </Container>
   );
 };

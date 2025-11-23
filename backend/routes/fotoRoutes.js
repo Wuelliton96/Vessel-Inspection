@@ -722,7 +722,7 @@ router.post('/', upload.single('foto'), async (req, res) => {
       });
       console.log(`  - Item do checklist atualizado: ${itemAtualizado ? 'sim' : 'não'}`);
       if (itemAtualizado) {
-        console.log(`    └─ Item: "${itemAtualizado.nome}" (ID: ${itemAtualizado.id})`);
+        console.log(`    - Item: "${itemAtualizado.nome}" (ID: ${itemAtualizado.id})`);
       }
     } catch (checkError) {
       console.warn('[UPLOAD] ATENCAO: Erro ao verificar checklist:', checkError.message);
@@ -749,10 +749,10 @@ router.post('/', upload.single('foto'), async (req, res) => {
     console.log(`  - checklist_item_id_enviado: ${resposta.checklist_item_id_enviado || 'null'}`);
     console.log(`  - checklist_atualizado: ${resposta.checklist_atualizado ? 'sim' : 'não'}`);
     if (resposta.checklist_atualizado) {
-      console.log(`    └─ Item ID atualizado: ${resposta.checklist_atualizado.item_id}`);
-      console.log(`    └─ Item Nome: "${resposta.checklist_atualizado.item_nome}"`);
-      console.log(`    └─ Status: ${resposta.checklist_atualizado.status}`);
-      console.log(`    └─ Foto ID vinculada: ${resposta.checklist_atualizado.foto_id}`);
+      console.log(`    - Item ID atualizado: ${resposta.checklist_atualizado.item_id}`);
+      console.log(`    - Item Nome: "${resposta.checklist_atualizado.item_nome}"`);
+      console.log(`    - Status: ${resposta.checklist_atualizado.status}`);
+      console.log(`    - Foto ID vinculada: ${resposta.checklist_atualizado.foto_id}`);
       
       // Verificar se o ID enviado corresponde ao ID atualizado
       if (checklist_item_id && resposta.checklist_atualizado.item_id) {
