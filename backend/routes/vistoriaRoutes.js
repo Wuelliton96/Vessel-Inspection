@@ -456,7 +456,8 @@ router.get('/:id', requireAuth, async (req, res) => {
       include: [
         { model: Embarcacao, as: 'Embarcacao' },
         { model: Local, as: 'Local' },
-        { model: StatusVistoria, as: 'StatusVistoria' }
+        { model: StatusVistoria, as: 'StatusVistoria' },
+        { model: Usuario, as: 'vistoriador', attributes: ['id', 'nome', 'email', 'cpf'] }
       ]
     });
 
