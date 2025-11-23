@@ -1,26 +1,59 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useAccessControl } from './hooks/useAccessControl';
+import { queryClient } from './config/queryClient';
 import Layout from './components/Layout/Layout';
 import Login from './pages/Login';
 import PasswordUpdate from './pages/PasswordUpdate';
-import Dashboard from './pages/Dashboard';
-import Usuarios from './pages/Usuarios';
-import Embarcacoes from './pages/Embarcacoes';
-import Locais from './pages/Locais';
-import Vistorias from './pages/Vistorias';
-import NovaVistoria from './pages/NovaVistoria';
-import VistoriadorVistoria from './pages/VistoriadorVistoria';
-import PagamentosVistoriadores from './pages/PagamentosVistoriadores';
-import Seguradoras from './pages/Seguradoras';
-import Clientes from './pages/Clientes';
-import ChecklistTemplates from './pages/ChecklistTemplates';
-import FotosVistoria from './pages/FotosVistoria';
-import Fotos from './pages/Fotos';
-import Laudos from './pages/Laudos';
-import LaudoForm from './pages/LaudoForm';
-import AuditoriaLogs from './pages/AuditoriaLogs';
+
+// Lazy loading de componentes para melhor performance
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const Usuarios = React.lazy(() => import('./pages/Usuarios'));
+const Embarcacoes = React.lazy(() => import('./pages/Embarcacoes'));
+const Locais = React.lazy(() => import('./pages/Locais'));
+const Vistorias = React.lazy(() => import('./pages/Vistorias'));
+const NovaVistoria = React.lazy(() => import('./pages/NovaVistoria'));
+const VistoriadorVistoria = React.lazy(() => import('./pages/VistoriadorVistoria'));
+const PagamentosVistoriadores = React.lazy(() => import('./pages/PagamentosVistoriadores'));
+const Seguradoras = React.lazy(() => import('./pages/Seguradoras'));
+const Clientes = React.lazy(() => import('./pages/Clientes'));
+const ChecklistTemplates = React.lazy(() => import('./pages/ChecklistTemplates'));
+const FotosVistoria = React.lazy(() => import('./pages/FotosVistoria'));
+const Fotos = React.lazy(() => import('./pages/Fotos'));
+const Laudos = React.lazy(() => import('./pages/Laudos'));
+const LaudoForm = React.lazy(() => import('./pages/LaudoForm'));
+const AuditoriaLogs = React.lazy(() => import('./pages/AuditoriaLogs'));
+
+// Componente de loading para Suspense
+const LoadingFallback: React.FC = () => (
+  <div style={{ 
+    display: 'flex', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    height: '100vh',
+    flexDirection: 'column',
+    gap: '1rem',
+    color: '#6b7280'
+  }}>
+    <div style={{ 
+      width: '40px', 
+      height: '40px', 
+      border: '4px solid #e5e7eb',
+      borderTop: '4px solid #3b82f6',
+      borderRadius: '50%',
+      animation: 'spin 1s linear infinite'
+    }} />
+    <p>Carregando...</p>
+    <style>{`
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    `}</style>
+  </div>
+);
 
 const AppRoutes: React.FC = () => {
   const { isAuthenticated, usuario } = useAuth();
@@ -179,11 +212,15 @@ const AppRoutes: React.FC = () => {
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <AppRoutes />
-      </Router>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <Router>
+          <Suspense fallback={<LoadingFallback />}>
+            <AppRoutes />
+          </Suspense>
+        </Router>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 
