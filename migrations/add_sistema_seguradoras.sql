@@ -12,6 +12,25 @@ CREATE TABLE IF NOT EXISTS seguradoras (
     "updatedAt"         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Garantir que as colunas createdAt e updatedAt tenham DEFAULT mesmo se a tabela já existir
+ALTER TABLE seguradoras 
+  ALTER COLUMN "createdAt" SET DEFAULT CURRENT_TIMESTAMP,
+  ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;
+
+-- Se as colunas não existirem, criar (para tabelas antigas)
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'seguradoras' AND column_name = 'createdAt') THEN
+        ALTER TABLE seguradoras ADD COLUMN "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'seguradoras' AND column_name = 'updatedAt') THEN
+        ALTER TABLE seguradoras ADD COLUMN "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+END $$;
+
 COMMENT ON TABLE seguradoras IS 'Cadastro de seguradoras';
 COMMENT ON COLUMN seguradoras.nome IS 'Nome da seguradora';
 COMMENT ON COLUMN seguradoras.ativo IS 'Indica se a seguradora está ativa';
@@ -38,6 +57,25 @@ CREATE TABLE IF NOT EXISTS seguradora_tipo_embarcacao (
     UNIQUE(seguradora_id, tipo_embarcacao)
 );
 
+-- Garantir que as colunas createdAt e updatedAt tenham DEFAULT mesmo se a tabela já existir
+ALTER TABLE seguradora_tipo_embarcacao 
+  ALTER COLUMN "createdAt" SET DEFAULT CURRENT_TIMESTAMP,
+  ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;
+
+-- Se as colunas não existirem, criar (para tabelas antigas)
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'seguradora_tipo_embarcacao' AND column_name = 'createdAt') THEN
+        ALTER TABLE seguradora_tipo_embarcacao ADD COLUMN "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'seguradora_tipo_embarcacao' AND column_name = 'updatedAt') THEN
+        ALTER TABLE seguradora_tipo_embarcacao ADD COLUMN "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+END $$;
+
 COMMENT ON TABLE seguradora_tipo_embarcacao IS 'Tipos de embarcação permitidos por cada seguradora';
 
 -- Índices para melhorar performance
@@ -57,48 +95,48 @@ CREATE INDEX IF NOT EXISTS idx_embarcacoes_seguradora ON embarcacoes(seguradora_
 -- POPULAR DADOS INICIAIS
 -- ============================================
 
--- Inserir seguradoras
-INSERT INTO seguradoras (nome, ativo) VALUES
-    ('Essor', TRUE),
-    ('Mapfre', TRUE),
-    ('Swiss RE', TRUE),
-    ('AXA Seguros', TRUE),
-    ('Fairfax', TRUE)
+-- Inserir seguradoras (com createdAt e updatedAt explícitos para garantir)
+INSERT INTO seguradoras (nome, ativo, "createdAt", "updatedAt") VALUES
+    ('Essor', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('Mapfre', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('Swiss RE', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('AXA Seguros', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('Fairfax', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT (nome) DO NOTHING;
 
 -- Inserir tipos de embarcação permitidos por seguradora
 
 -- Essor: Lancha, Jet ski
-INSERT INTO seguradora_tipo_embarcacao (seguradora_id, tipo_embarcacao)
-SELECT id, 'LANCHA' FROM seguradoras WHERE nome = 'Essor'
+INSERT INTO seguradora_tipo_embarcacao (seguradora_id, tipo_embarcacao, "createdAt", "updatedAt")
+SELECT id, 'LANCHA', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM seguradoras WHERE nome = 'Essor'
 ON CONFLICT (seguradora_id, tipo_embarcacao) DO NOTHING;
 
-INSERT INTO seguradora_tipo_embarcacao (seguradora_id, tipo_embarcacao)
-SELECT id, 'JET_SKI' FROM seguradoras WHERE nome = 'Essor'
+INSERT INTO seguradora_tipo_embarcacao (seguradora_id, tipo_embarcacao, "createdAt", "updatedAt")
+SELECT id, 'JET_SKI', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM seguradoras WHERE nome = 'Essor'
 ON CONFLICT (seguradora_id, tipo_embarcacao) DO NOTHING;
 
 -- Mapfre: Lancha, Embarcação Comercial
-INSERT INTO seguradora_tipo_embarcacao (seguradora_id, tipo_embarcacao)
-SELECT id, 'LANCHA' FROM seguradoras WHERE nome = 'Mapfre'
+INSERT INTO seguradora_tipo_embarcacao (seguradora_id, tipo_embarcacao, "createdAt", "updatedAt")
+SELECT id, 'LANCHA', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM seguradoras WHERE nome = 'Mapfre'
 ON CONFLICT (seguradora_id, tipo_embarcacao) DO NOTHING;
 
-INSERT INTO seguradora_tipo_embarcacao (seguradora_id, tipo_embarcacao)
-SELECT id, 'EMBARCACAO_COMERCIAL' FROM seguradoras WHERE nome = 'Mapfre'
+INSERT INTO seguradora_tipo_embarcacao (seguradora_id, tipo_embarcacao, "createdAt", "updatedAt")
+SELECT id, 'EMBARCACAO_COMERCIAL', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM seguradoras WHERE nome = 'Mapfre'
 ON CONFLICT (seguradora_id, tipo_embarcacao) DO NOTHING;
 
 -- Swiss RE: Embarcação comercial
-INSERT INTO seguradora_tipo_embarcacao (seguradora_id, tipo_embarcacao)
-SELECT id, 'EMBARCACAO_COMERCIAL' FROM seguradoras WHERE nome = 'Swiss RE'
+INSERT INTO seguradora_tipo_embarcacao (seguradora_id, tipo_embarcacao, "createdAt", "updatedAt")
+SELECT id, 'EMBARCACAO_COMERCIAL', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM seguradoras WHERE nome = 'Swiss RE'
 ON CONFLICT (seguradora_id, tipo_embarcacao) DO NOTHING;
 
 -- AXA Seguros: Embarcação Comercial
-INSERT INTO seguradora_tipo_embarcacao (seguradora_id, tipo_embarcacao)
-SELECT id, 'EMBARCACAO_COMERCIAL' FROM seguradoras WHERE nome = 'AXA Seguros'
+INSERT INTO seguradora_tipo_embarcacao (seguradora_id, tipo_embarcacao, "createdAt", "updatedAt")
+SELECT id, 'EMBARCACAO_COMERCIAL', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM seguradoras WHERE nome = 'AXA Seguros'
 ON CONFLICT (seguradora_id, tipo_embarcacao) DO NOTHING;
 
 -- Fairfax: Embarcação Comercial
-INSERT INTO seguradora_tipo_embarcacao (seguradora_id, tipo_embarcacao)
-SELECT id, 'EMBARCACAO_COMERCIAL' FROM seguradoras WHERE nome = 'Fairfax'
+INSERT INTO seguradora_tipo_embarcacao (seguradora_id, tipo_embarcacao, "createdAt", "updatedAt")
+SELECT id, 'EMBARCACAO_COMERCIAL', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM seguradoras WHERE nome = 'Fairfax'
 ON CONFLICT (seguradora_id, tipo_embarcacao) DO NOTHING;
 
 -- ============================================

@@ -113,170 +113,170 @@ CREATE TRIGGER trigger_vistoria_checklist_itens_updated_at
 -- ============================================
 
 -- Checklist para JET SKI
-INSERT INTO checklist_templates (tipo_embarcacao, nome, descricao, ativo) VALUES
-    ('JET_SKI', 'Checklist Padrão - Jet Ski', 'Sequência de fotos para vistoria de Jet Ski', TRUE)
+INSERT INTO checklist_templates (tipo_embarcacao, nome, descricao, ativo, created_at, updated_at) VALUES
+    ('JET_SKI', 'Checklist Padrão - Jet Ski', 'Sequência de fotos para vistoria de Jet Ski', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT (tipo_embarcacao) DO NOTHING;
 
-INSERT INTO checklist_template_itens (checklist_template_id, ordem, nome, descricao, obrigatorio, permite_video) 
-SELECT id, 1, 'Confirmação do nº de inscrição e nome', 'Foto mostrando claramente o número de inscrição e nome do jet ski', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
+INSERT INTO checklist_template_itens (checklist_template_id, ordem, nome, descricao, obrigatorio, permite_video, created_at, updated_at) 
+SELECT id, 1, 'Confirmação do nº de inscrição e nome', 'Foto mostrando claramente o número de inscrição e nome do jet ski', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
 UNION ALL
-SELECT id, 2, 'Nome do acompanhante', 'Foto ou identificação da pessoa que acompanha a vistoria', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
+SELECT id, 2, 'Nome do acompanhante', 'Foto ou identificação da pessoa que acompanha a vistoria', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
 UNION ALL
-SELECT id, 3, 'Proa (frente)', 'Foto da parte frontal do jet ski', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
+SELECT id, 3, 'Proa (frente)', 'Foto da parte frontal do jet ski', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
 UNION ALL
-SELECT id, 4, 'Costado direito', 'Foto do lado direito completo', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
+SELECT id, 4, 'Costado direito', 'Foto do lado direito completo', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
 UNION ALL
-SELECT id, 5, 'Costado esquerdo', 'Foto do lado esquerdo completo', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
+SELECT id, 5, 'Costado esquerdo', 'Foto do lado esquerdo completo', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
 UNION ALL
-SELECT id, 6, 'Modelo do jet', 'Foto mostrando o modelo/marca', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
+SELECT id, 6, 'Modelo do jet', 'Foto mostrando o modelo/marca', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
 UNION ALL
-SELECT id, 7, 'Nome do jet', 'Foto do nome/identificação lateral', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
+SELECT id, 7, 'Nome do jet', 'Foto do nome/identificação lateral', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
 UNION ALL
-SELECT id, 8, 'Popa (traseira)', 'Foto da parte traseira', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
+SELECT id, 8, 'Popa (traseira)', 'Foto da parte traseira', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
 UNION ALL
-SELECT id, 9, 'Propulsão/rabeta', 'Foto do sistema de propulsão', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
+SELECT id, 9, 'Propulsão/rabeta', 'Foto do sistema de propulsão', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
 UNION ALL
-SELECT id, 10, 'Nº de inscrição e capitania', 'Foto da placa/adesivo com número de inscrição e capitania', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
+SELECT id, 10, 'Nº de inscrição e capitania', 'Foto da placa/adesivo com número de inscrição e capitania', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
 UNION ALL
-SELECT id, 11, 'Plaqueta do chassi', 'Foto da plaqueta de identificação do chassi', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
+SELECT id, 11, 'Plaqueta do chassi', 'Foto da plaqueta de identificação do chassi', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
 UNION ALL
-SELECT id, 12, 'Cockpit (visão geral)', 'Foto do cockpit de cima: parte de trás para frente', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
+SELECT id, 12, 'Cockpit (visão geral)', 'Foto do cockpit de cima: parte de trás para frente', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
 UNION ALL
-SELECT id, 13, 'Painel de comando', 'Foto do painel de instrumentos', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
+SELECT id, 13, 'Painel de comando', 'Foto do painel de instrumentos', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
 UNION ALL
-SELECT id, 14, 'Horas do motor', 'Foto do horímetro mostrando as horas de uso', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
+SELECT id, 14, 'Horas do motor', 'Foto do horímetro mostrando as horas de uso', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
 UNION ALL
-SELECT id, 15, 'Acionamento do motor', 'Foto ou vídeo do RPM com jet ski ligado ou propulsor funcionando', TRUE, TRUE FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
+SELECT id, 15, 'Acionamento do motor', 'Foto ou vídeo do RPM com jet ski ligado ou propulsor funcionando', TRUE, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
 UNION ALL
-SELECT id, 16, 'Objetos extras', 'Fotos de âncora, coletes salva-vidas, retrovisor, CD player, etc', FALSE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
+SELECT id, 16, 'Objetos extras', 'Fotos de âncora, coletes salva-vidas, retrovisor, CD player, etc', FALSE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
 UNION ALL
-SELECT id, 17, 'Vista geral do motor', 'Foto do motor completo', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
+SELECT id, 17, 'Vista geral do motor', 'Foto do motor completo', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
 UNION ALL
-SELECT id, 18, 'Plaqueta do motor', 'Foto da plaqueta de identificação do motor', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
+SELECT id, 18, 'Plaqueta do motor', 'Foto da plaqueta de identificação do motor', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
 UNION ALL
-SELECT id, 19, 'Documentos (TIE)', 'Foto dos documentos, principalmente TIE', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
+SELECT id, 19, 'Documentos (TIE)', 'Foto dos documentos, principalmente TIE', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'JET_SKI'
 ON CONFLICT DO NOTHING;
 
 -- Checklist para LANCHA
-INSERT INTO checklist_templates (tipo_embarcacao, nome, descricao, ativo) VALUES
-    ('LANCHA', 'Checklist Padrão - Lancha', 'Sequência de fotos para vistoria de Lancha', TRUE)
+INSERT INTO checklist_templates (tipo_embarcacao, nome, descricao, ativo, created_at, updated_at) VALUES
+    ('LANCHA', 'Checklist Padrão - Lancha', 'Sequência de fotos para vistoria de Lancha', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT (tipo_embarcacao) DO NOTHING;
 
-INSERT INTO checklist_template_itens (checklist_template_id, ordem, nome, descricao, obrigatorio, permite_video)
-SELECT id, 1, 'Confirmação do nº de inscrição e nome', 'Foto mostrando claramente o número de inscrição e nome da lancha', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+INSERT INTO checklist_template_itens (checklist_template_id, ordem, nome, descricao, obrigatorio, permite_video, created_at, updated_at)
+SELECT id, 1, 'Confirmação do nº de inscrição e nome', 'Foto mostrando claramente o número de inscrição e nome da lancha', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 2, 'Nome do acompanhante', 'Foto ou identificação da pessoa que acompanha a vistoria', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 2, 'Nome do acompanhante', 'Foto ou identificação da pessoa que acompanha a vistoria', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 3, 'Proa (frente)', 'Foto da parte frontal da embarcação', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 3, 'Proa (frente)', 'Foto da parte frontal da embarcação', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 4, 'Âncora', 'Foto da âncora e sistema de ancoragem', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 4, 'Âncora', 'Foto da âncora e sistema de ancoragem', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 5, 'Costado direito', 'Foto do lado direito completo', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 5, 'Costado direito', 'Foto do lado direito completo', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 6, 'Costado esquerdo', 'Foto do lado esquerdo completo', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 6, 'Costado esquerdo', 'Foto do lado esquerdo completo', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 7, 'Nome da lancha', 'Foto do nome/identificação', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 7, 'Nome da lancha', 'Foto do nome/identificação', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 8, 'Popa (traseira)', 'Foto da parte traseira', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 8, 'Popa (traseira)', 'Foto da parte traseira', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 9, 'Nº de inscrição e capitania', 'Foto da placa/adesivo com número de inscrição e capitania', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 9, 'Nº de inscrição e capitania', 'Foto da placa/adesivo com número de inscrição e capitania', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 10, 'Plaqueta do casco/chassi', 'Foto da plaqueta de identificação do casco', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 10, 'Plaqueta do casco/chassi', 'Foto da plaqueta de identificação do casco', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 11, 'Objetos', 'Fotos de bandeira, defensas, guincho, estofarias, etc', FALSE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 11, 'Objetos', 'Fotos de bandeira, defensas, guincho, estofarias, etc', FALSE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 12, 'Painel de comando geral', 'Foto do painel de comando completo', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 12, 'Painel de comando geral', 'Foto do painel de comando completo', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 13, 'Equipamentos do painel', 'Foto dos instrumentos e equipamentos', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 13, 'Equipamentos do painel', 'Foto dos instrumentos e equipamentos', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 14, 'Acionamento do motor', 'Foto ou vídeo do RPM com embarcação ligada ou rabeta funcionando', TRUE, TRUE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 14, 'Acionamento do motor', 'Foto ou vídeo do RPM com embarcação ligada ou rabeta funcionando', TRUE, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 15, 'Horas do motor', 'Foto do horímetro', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 15, 'Horas do motor', 'Foto do horímetro', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 16, 'Extintores + validade', 'Foto dos extintores mostrando validade', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 16, 'Extintores + validade', 'Foto dos extintores mostrando validade', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 17, 'Boias salva-vidas', 'Foto das boias salva-vidas', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 17, 'Boias salva-vidas', 'Foto das boias salva-vidas', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 18, 'Coletes salva-vidas', 'Foto dos coletes salva-vidas', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 18, 'Coletes salva-vidas', 'Foto dos coletes salva-vidas', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 19, 'Visão geral do motor', 'Foto do motor completo', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 19, 'Visão geral do motor', 'Foto do motor completo', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 20, 'Bombas de porão', 'Foto das bombas de porão', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 20, 'Bombas de porão', 'Foto das bombas de porão', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 21, 'Bombas de água doce', 'Foto do sistema de água doce', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 21, 'Bombas de água doce', 'Foto do sistema de água doce', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 22, 'Baterias', 'Foto das baterias', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 22, 'Baterias', 'Foto das baterias', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 23, 'Plaqueta do motor/etiqueta', 'Foto da plaqueta de identificação do motor', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 23, 'Plaqueta do motor/etiqueta', 'Foto da plaqueta de identificação do motor', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 UNION ALL
-SELECT id, 24, 'Documentos (TIE)', 'Foto dos documentos, principalmente TIE', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
+SELECT id, 24, 'Documentos (TIE)', 'Foto dos documentos, principalmente TIE', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'LANCHA'
 ON CONFLICT DO NOTHING;
 
 -- Checklist para EMBARCACAO_COMERCIAL
-INSERT INTO checklist_templates (tipo_embarcacao, nome, descricao, ativo) VALUES
-    ('EMBARCACAO_COMERCIAL', 'Checklist Padrão - Embarcação Comercial', 'Sequência de fotos para vistoria de Embarcação Comercial', TRUE)
+INSERT INTO checklist_templates (tipo_embarcacao, nome, descricao, ativo, created_at, updated_at) VALUES
+    ('EMBARCACAO_COMERCIAL', 'Checklist Padrão - Embarcação Comercial', 'Sequência de fotos para vistoria de Embarcação Comercial', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT (tipo_embarcacao) DO NOTHING;
 
-INSERT INTO checklist_template_itens (checklist_template_id, ordem, nome, descricao, obrigatorio, permite_video)
-SELECT id, 1, 'Confirmação do nº de inscrição e nome', 'Foto mostrando claramente o número de inscrição e nome da embarcação comercial', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+INSERT INTO checklist_template_itens (checklist_template_id, ordem, nome, descricao, obrigatorio, permite_video, created_at, updated_at)
+SELECT id, 1, 'Confirmação do nº de inscrição e nome', 'Foto mostrando claramente o número de inscrição e nome da embarcação comercial', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 2, 'Nome do acompanhante', 'Foto ou identificação da pessoa que acompanha a vistoria', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 2, 'Nome do acompanhante', 'Foto ou identificação da pessoa que acompanha a vistoria', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 3, 'Proa (frente)', 'Foto da parte frontal da embarcação', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 3, 'Proa (frente)', 'Foto da parte frontal da embarcação', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 4, 'Âncora e sistema de ancoragem', 'Foto da âncora, corrente e sistema completo de ancoragem', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 4, 'Âncora e sistema de ancoragem', 'Foto da âncora, corrente e sistema completo de ancoragem', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 5, 'Costado direito completo', 'Foto do lado direito completo da embarcação', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 5, 'Costado direito completo', 'Foto do lado direito completo da embarcação', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 6, 'Costado esquerdo completo', 'Foto do lado esquerdo completo da embarcação', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 6, 'Costado esquerdo completo', 'Foto do lado esquerdo completo da embarcação', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 7, 'Nome da embarcação', 'Foto do nome/identificação da embarcação', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 7, 'Nome da embarcação', 'Foto do nome/identificação da embarcação', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 8, 'Popa (traseira)', 'Foto da parte traseira completa', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 8, 'Popa (traseira)', 'Foto da parte traseira completa', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 9, 'Nº de inscrição e capitania', 'Foto da placa/adesivo com número de inscrição e capitania', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 9, 'Nº de inscrição e capitania', 'Foto da placa/adesivo com número de inscrição e capitania', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 10, 'Plaqueta do casco/chassi', 'Foto da plaqueta de identificação do casco', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 10, 'Plaqueta do casco/chassi', 'Foto da plaqueta de identificação do casco', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 11, 'Estrutura do convés', 'Foto geral do convés principal', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 11, 'Estrutura do convés', 'Foto geral do convés principal', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 12, 'Cabine de comando', 'Foto externa da cabine de comando', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 12, 'Cabine de comando', 'Foto externa da cabine de comando', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 13, 'Painel de comando principal', 'Foto do painel de comando completo', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 13, 'Painel de comando principal', 'Foto do painel de comando completo', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 14, 'Equipamentos de navegação', 'Foto dos equipamentos de navegação (GPS, radar, etc)', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 14, 'Equipamentos de navegação', 'Foto dos equipamentos de navegação (GPS, radar, etc)', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 15, 'Rádio comunicador', 'Foto do rádio comunicador e certificado', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 15, 'Rádio comunicador', 'Foto do rádio comunicador e certificado', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 16, 'Acionamento do motor', 'Foto ou vídeo do RPM com embarcação ligada ou motor funcionando', TRUE, TRUE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 16, 'Acionamento do motor', 'Foto ou vídeo do RPM com embarcação ligada ou motor funcionando', TRUE, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 17, 'Horas do motor', 'Foto do horímetro mostrando as horas de uso', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 17, 'Horas do motor', 'Foto do horímetro mostrando as horas de uso', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 18, 'Extintores + validade', 'Foto dos extintores mostrando validade e localização', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 18, 'Extintores + validade', 'Foto dos extintores mostrando validade e localização', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 19, 'Boias salva-vidas', 'Foto das boias salva-vidas e quantidade', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 19, 'Boias salva-vidas', 'Foto das boias salva-vidas e quantidade', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 20, 'Coletes salva-vidas', 'Foto dos coletes salva-vidas e quantidade', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 20, 'Coletes salva-vidas', 'Foto dos coletes salva-vidas e quantidade', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 21, 'Bote salva-vidas', 'Foto do bote salva-vidas e sistema de lançamento', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 21, 'Bote salva-vidas', 'Foto do bote salva-vidas e sistema de lançamento', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 22, 'Sinalizadores de emergência', 'Foto dos sinalizadores e equipamentos de sinalização', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 22, 'Sinalizadores de emergência', 'Foto dos sinalizadores e equipamentos de sinalização', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 23, 'Visão geral do motor', 'Foto do motor completo', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 23, 'Visão geral do motor', 'Foto do motor completo', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 24, 'Plaqueta do motor/etiqueta', 'Foto da plaqueta de identificação do motor', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 24, 'Plaqueta do motor/etiqueta', 'Foto da plaqueta de identificação do motor', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 25, 'Bombas de porão', 'Foto das bombas de porão e sistema de drenagem', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 25, 'Bombas de porão', 'Foto das bombas de porão e sistema de drenagem', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 26, 'Bombas de água doce', 'Foto do sistema de água doce', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 26, 'Bombas de água doce', 'Foto do sistema de água doce', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 27, 'Baterias', 'Foto das baterias e sistema elétrico', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 27, 'Baterias', 'Foto das baterias e sistema elétrico', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 28, 'Sistema de combustível', 'Foto do sistema de combustível e tanques', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 28, 'Sistema de combustível', 'Foto do sistema de combustível e tanques', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 29, 'Equipamentos de segurança', 'Foto de equipamentos adicionais (EPIs, cordas, etc)', FALSE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 29, 'Equipamentos de segurança', 'Foto de equipamentos adicionais (EPIs, cordas, etc)', FALSE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 UNION ALL
-SELECT id, 30, 'Documentos (TIE e licenças)', 'Foto dos documentos, principalmente TIE e licenças comerciais', TRUE, FALSE FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
+SELECT id, 30, 'Documentos (TIE e licenças)', 'Foto dos documentos, principalmente TIE e licenças comerciais', TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM checklist_templates WHERE tipo_embarcacao = 'EMBARCACAO_COMERCIAL'
 ON CONFLICT DO NOTHING;
 
 -- Tabela: Itens de checklist de cada vistoria

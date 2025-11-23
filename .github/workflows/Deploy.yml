@@ -44,6 +44,11 @@ jobs:
 
       #- name: Rodar testes
       #  working-directory: ./backend
+      #  env:
+      #    NODE_ENV: test
+      #    TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+      #    # IMPORTANTE: TEST_DATABASE_URL deve apontar para um banco SEPARADO de produção
+      #    # Isso garante que testes nunca apaguem dados de produção
       #  run: npm test   # ou npm run test, se for o caso
 
       - name: Restart PM2 

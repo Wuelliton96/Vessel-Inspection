@@ -14,6 +14,9 @@ describe('Rotas de Dashboard', () => {
   let admin;
 
   beforeAll(async () => {
+    // IMPORTANTE: force: true apaga e recria todas as tabelas
+    // Isso é SEGURO porque NODE_ENV=test garante uso de banco de teste (TEST_DATABASE_URL)
+    // NUNCA apagará dados de produção quando configurado corretamente
     await sequelize.sync({ force: true });
 
     await NivelAcesso.create({ id: 1, nome: 'ADMINISTRADOR', descricao: 'Admin' });

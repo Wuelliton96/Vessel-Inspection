@@ -29,6 +29,7 @@
     "update:niveis": "node scripts/updateNiveisAcesso.js",
     "sync:db": "node scripts/syncDatabase.js",
     "migrate:prod": "echo 'Migrations executadas via Railway'",
+    "migrate:seguradoras-checklist": "node scripts/executarMigrationsSeguradorasChecklist.js",
     "postinstall": "echo 'Dependencies installed successfully'"
   },
   "keywords": [],
