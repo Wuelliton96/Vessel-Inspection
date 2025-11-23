@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { Usuario } from '../types';
 import { authService } from '../services/api';
+import { useInactivityTimeout } from '../hooks/useInactivityTimeout';
 
 interface AuthContextType {
   usuario: Usuario | null;
@@ -80,7 +81,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setToken(null);
     setUsuario(null);
     localStorage.removeItem('token');
@@ -88,9 +89,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Limpar flags de sessão ao fazer logout
     sessionStorage.removeItem('justLoggedIn');
     sessionStorage.removeItem('newVistoriaAlertDismissed');
-  };
+  }, []);
 
   const isAuthenticated = !!token && !!usuario;
+
+  // Função para logout automático por inatividade
+  const handleInactivityLogout = useCallback(() => {
+    // Só faz logout se o usuário estiver autenticado
+    if (token && usuario) {
+      logout();
+      // Usar window.location para garantir redirecionamento
+      window.location.href = '/login';
+    }
+  }, [token, usuario, logout]);
+
+  // Hook de timeout de inatividade (2 minutos) - só ativo se estiver autenticado
+  useInactivityTimeout(
+    handleInactivityLogout,
+    isAuthenticated ? 2 * 60 * 1000 : Infinity // Se não autenticado, não faz nada
+  );
 
   const updatePassword = async (token: string, novaSenha: string) => {
     try {
