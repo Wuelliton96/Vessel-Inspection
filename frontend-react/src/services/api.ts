@@ -650,6 +650,11 @@ export const laudoService = {
     return response.data;
   },
 
+  preview: async (id: number) => {
+    const response = await api.get(`/api/laudos/${id}/preview`);
+    return response.data;
+  },
+
   gerarPDF: async (id: number) => {
     const response = await api.post(`/api/laudos/${id}/gerar-pdf`);
     return response.data;

@@ -1,6 +1,7 @@
-const PDFDocument = require('pdfkit');
+const { PDFDocument, rgb } = require('pdf-lib');
 const fs = require('fs');
 const path = require('path');
+const { getFileUrl, getFullPath, UPLOAD_STRATEGY } = require('./uploadService');
 
 const gerarNumeroLaudo = () => {
   const agora = new Date();
@@ -35,487 +36,648 @@ const garantirDiretorioLaudos = () => {
   return monthPath;
 };
 
+/**
+ * Determina qual template PDF usar baseado no tipo de embarcação
+ */
+const obterTemplatePDF = (tipoEmbarcacao) => {
+  const tipo = tipoEmbarcacao?.toUpperCase();
+  
+  // Caminho relativo à raiz do projeto (não backend/)
+  const basePath = path.join(__dirname, '..', '..', 'PDF');
+  
+  if (tipo === 'JET_SKI' || tipo === 'JETSKI') {
+    return path.join(basePath, 'jetski.pdf');
+  }
+  
+  // Para LANCHA, EMBARCACAO_COMERCIAL e outros tipos, usar template de lancha
+  if (tipo === 'LANCHA' || tipo === 'EMBARCACAO_COMERCIAL' || tipo === 'BARCO' || tipo === 'IATE' || tipo === 'VELEIRO') {
+    return path.join(basePath, 'lancha_embarcação.pdf');
+  }
+  
+  // Default: usar template de lancha
+  return path.join(basePath, 'lancha_embarcação.pdf');
+};
+
+/**
+ * Mapeamento de coordenadas para campos do PDF
+ * Estas coordenadas precisam ser ajustadas baseadas no layout real dos PDFs
+ * Formato: { campo: { x, y, fontSize, page } }
+ */
+const obterCoordenadasCampos = (tipoEmbarcacao) => {
+  const tipo = tipoEmbarcacao?.toUpperCase();
+  
+  // Coordenadas base (A4: 595 x 842 points)
+  // Estas são coordenadas genéricas que precisam ser ajustadas
+  const coordenadasBase = {
+    numero_laudo: { x: 450, y: 800, fontSize: 10, page: 0 },
+    nome_embarcacao: { x: 150, y: 750, fontSize: 10, page: 0 },
+    proprietario: { x: 150, y: 730, fontSize: 10, page: 0 },
+    cpf_cnpj: { x: 150, y: 710, fontSize: 10, page: 0 },
+    data_inspecao: { x: 450, y: 750, fontSize: 10, page: 0 },
+    inscricao_capitania: { x: 150, y: 690, fontSize: 10, page: 0 },
+    tipo_embarcacao: { x: 150, y: 670, fontSize: 10, page: 0 },
+    ano_fabricacao: { x: 150, y: 650, fontSize: 10, page: 0 },
+    valor_risco: { x: 450, y: 730, fontSize: 10, page: 0 },
+  };
+  
+  // Coordenadas específicas por tipo (se necessário)
+  if (tipo === 'JET_SKI' || tipo === 'JETSKI') {
+    // Coordenadas específicas para jetski.pdf
+    return coordenadasBase;
+  } else {
+    // Coordenadas específicas para lancha_embarcação.pdf
+    return coordenadasBase;
+  }
+};
+
+/**
+ * Formata CPF/CNPJ para exibição
+ */
+const formatarCPFCNPJ = (cpfCnpj) => {
+  if (!cpfCnpj) return '';
+  const limpo = cpfCnpj.replace(/\D/g, '');
+  if (limpo.length === 11) {
+    return limpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  } else if (limpo.length === 14) {
+    return limpo.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+  }
+  return cpfCnpj;
+};
+
+/**
+ * Formata data para exibição
+ */
+const formatarData = (data) => {
+  if (!data) return '';
+  try {
+    const date = new Date(data);
+    return date.toLocaleDateString('pt-BR');
+  } catch {
+    return data;
+  }
+};
+
+/**
+ * Formata valor monetário
+ */
+const formatarValor = (valor) => {
+  if (!valor) return '';
+  return parseFloat(valor).toLocaleString('pt-BR', { 
+    minimumFractionDigits: 2, 
+    maximumFractionDigits: 2 
+  });
+};
+
+/**
+ * Preenche campos do PDF usando pdf-lib
+ * Nota: pdf-lib não suporta preenchimento de formulários PDF diretamente.
+ * Para isso, precisaríamos usar pdf-fill-form ou similar.
+ * Por enquanto, vamos criar uma versão que carrega o template e adiciona texto sobre ele.
+ */
 const gerarLaudoPDF = async (laudo, vistoria, fotos = []) => {
-  return new Promise((resolve, reject) => {
+  try {
+    console.log('[PDF] Iniciando geração do PDF com template...');
+    console.log('[PDF] Laudo ID:', laudo.id);
+    console.log('[PDF] Tipo de embarcação:', vistoria?.Embarcacao?.tipo_embarcacao);
+    console.log('[PDF] Número de fotos:', fotos?.length || 0);
+    
+    // Determinar qual template usar baseado no tipo de embarcação da vistoria
+    const tipoEmbarcacao = vistoria?.Embarcacao?.tipo_embarcacao;
+    
+    if (!tipoEmbarcacao) {
+      console.log('[PDF] AVISO: Tipo de embarcação não encontrado, usando template padrão (lancha)');
+    }
+    
+    const templatePath = obterTemplatePDF(tipoEmbarcacao);
+    
+    console.log('[PDF] Template selecionado:', templatePath);
+    console.log('[PDF] Tipo de embarcação usado para seleção:', tipoEmbarcacao || 'NÃO DEFINIDO (usando padrão)');
+    
+    // Verificar se o template existe
+    if (!fs.existsSync(templatePath)) {
+      throw new Error(`Template PDF não encontrado: ${templatePath}`);
+    }
+    
+    // Carregar template PDF
+    const templateBytes = fs.readFileSync(templatePath);
+    const pdfDoc = await PDFDocument.load(templateBytes);
+    
+    // Habilitar fontkit para melhor suporte a fontes (opcional)
     try {
-      console.log('[PDF] Iniciando geração do PDF...');
-      console.log('[PDF] Laudo ID:', laudo.id);
+      const fontkit = require('@pdf-lib/fontkit');
+      pdfDoc.registerFontkit(fontkit);
+    } catch (e) {
+      console.log('[PDF] Fontkit não disponível, usando fontes padrão');
+    }
+    
+    // Obter dados da embarcação e vistoria
+    const embarcacao = vistoria?.Embarcacao || {};
+    const local = vistoria?.Local || {};
+    
+    // Preparar dados para preenchimento
+    const dados = {
+      // Dados gerais
+      numero_laudo: laudo.numero_laudo || '',
+      versao: laudo.versao || 'BS 2021-01',
+      nome_embarcacao: laudo.nome_moto_aquatica || embarcacao.nome || '',
+      proprietario: laudo.proprietario || embarcacao.proprietario_nome || embarcacao.Cliente?.nome || '',
+      cpf_cnpj: formatarCPFCNPJ(laudo.cpf_cnpj || embarcacao.proprietario_cpf || embarcacao.Cliente?.cpf || embarcacao.Cliente?.cnpj || ''),
+      endereco_proprietario: laudo.endereco_proprietario || '',
+      data_inspecao: formatarData(laudo.data_inspecao || vistoria.data_conclusao || vistoria.data_inicio),
+      local_vistoria: laudo.local_vistoria || local.logradouro || '',
+      empresa_prestadora: laudo.empresa_prestadora || '',
+      responsavel_inspecao: laudo.responsavel_inspecao || '',
       
-      const doc = new PDFDocument({
-        size: 'A4',
-        margins: {
-          top: 50,
-          bottom: 50,
-          left: 50,
-          right: 50
-        }
-      });
-
-      const dirPath = garantirDiretorioLaudos();
-      console.log('[PDF] Diretório:', dirPath);
+      // Dados da embarcação
+      inscricao_capitania: laudo.inscricao_capitania || embarcacao.nr_inscricao_barco || '',
+      estaleiro_construtor: laudo.estaleiro_construtor || '',
+      tipo_embarcacao: laudo.tipo_embarcacao || embarcacao.tipo_embarcacao || '',
+      modelo_embarcacao: laudo.modelo_embarcacao || '',
+      ano_fabricacao: laudo.ano_fabricacao || embarcacao.ano_fabricacao || '',
+      capacidade: laudo.capacidade || '',
+      classificacao_embarcacao: laudo.classificacao_embarcacao || '',
+      area_navegacao: laudo.area_navegacao || '',
+      situacao_capitania: laudo.situacao_capitania || '',
+      valor_risco: formatarValor(laudo.valor_risco || vistoria.valor_embarcacao || embarcacao.valor_embarcacao),
       
-      const fileName = `laudo-${laudo.id}.pdf`;
-      const filePath = path.join(dirPath, fileName);
-      console.log('[PDF] Caminho completo:', filePath);
+      // Casco
+      material_casco: laudo.material_casco || '',
+      observacoes_casco: laudo.observacoes_casco || '',
       
-      const stream = fs.createWriteStream(filePath);
-
-      stream.on('error', (streamError) => {
-        console.error('[PDF] Erro no stream:', streamError);
-        reject(streamError);
-      });
-
-      doc.on('error', (docError) => {
-        console.error('[PDF] Erro no documento:', docError);
-        reject(docError);
-      });
-
-      doc.pipe(stream);
-
-      const drawHeader = () => {
-        doc.fontSize(10).text(`Versão: ${laudo.versao || 'BS 2021-01'}`, 50, 50);
-        doc.fontSize(16).font('Helvetica-Bold').text('RELATÓRIO DE INSPEÇÃO DE RISCO', 50, 80, { align: 'center' });
-        doc.fontSize(14).text('CASCOS', 50, 100, { align: 'center' });
-        doc.fontSize(10).font('Helvetica').text(`Laudo: ${laudo.numero_laudo}`, 50, 120);
-        
-        if (laudo.nome_empresa) {
-          doc.fontSize(12).font('Helvetica-Bold').text(laudo.nome_empresa, 50, 140, { align: 'center' });
-        }
-        
-        doc.moveDown(2);
-      };
-
-      const drawSection = (titulo, y) => {
-        doc.fontSize(12).font('Helvetica-Bold').text(titulo, 50, y);
-        return y + 20;
-      };
-
-      const drawField = (label, value, y) => {
-        doc.fontSize(10).font('Helvetica-Bold').text(label, 50, y);
-        doc.font('Helvetica').text(value || '---', 250, y);
-        return y + 18;
-      };
-
-      const drawCheckbox = (label, checked, y) => {
-        const boxes = ['Sim', 'Não', 'Não possui'];
-        doc.fontSize(10).font('Helvetica').text(label, 70, y, { width: 450 });
-        
-        let xPos = 70;
-        boxes.forEach((box) => {
-          const isChecked = checked === box || (checked === true && box === 'Sim');
-          doc.rect(xPos, y + 15, 8, 8).stroke();
-          if (isChecked) {
-            doc.fontSize(12).text('X', xPos + 1, y + 13);
+      // Propulsão
+      quantidade_motores: laudo.quantidade_motores || '',
+      tipo_motor: laudo.tipo_motor || '',
+      fabricante_motor: laudo.fabricante_motor || '',
+      modelo_motor: laudo.modelo_motor || '',
+      numero_serie_motor: laudo.numero_serie_motor || '',
+      potencia_motor: laudo.potencia_motor || '',
+      combustivel_utilizado: laudo.combustivel_utilizado || '',
+      capacidade_tanque: laudo.capacidade_tanque || '',
+      ano_fabricacao_motor: laudo.ano_fabricacao_motor || '',
+      numero_helices: laudo.numero_helices || '',
+      rabeta_reversora: laudo.rabeta_reversora || '',
+      blower: laudo.blower || '',
+      
+      // Sistemas elétricos
+      quantidade_baterias: laudo.quantidade_baterias || '',
+      marca_baterias: laudo.marca_baterias || '',
+      capacidade_baterias: laudo.capacidade_baterias || '',
+      carregador_bateria: laudo.carregador_bateria || '',
+      transformador: laudo.transformador || '',
+      quantidade_geradores: laudo.quantidade_geradores || '',
+      fabricante_geradores: laudo.fabricante_geradores || '',
+      tipo_modelo_geradores: laudo.tipo_modelo_geradores || '',
+      capacidade_geracao: laudo.capacidade_geracao || '',
+      quantidade_bombas_porao: laudo.quantidade_bombas_porao || '',
+      fabricante_bombas_porao: laudo.fabricante_bombas_porao || '',
+      modelo_bombas_porao: laudo.modelo_bombas_porao || '',
+      quantidade_bombas_agua_doce: laudo.quantidade_bombas_agua_doce || '',
+      fabricante_bombas_agua_doce: laudo.fabricante_bombas_agua_doce || '',
+      modelo_bombas_agua_doce: laudo.modelo_bombas_agua_doce || '',
+      observacoes_eletricos: laudo.observacoes_eletricos || '',
+      
+      // Materiais de fundeio
+      guincho_eletrico: laudo.guincho_eletrico || '',
+      ancora: laudo.ancora || '',
+      cabos: laudo.cabos || '',
+      
+      // Equipamentos de navegação
+      agulha_giroscopica: laudo.agulha_giroscopica || '',
+      agulha_magnetica: laudo.agulha_magnetica || '',
+      antena: laudo.antena || '',
+      bidata: laudo.bidata || '',
+      barometro: laudo.barometro || '',
+      buzina: laudo.buzina || '',
+      conta_giros: laudo.conta_giros || '',
+      farol_milha: laudo.farol_milha || '',
+      gps: laudo.gps || '',
+      higrometro: laudo.higrometro || '',
+      horimetro: laudo.horimetro || '',
+      limpador_parabrisa: laudo.limpador_parabrisa || '',
+      manometros: laudo.manometros || '',
+      odometro_fundo: laudo.odometro_fundo || '',
+      passarela_embarque: laudo.passarela_embarque || '',
+      piloto_automatico: laudo.piloto_automatico || '',
+      psi: laudo.psi || '',
+      radar: laudo.radar || '',
+      radio_ssb: laudo.radio_ssb || '',
+      radio_vhf: laudo.radio_vhf || '',
+      radiogoniometro: laudo.radiogoniometro || '',
+      sonda: laudo.sonda || '',
+      speed_log: laudo.speed_log || '',
+      strobow: laudo.strobow || '',
+      termometro: laudo.termometro || '',
+      voltimetro: laudo.voltimetro || '',
+      outros_equipamentos: laudo.outros_equipamentos || '',
+      
+      // Sistemas de combate a incêndio
+      extintores_automaticos: laudo.extintores_automaticos || '',
+      extintores_portateis: laudo.extintores_portateis || '',
+      outros_incendio: laudo.outros_incendio || '',
+      atendimento_normas: laudo.atendimento_normas || '',
+      
+      // Vistoria
+      acumulo_agua: laudo.acumulo_agua || '',
+      avarias_casco: laudo.avarias_casco || '',
+      estado_geral_limpeza: laudo.estado_geral_limpeza || '',
+      teste_funcionamento_motor: laudo.teste_funcionamento_motor || '',
+      funcionamento_bombas_porao: laudo.funcionamento_bombas_porao || '',
+      manutencao: laudo.manutencao || '',
+      observacoes_vistoria: laudo.observacoes_vistoria || '',
+    };
+    
+    console.log('[PDF] Dados preparados para preenchimento');
+    console.log('[PDF] Dados principais:', {
+      numero_laudo: dados.numero_laudo,
+      nome_embarcacao: dados.nome_embarcacao,
+      proprietario: dados.proprietario,
+      cpf_cnpj: dados.cpf_cnpj,
+      data_inspecao: dados.data_inspecao
+    });
+    
+    // Tentar preencher campos de formulário do PDF (se existirem)
+    let camposPreenchidos = 0;
+    try {
+      const form = pdfDoc.getForm();
+      const fields = form.getFields();
+      console.log('[PDF] Campos de formulário encontrados:', fields.length);
+      
+      if (fields.length > 0) {
+        // Listar todos os campos para debug
+        fields.forEach((field, index) => {
+          try {
+            const fieldName = field.getName();
+            console.log(`[PDF] Campo ${index + 1}: ${fieldName} (${field.constructor.name})`);
+          } catch (e) {
+            console.log(`[PDF] Campo ${index + 1}: (nome não disponível)`);
           }
-          doc.fontSize(10).text(box, xPos + 12, y + 15);
-          xPos += 80;
         });
         
-        return y + 35;
-      };
-
-      const drawFooter = (pageNumber) => {
-        const bottom = doc.page.height - 30;
+        // Mapear campos comuns (ajustar conforme os nomes reais dos campos no PDF)
+        // Estes são exemplos - os nomes reais precisam ser verificados nos PDFs
+        const fieldMapping = {
+          'numero_laudo': dados.numero_laudo,
+          'laudo': dados.numero_laudo,
+          'nome_embarcacao': dados.nome_embarcacao,
+          'embarcacao': dados.nome_embarcacao,
+          'proprietario': dados.proprietario,
+          'cpf_cnpj': dados.cpf_cnpj,
+          'cpf': dados.cpf_cnpj,
+          'data_inspecao': dados.data_inspecao,
+          'data': dados.data_inspecao,
+          'inscricao_capitania': dados.inscricao_capitania,
+          'inscricao': dados.inscricao_capitania,
+          'tipo_embarcacao': dados.tipo_embarcacao,
+          'ano_fabricacao': dados.ano_fabricacao,
+          'valor_risco': dados.valor_risco,
+        };
         
-        if (laudo.nota_rodape) {
-          doc.fontSize(8).font('Helvetica-Oblique').text(
-            laudo.nota_rodape,
-            50,
-            bottom - 20,
-            { align: 'center', width: doc.page.width - 100 }
-          );
-        }
-        
-        doc.fontSize(8).font('Helvetica').text(
-          `Página ${pageNumber}`,
-          0,
-          bottom,
-          { align: 'center' }
-        );
-      };
-      
-      let pageNumber = 1;
-
-      drawHeader();
-      drawFooter(pageNumber);
-      let currentY = 180;
-
-      currentY = drawSection('DADOS GERAIS', currentY);
-      currentY = drawField('Nome da moto aquática:', laudo.nome_moto_aquatica, currentY);
-      currentY = drawField('Local de Guarda:', laudo.local_guarda, currentY);
-      currentY = drawField('Proprietário:', laudo.proprietario, currentY);
-      currentY = drawField('CPF / CNPJ:', laudo.cpf_cnpj, currentY);
-      currentY = drawField('Endereço do Proprietário:', laudo.endereco_proprietario, currentY);
-      currentY = drawField('Responsável:', laudo.responsavel, currentY);
-      currentY = drawField('Data da Inspeção:', laudo.data_inspecao, currentY);
-      currentY = drawField('Local da Vistoria:', laudo.local_vistoria, currentY);
-      currentY = drawField('Empresa Prestadora:', laudo.empresa_prestadora, currentY);
-      currentY = drawField('Responsável pela Inspeção:', laudo.responsavel_inspecao, currentY);
-      currentY = drawField('Participantes na Inspeção:', laudo.participantes_inspecao, currentY);
-      currentY += 20;
-
-      if (currentY > 650) {
-        doc.addPage();
-        pageNumber++;
-        drawFooter(pageNumber);
-        currentY = 50;
-      }
-
-      currentY = drawSection('1. DADOS DA MOTO AQUÁTICA', currentY);
-      currentY = drawField('1.1. Inscrição na Capitania dos Portos:', laudo.inscricao_capitania, currentY);
-      currentY = drawField('1.2. Estaleiro Construtor:', laudo.estaleiro_construtor, currentY);
-      currentY = drawField('1.3. Tipo de Embarcação:', laudo.tipo_embarcacao, currentY);
-      currentY = drawField('1.4. Modelo:', laudo.modelo_embarcacao, currentY);
-      currentY = drawField('1.5. Ano de Fabricação:', laudo.ano_fabricacao, currentY);
-      currentY = drawField('1.6. Capacidade:', laudo.capacidade, currentY);
-      currentY = drawField('1.7. Classificação da Embarcação:', laudo.classificacao_embarcacao, currentY);
-      currentY = drawField('1.8. Área de Navegação:', laudo.area_navegacao, currentY);
-      currentY = drawField('1.9. Situação perante a Capitania dos Portos:', laudo.situacao_capitania, currentY);
-      currentY = drawField('1.10. Valor em Risco:', laudo.valor_risco ? `R$ ${parseFloat(laudo.valor_risco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '---', currentY);
-      currentY += 20;
-
-      if (currentY > 650) {
-        doc.addPage();
-        pageNumber++;
-        drawFooter(pageNumber);
-        currentY = 50;
-      }
-
-      currentY = drawSection('2. CASCO', currentY);
-      currentY = drawField('2.1. Material do Casco:', laudo.material_casco, currentY);
-      currentY = drawField('2.2. Observações:', laudo.observacoes_casco, currentY);
-      currentY += 20;
-
-      if (currentY > 650) {
-        doc.addPage();
-        pageNumber++;
-        drawFooter(pageNumber);
-        currentY = 50;
-      }
-
-      currentY = drawSection('3. PROPULSÃO', currentY);
-      currentY = drawField('3.1. Quantidade de Motores:', laudo.quantidade_motores, currentY);
-      currentY = drawField('3.2. Tipo:', laudo.tipo_motor, currentY);
-      currentY = drawField('3.3. Fabricante do(s) Motor(es):', laudo.fabricante_motor, currentY);
-      currentY = drawField('3.4. Modelo do(s) Motor(es):', laudo.modelo_motor, currentY);
-      currentY = drawField('3.5. Número(s) de Série:', laudo.numero_serie_motor, currentY);
-      currentY = drawField('3.6. Potência do(s) Motor(es):', laudo.potencia_motor, currentY);
-      currentY = drawField('3.7. Combustível Utilizado:', laudo.combustivel_utilizado, currentY);
-      currentY = drawField('3.8. Capacidade do Tanque de Combustível:', laudo.capacidade_tanque, currentY);
-      currentY = drawField('3.9. Ano de Fabricação:', laudo.ano_fabricacao_motor, currentY);
-      currentY = drawField('3.10. Número de Hélices e Material:', laudo.numero_helices, currentY);
-      currentY = drawField('3.11. Rabeta / Reversora:', laudo.rabeta_reversora, currentY);
-      currentY = drawField('3.12. Blower:', laudo.blower, currentY);
-      currentY += 20;
-
-      if (currentY > 600) {
-        doc.addPage();
-        pageNumber++;
-        drawFooter(pageNumber);
-        currentY = 50;
-      }
-
-      currentY = drawSection('4. SISTEMAS ELÉTRICOS E DE SUPORTE', currentY);
-      currentY = drawField('4.1. Quantidade de Baterias:', laudo.quantidade_baterias, currentY);
-      currentY = drawField('4.2. Marca das Baterias:', laudo.marca_baterias, currentY);
-      currentY = drawField('4.3. Capacidade das Baterias (Ah):', laudo.capacidade_baterias, currentY);
-      currentY = drawField('4.4. Carregador de Bateria:', laudo.carregador_bateria, currentY);
-      currentY = drawField('4.5. Transformador:', laudo.transformador, currentY);
-      currentY = drawField('4.6. Quantidade de Geradores:', laudo.quantidade_geradores, currentY);
-      currentY = drawField('4.7. Fabricante do(s) Gerador(es):', laudo.fabricante_geradores, currentY);
-      currentY = drawField('4.8. Tipo e Modelo do(s) Gerador(es):', laudo.tipo_modelo_geradores, currentY);
-      currentY = drawField('4.9. Capacidade de Geração:', laudo.capacidade_geracao, currentY);
-      currentY = drawField('4.10. Quantidade de Bombas de Porão:', laudo.quantidade_bombas_porao, currentY);
-      currentY = drawField('4.11. Fabricante da(s) Bomba(s) de Porão:', laudo.fabricante_bombas_porao, currentY);
-      currentY = drawField('4.12. Modelo da(s) Bomba(s) de Porão:', laudo.modelo_bombas_porao, currentY);
-      currentY = drawField('4.13. Quantidade de Bombas de Água Doce:', laudo.quantidade_bombas_agua_doce, currentY);
-      currentY = drawField('4.14. Fabricante da(s) Bomba(s) de Água Doce:', laudo.fabricante_bombas_agua_doce, currentY);
-      currentY = drawField('4.15. Modelo da(s) Bomba(s) de Água Doce:', laudo.modelo_bombas_agua_doce, currentY);
-      if (laudo.observacoes_eletricos) {
-        currentY = drawField('4.16. Observações:', laudo.observacoes_eletricos, currentY);
-      }
-      currentY += 20;
-
-      if (currentY > 600) {
-        doc.addPage();
-        pageNumber++;
-        drawFooter(pageNumber);
-        currentY = 50;
-      }
-
-      currentY = drawSection('5. MATERIAIS DE FUNDEIO', currentY);
-      currentY = drawField('5.1. Guincho Elétrico:', laudo.guincho_eletrico, currentY);
-      currentY = drawField('5.2. Ancora:', laudo.ancora, currentY);
-      currentY = drawField('5.3. Cabos:', laudo.cabos, currentY);
-      currentY += 20;
-
-      if (currentY > 600) {
-        doc.addPage();
-        pageNumber++;
-        drawFooter(pageNumber);
-        currentY = 50;
-      }
-
-      currentY = drawSection('6. EQUIPAMENTOS DE NAVEGAÇÃO', currentY);
-      currentY = drawField('6.1. Agulha Giroscópica:', laudo.agulha_giroscopica, currentY);
-      currentY = drawField('6.2. Agulha Magnética:', laudo.agulha_magnetica, currentY);
-      currentY = drawField('6.3. Antena:', laudo.antena, currentY);
-      currentY = drawField('6.4. Bidata:', laudo.bidata, currentY);
-      currentY = drawField('6.5. Barômetro:', laudo.barometro, currentY);
-      currentY = drawField('6.6. Buzina:', laudo.buzina, currentY);
-      currentY = drawField('6.7. Conta Giros:', laudo.conta_giros, currentY);
-      currentY = drawField('6.8. Farol de Milha:', laudo.farol_milha, currentY);
-      currentY = drawField('6.9. GPS:', laudo.gps, currentY);
-      currentY = drawField('6.10. Higrômetro:', laudo.higrometro, currentY);
-      currentY = drawField('6.11. Horímetro:', laudo.horimetro, currentY);
-      currentY = drawField('6.12. Limpador de Para-brisas:', laudo.limpador_parabrisa, currentY);
-      currentY = drawField('6.13. Manômetros:', laudo.manometros, currentY);
-      currentY = drawField('6.14. Odômetro de Fundo:', laudo.odometro_fundo, currentY);
-      currentY = drawField('6.15. Passarela de Embarque:', laudo.passarela_embarque, currentY);
-      currentY = drawField('6.16. Piloto Automático:', laudo.piloto_automatico, currentY);
-      currentY = drawField('6.17. PSI:', laudo.psi, currentY);
-      currentY = drawField('6.18. Radar:', laudo.radar, currentY);
-      currentY = drawField('6.19. Rádio SSB:', laudo.radio_ssb, currentY);
-      currentY = drawField('6.20. Rádio VHF:', laudo.radio_vhf, currentY);
-      currentY = drawField('6.21. Radiogoniometro:', laudo.radiogoniometro, currentY);
-      currentY = drawField('6.22. Sonda:', laudo.sonda, currentY);
-      currentY = drawField('6.23. Speed Log:', laudo.speed_log, currentY);
-      currentY = drawField('6.24. Strobow:', laudo.strobow, currentY);
-      currentY = drawField('6.25. Termômetro:', laudo.termometro, currentY);
-      currentY = drawField('6.26. Voltímetro:', laudo.voltimetro, currentY);
-      if (laudo.outros_equipamentos) {
-        currentY = drawField('6.27. Outros:', laudo.outros_equipamentos, currentY);
-      }
-      currentY += 20;
-
-      if (currentY > 600) {
-        doc.addPage();
-        pageNumber++;
-        drawFooter(pageNumber);
-        currentY = 50;
-      }
-
-      currentY = drawSection('7. SISTEMAS DE COMBATE A INCÊNDIO', currentY);
-      currentY = drawField('7.1. Extintores Automáticos:', laudo.extintores_automaticos, currentY);
-      currentY = drawField('7.2. Extintores Portáteis:', laudo.extintores_portateis, currentY);
-      if (laudo.outros_incendio) {
-        currentY = drawField('7.3. Outros:', laudo.outros_incendio, currentY);
-      }
-      currentY = drawField('7.4. Atendimento às Normas de Segurança:', laudo.atendimento_normas, currentY);
-      currentY += 20;
-
-      if (currentY > 600) {
-        doc.addPage();
-        pageNumber++;
-        drawFooter(pageNumber);
-        currentY = 50;
-      }
-
-      currentY = drawSection('8. VISTORIA', currentY);
-      currentY = drawField('8.1. Acúmulo de água no fundo da embarcação:', laudo.acumulo_agua, currentY);
-      currentY = drawField('8.2. Avarias no casco:', laudo.avarias_casco, currentY);
-      currentY = drawField('8.3. Estado Geral de Limpeza e Conservação:', laudo.estado_geral_limpeza, currentY);
-      currentY = drawField('8.4. Teste de Funcionamento do Motor Propulsor:', laudo.teste_funcionamento_motor, currentY);
-      currentY = drawField('8.5. Funcionamento de Bombas de Porão:', laudo.funcionamento_bombas_porao, currentY);
-      currentY = drawField('8.6. Manutenção:', laudo.manutencao, currentY);
-      if (laudo.observacoes_vistoria) {
-        currentY = drawField('8.7. Observações:', laudo.observacoes_vistoria, currentY);
-      }
-      currentY += 30;
-
-      if (currentY > 600) {
-        doc.addPage();
-        pageNumber++;
-        drawFooter(pageNumber);
-        currentY = 50;
-      }
-
-      doc.fontSize(12).font('Helvetica-Bold').text('RELAÇÃO DE ITENS A SEREM VERIFICADOS', 50, currentY, { underline: true });
-      currentY += 30;
-
-      currentY = drawSection('9. INSTALAÇÕES ELÉTRICAS', currentY);
-      
-      if (laudo.checklist_eletrica) {
-        const checklistEletrica = typeof laudo.checklist_eletrica === 'string' 
-          ? JSON.parse(laudo.checklist_eletrica) 
-          : laudo.checklist_eletrica;
-        
-        if (checklistEletrica.terminais_estanhados !== undefined) {
-          currentY = drawCheckbox('9.1. Os terminais de cabos elétricos estão devidamente estanhados?', checklistEletrica.terminais_estanhados, currentY);
-        }
-        if (checklistEletrica.circuitos_protegidos !== undefined) {
-          currentY = drawCheckbox('9.2. Circuitos elétricos estão protegidos por disjuntores ou fusíveis?', checklistEletrica.circuitos_protegidos, currentY);
-        }
-        if (checklistEletrica.chave_geral !== undefined) {
-          currentY = drawCheckbox('9.3. A chave geral é de uso náutico, está em local de fácil acesso e protegido de respingos?', checklistEletrica.chave_geral, currentY);
-        }
-        if (checklistEletrica.terminais_baterias !== undefined) {
-          currentY = drawCheckbox('9.4. Os terminais de cabos de baterias estão devidamente prensados?', checklistEletrica.terminais_baterias, currentY);
-        }
-        if (checklistEletrica.baterias_fixadas !== undefined) {
-          currentY = drawCheckbox('9.5. As baterias estão devidamente fixadas, sem apresentar movimento?', checklistEletrica.baterias_fixadas, currentY);
-        }
-        if (checklistEletrica.passagem_chicotes !== undefined) {
-          currentY = drawCheckbox('9.6. A passagem dos chicotes elétricos pelas anteparas estão protegidos com anéis de borracha para evitar danos às capas de fiação?', checklistEletrica.passagem_chicotes, currentY);
-        }
-        if (checklistEletrica.cabo_arranque !== undefined) {
-          currentY = drawCheckbox('9.7. O cabo de alimentação do motor de arranque tem fusível próprio?', checklistEletrica.cabo_arranque, currentY);
-        }
-      }
-      currentY += 20;
-
-      if (currentY > 600) {
-        doc.addPage();
-        pageNumber++;
-        drawFooter(pageNumber);
-        currentY = 50;
-      }
-
-      currentY = drawSection('10. INSTALAÇÃO HIDRÁULICA', currentY);
-      
-      if (laudo.checklist_hidraulica) {
-        const checklistHidraulica = typeof laudo.checklist_hidraulica === 'string' 
-          ? JSON.parse(laudo.checklist_hidraulica) 
-          : laudo.checklist_hidraulica;
-        
-        if (checklistHidraulica.material_tanques !== undefined) {
-          currentY = drawCheckbox('10.1. O material de fabricação dos tanques de combustível está de acordo com o combustível utilizado pela embarcação?', checklistHidraulica.material_tanques, currentY);
-        }
-        if (checklistHidraulica.abracadeiras_inox !== undefined) {
-          currentY = drawCheckbox('10.2. As abraçadeiras usadas a bordo são de aço inox?', checklistHidraulica.abracadeiras_inox, currentY);
-        }
-      }
-      currentY += 20;
-
-      if (currentY > 600) {
-        doc.addPage();
-        pageNumber++;
-        drawFooter(pageNumber);
-        currentY = 50;
-      }
-
-      currentY = drawSection('11. GERAL', currentY);
-      
-      if (laudo.checklist_geral) {
-        const checklistGeral = typeof laudo.checklist_geral === 'string' 
-          ? JSON.parse(laudo.checklist_geral) 
-          : laudo.checklist_geral;
-        
-        if (checklistGeral.carreta_condicoes !== undefined) {
-          currentY = drawCheckbox('11.1. A carreta da embarcação se encontra em boas condições e com manutenção em dia?', checklistGeral.carreta_condicoes, currentY);
-        }
-      }
-      currentY += 30;
-
-      if (fotos && fotos.length > 0) {
-        doc.addPage();
-        pageNumber++;
-        drawFooter(pageNumber);
-        currentY = 50;
-        doc.fontSize(14).font('Helvetica-Bold').text('REGISTRO FOTOGRÁFICO', 50, currentY, { align: 'center' });
-        currentY += 30;
-
-        let fotosPorPagina = 0;
-        const maxFotosPorPagina = 4;
-        const fotoWidth = 200;
-        const fotoHeight = 150;
-
-        for (let i = 0; i < fotos.length; i++) {
-          const foto = fotos[i];
-          const fotoPath = path.join(__dirname, '..', foto.url_arquivo);
-
-          if (fs.existsSync(fotoPath)) {
+        // Tentar preencher campos conhecidos
+        for (const [fieldName, value] of Object.entries(fieldMapping)) {
+          if (!value) continue;
+          
+          try {
+            // Tentar como campo de texto
+            const field = form.getTextField(fieldName);
+            if (field) {
+              field.setText(String(value));
+              camposPreenchidos++;
+              console.log(`[PDF] Campo ${fieldName} preenchido: ${value}`);
+            }
+          } catch (e) {
+            // Campo não existe ou não é texto, tentar outros tipos
             try {
-              if (fotosPorPagina >= maxFotosPorPagina) {
-                doc.addPage();
-                pageNumber++;
-                drawFooter(pageNumber);
-                currentY = 50;
-                fotosPorPagina = 0;
+              const field = form.getDropdown(fieldName);
+              if (field) {
+                field.select(String(value));
+                camposPreenchidos++;
+                console.log(`[PDF] Campo dropdown ${fieldName} preenchido: ${value}`);
               }
-
-              const xPos = 50 + (fotosPorPagina % 2) * 250;
-              const yPos = currentY + Math.floor(fotosPorPagina / 2) * 200;
-
-              doc.image(fotoPath, xPos, yPos, { 
-                width: fotoWidth,
-                height: fotoHeight,
-                fit: [fotoWidth, fotoHeight],
-                align: 'center'
-              });
-
-              doc.fontSize(8).font('Helvetica').text(
-                foto.TipoFotoChecklist?.nome_exibicao || `Foto ${i + 1}`,
-                xPos,
-                yPos + fotoHeight + 5,
-                { width: fotoWidth, align: 'center' }
-              );
-
-              if (foto.observacao) {
-                doc.fontSize(7).font('Helvetica-Oblique').text(
-                  foto.observacao,
-                  xPos,
-                  yPos + fotoHeight + 20,
-                  { width: fotoWidth, align: 'center' }
-                );
-              }
-
-              fotosPorPagina++;
-
-              if (fotosPorPagina % 2 === 0) {
-                currentY += 200;
-              }
-            } catch (imgError) {
-              console.error(`Erro ao adicionar foto ${i + 1}:`, imgError);
+            } catch (e2) {
+              // Campo não encontrado, continuar
             }
           }
         }
+        
+        console.log(`[PDF] Total de campos preenchidos: ${camposPreenchidos}`);
+      } else {
+        console.log('[PDF] Nenhum campo de formulário encontrado no PDF');
       }
-
-      doc.addPage();
-      pageNumber++;
-      drawFooter(pageNumber);
-      currentY = 50;
-      doc.fontSize(12).font('Helvetica-Bold').text('ASSINATURA', 50, currentY);
-      currentY += 40;
-      
-      doc.fontSize(10).font('Helvetica').text('_'.repeat(60), 50, currentY);
-      currentY += 20;
-      doc.text('Responsável pela Inspeção', 50, currentY);
-      currentY += 40;
-      
-      doc.fontSize(10).text('_'.repeat(60), 50, currentY);
-      currentY += 20;
-      doc.text('Data: ___/___/_____', 50, currentY);
-
-      stream.on('finish', () => {
-        console.log('[PDF] Stream finalizado com sucesso!');
-        const agora = new Date();
-        const ano = agora.getFullYear();
-        const mes = String(agora.getMonth() + 1).padStart(2, '0');
-        const urlRelativa = `/uploads/laudos/${ano}/${mes}/${fileName}`;
-        
-        console.log('[PDF] PDF criado:', urlRelativa);
-        
-        resolve({
-          filePath,
-          urlRelativa,
-          fileName
-        });
-      });
-
-      stream.on('error', (streamError) => {
-        console.error('[PDF] Erro no stream finish:', streamError);
-        reject(streamError);
-      });
-
-      console.log('[PDF] Finalizando documento...');
-      doc.end();
-
-    } catch (error) {
-      reject(error);
+    } catch (formError) {
+      console.log('[PDF] Erro ao acessar formulário do PDF:', formError.message);
+      console.log('[PDF] Adicionando texto sobre o PDF como fallback');
     }
-  });
+    
+    // Adicionar texto sobre o PDF usando coordenadas mapeadas
+    // Isso garante que os dados apareçam mesmo se os campos de formulário não existirem
+    try {
+      const pages = pdfDoc.getPages();
+      const coordenadas = obterCoordenadasCampos(tipoEmbarcacao);
+      
+      // Mapear dados para coordenadas
+      const camposParaPreencher = [
+        { campo: 'numero_laudo', valor: dados.numero_laudo },
+        { campo: 'nome_embarcacao', valor: dados.nome_embarcacao },
+        { campo: 'proprietario', valor: dados.proprietario },
+        { campo: 'cpf_cnpj', valor: dados.cpf_cnpj },
+        { campo: 'data_inspecao', valor: dados.data_inspecao },
+        { campo: 'inscricao_capitania', valor: dados.inscricao_capitania },
+        { campo: 'tipo_embarcacao', valor: dados.tipo_embarcacao },
+        { campo: 'ano_fabricacao', valor: dados.ano_fabricacao ? String(dados.ano_fabricacao) : '' },
+        { campo: 'valor_risco', valor: dados.valor_risco ? `R$ ${dados.valor_risco}` : '' },
+      ];
+      
+      let camposAdicionados = 0;
+      camposParaPreencher.forEach(({ campo, valor }) => {
+        if (!valor) return;
+        
+        const coord = coordenadas[campo];
+        if (!coord) {
+          console.log(`[PDF] Coordenadas não definidas para campo: ${campo}`);
+          return;
+        }
+        
+        try {
+          const pageIndex = coord.page || 0;
+          const page = pages[pageIndex];
+          if (!page) {
+            console.log(`[PDF] Página ${pageIndex} não encontrada para campo: ${campo}`);
+            return;
+          }
+          
+          page.drawText(String(valor), {
+            x: coord.x,
+            y: coord.y,
+            size: coord.fontSize || 10,
+            color: rgb(0, 0, 0),
+          });
+          
+          camposAdicionados++;
+          console.log(`[PDF] Campo ${campo} adicionado em (${coord.x}, ${coord.y}): ${valor}`);
+        } catch (drawError) {
+          console.log(`[PDF] Erro ao adicionar campo ${campo}:`, drawError.message);
+        }
+      });
+      
+      console.log(`[PDF] Total de ${camposAdicionados} campos adicionados sobre o PDF`);
+    } catch (textError) {
+      console.log('[PDF] Erro ao adicionar texto sobre o PDF:', textError.message);
+      // Continuar mesmo se não conseguir adicionar texto
+    }
+    
+    // Adicionar fotos ao PDF
+    if (fotos && fotos.length > 0) {
+      console.log(`[PDF] Adicionando ${fotos.length} fotos ao PDF...`);
+      
+      try {
+        const pages = pdfDoc.getPages();
+        let currentPage = pages[pages.length - 1]; // Última página existente
+        const { width, height } = currentPage.getSize();
+        
+        // Verificar se há espaço na última página para título
+        let yPos = 50; // Posição inicial para fotos
+        
+        // Adicionar título "REGISTRO FOTOGRÁFICO" se houver espaço
+        if (yPos + 30 < height - 200) {
+          currentPage.drawText('REGISTRO FOTOGRÁFICO', {
+            x: 50,
+            y: yPos,
+            size: 14,
+            color: rgb(0, 0, 0),
+          });
+          yPos += 30;
+        } else {
+          // Criar nova página para fotos
+          currentPage = pdfDoc.addPage([width, height]);
+          yPos = height - 50;
+          currentPage.drawText('REGISTRO FOTOGRÁFICO', {
+            x: 50,
+            y: yPos,
+            size: 14,
+            color: rgb(0, 0, 0),
+          });
+          yPos -= 30;
+        }
+        
+        const fotoWidth = 200;
+        const fotoHeight = 150;
+        const maxFotosPorPagina = 4;
+        let fotosPorPagina = 0;
+        
+        for (let i = 0; i < fotos.length; i++) {
+          const foto = fotos[i];
+          
+          try {
+            // Verificar se precisa de nova página
+            if (fotosPorPagina >= maxFotosPorPagina) {
+              currentPage = pdfDoc.addPage([width, height]);
+              yPos = height - 50;
+              fotosPorPagina = 0;
+            }
+            
+            // Obter bytes da imagem (suporta S3 e local)
+            let imageBytes;
+            
+            if (!foto.url_arquivo) {
+              console.log(`[PDF] Foto ${i + 1} sem url_arquivo, pulando...`);
+              continue;
+            }
+            
+            try {
+              if (UPLOAD_STRATEGY === 'S3' || UPLOAD_STRATEGY === 's3') {
+                // Se for S3, buscar URL e fazer download
+                const imageUrl = getFullPath(foto.url_arquivo, vistoria?.id);
+                console.log(`[PDF] Baixando imagem do S3: ${imageUrl}`);
+                
+                // Usar https nativo do Node.js para fazer download
+                const https = require('https');
+                const http = require('http');
+                const urlModule = require('url');
+                
+                imageBytes = await new Promise((resolve, reject) => {
+                  const parsedUrl = urlModule.parse(imageUrl);
+                  const client = parsedUrl.protocol === 'https:' ? https : http;
+                  
+                  client.get(imageUrl, (res) => {
+                    if (res.statusCode !== 200) {
+                      return reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`));
+                    }
+                    
+                    const chunks = [];
+                    res.on('data', (chunk) => chunks.push(chunk));
+                    res.on('end', () => resolve(Buffer.concat(chunks)));
+                    res.on('error', reject);
+                  }).on('error', reject);
+                });
+              } else {
+                // Se for local, usar caminho do arquivo
+                const relativePath = getFullPath(foto.url_arquivo, vistoria?.id);
+                // getFullPath retorna caminho relativo, precisamos converter para absoluto
+                const imagePath = relativePath.startsWith('/') 
+                  ? path.join(__dirname, '..', relativePath)
+                  : path.join(__dirname, '..', 'uploads', 'fotos', `vistoria-${vistoria?.id}`, foto.url_arquivo);
+                
+                console.log(`[PDF] Carregando imagem local: ${imagePath}`);
+                
+                if (!fs.existsSync(imagePath)) {
+                  console.log(`[PDF] Arquivo de foto não encontrado: ${imagePath}`);
+                  // Tentar caminho alternativo
+                  const altPath = path.join(__dirname, '..', 'uploads', foto.url_arquivo);
+                  if (fs.existsSync(altPath)) {
+                    imageBytes = fs.readFileSync(altPath);
+                  } else {
+                    continue;
+                  }
+                } else {
+                  imageBytes = fs.readFileSync(imagePath);
+                }
+              }
+            } catch (imageLoadError) {
+              console.log(`[PDF] Erro ao carregar imagem ${i + 1}:`, imageLoadError.message);
+              continue;
+            }
+            
+            let image;
+            
+            // Detectar tipo de imagem baseado na URL ou tentar ambos
+            const urlLower = foto.url_arquivo.toLowerCase();
+            try {
+              if (urlLower.endsWith('.png')) {
+                image = await pdfDoc.embedPng(imageBytes);
+              } else if (urlLower.endsWith('.jpg') || urlLower.endsWith('.jpeg')) {
+                image = await pdfDoc.embedJpg(imageBytes);
+              } else {
+                // Tentar como JPEG primeiro (mais comum)
+                try {
+                  image = await pdfDoc.embedJpg(imageBytes);
+                } catch (jpegError) {
+                  // Se falhar, tentar PNG
+                  try {
+                    image = await pdfDoc.embedPng(imageBytes);
+                  } catch (pngError) {
+                    console.log(`[PDF] Erro ao carregar imagem ${i + 1} (tentou JPEG e PNG):`, pngError.message);
+                    continue;
+                  }
+                }
+              }
+            } catch (embedError) {
+              console.log(`[PDF] Erro ao incorporar imagem ${i + 1}:`, embedError.message);
+              continue;
+            }
+            
+            // Calcular posição
+            const xPos = 50 + (fotosPorPagina % 2) * 250;
+            const yPosFoto = yPos - Math.floor(fotosPorPagina / 2) * 200;
+            
+            // Adicionar imagem
+            currentPage.drawImage(image, {
+              x: xPos,
+              y: yPosFoto - fotoHeight,
+              width: fotoWidth,
+              height: fotoHeight,
+            });
+            
+            // Adicionar legenda (nome do tipo de foto)
+            const legenda = foto.TipoFotoChecklist?.nome_exibicao || `Foto ${i + 1}`;
+            currentPage.drawText(legenda, {
+              x: xPos,
+              y: yPosFoto - fotoHeight - 15,
+              size: 9,
+              color: rgb(0, 0, 0),
+            });
+            
+            let yOffset = 30; // Espaçamento inicial para observação/descrição
+            
+            // Adicionar descrição do tipo de foto se houver
+            if (foto.TipoFotoChecklist?.descricao) {
+              const descricao = foto.TipoFotoChecklist.descricao;
+              // Quebrar texto em linhas se necessário (máximo 40 caracteres por linha)
+              const maxChars = 40;
+              const linhas = [];
+              for (let i = 0; i < descricao.length; i += maxChars) {
+                linhas.push(descricao.substring(i, i + maxChars));
+              }
+              
+              linhas.forEach((linha, idx) => {
+                if (yPosFoto - fotoHeight - yOffset - (idx * 12) > 50) {
+                  currentPage.drawText(linha, {
+                    x: xPos,
+                    y: yPosFoto - fotoHeight - yOffset - (idx * 12),
+                    size: 7,
+                    color: rgb(0.3, 0.3, 0.3),
+                  });
+                }
+              });
+              
+              yOffset += linhas.length * 12 + 5;
+            }
+            
+            // Adicionar observação da foto se houver (do banco de dados)
+            if (foto.observacao) {
+              const observacao = foto.observacao.trim();
+              // Quebrar texto em linhas se necessário (máximo 40 caracteres por linha)
+              const maxChars = 40;
+              const linhas = [];
+              for (let i = 0; i < observacao.length; i += maxChars) {
+                linhas.push(observacao.substring(i, i + maxChars));
+              }
+              
+              linhas.forEach((linha, idx) => {
+                if (yPosFoto - fotoHeight - yOffset - (idx * 12) > 50) {
+                  currentPage.drawText(linha, {
+                    x: xPos,
+                    y: yPosFoto - fotoHeight - yOffset - (idx * 12),
+                    size: 7,
+                    color: rgb(0.5, 0.5, 0.5),
+                  });
+                }
+              });
+            }
+            
+            fotosPorPagina++;
+            
+            console.log(`[PDF] Foto ${i + 1} adicionada: ${legenda}`);
+            
+          } catch (fotoError) {
+            console.log(`[PDF] Erro ao adicionar foto ${i + 1}:`, fotoError.message);
+            // Continuar com próxima foto
+          }
+        }
+        
+        console.log(`[PDF] Total de ${fotos.length} fotos processadas`);
+      } catch (fotosError) {
+        console.log('[PDF] Erro ao processar fotos:', fotosError.message);
+        // Continuar mesmo se não conseguir adicionar fotos
+      }
+    } else {
+      console.log('[PDF] Nenhuma foto para adicionar ao PDF');
+    }
+    
+    // Salvar PDF
+    const dirPath = garantirDiretorioLaudos();
+    const fileName = `laudo-${laudo.id}.pdf`;
+    const filePath = path.join(dirPath, fileName);
+    
+    const pdfBytes = await pdfDoc.save();
+    fs.writeFileSync(filePath, pdfBytes);
+    
+    console.log('[PDF] PDF salvo:', filePath);
+    
+    const agora = new Date();
+    const ano = agora.getFullYear();
+    const mes = String(agora.getMonth() + 1).padStart(2, '0');
+    const urlRelativa = `/uploads/laudos/${ano}/${mes}/${fileName}`;
+    
+    return {
+      filePath,
+      urlRelativa,
+      fileName
+    };
+    
+  } catch (error) {
+    console.error('[PDF] Erro ao gerar PDF:', error);
+    throw error;
+  }
 };
 
 const deletarLaudoPDF = (urlPdf) => {
@@ -536,6 +698,6 @@ const deletarLaudoPDF = (urlPdf) => {
 module.exports = {
   gerarNumeroLaudo,
   gerarLaudoPDF,
-  deletarLaudoPDF
+  deletarLaudoPDF,
+  obterTemplatePDF // Exportar para testes
 };
-

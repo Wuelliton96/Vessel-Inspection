@@ -337,7 +337,7 @@ const Laudos: React.FC = () => {
                       )}
                       <ActionButton
                         variant="edit"
-                        onClick={() => window.location.href = `/laudos/${laudo.id}/editar`}
+                        onClick={() => navigate(`/laudos/${laudo.id}/editar`)}
                         title="Editar"
                       >
                         <Edit2 size={16} />

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { FileText, Save, FileCheck, ArrowLeft, Loader } from 'lucide-react';
+import { FileText, Save, FileCheck, ArrowLeft, Loader, Eye, X } from 'lucide-react';
 import { laudoService, vistoriaService } from '../services/api';
 import { Laudo } from '../types';
 
@@ -24,6 +24,153 @@ const Title = styled.h1`
   display: flex;
   align-items: center;
   gap: 0.75rem;
+`;
+
+const PreviewModal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 2rem;
+`;
+
+const PreviewContent = styled.div`
+  background: white;
+  border-radius: 8px;
+  max-width: 900px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+`;
+
+const PreviewHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  
+  h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #1f2937;
+  }
+`;
+
+const CloseButton = styled.button`
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: #f3f4f6;
+    color: #1f2937;
+  }
+`;
+
+const PreviewBody = styled.div`
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+`;
+
+const PreviewSection = styled.div`
+  margin-bottom: 2rem;
+  
+  h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1.2rem;
+    color: #1f2937;
+    border-bottom: 2px solid #3b82f6;
+    padding-bottom: 0.5rem;
+  }
+`;
+
+const PreviewGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const PreviewItem = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+`;
+
+const PreviewLabel = styled.span`
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 0.875rem;
+`;
+
+const PreviewValue = styled.span`
+  color: #1f2937;
+  font-size: 1rem;
+  word-break: break-word;
+`;
+
+const FotosGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+`;
+
+const FotoItem = styled.div`
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  background: #f9fafb;
+`;
+
+const FotoTipo = styled.div`
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+`;
+
+const FotoDescricao = styled.div`
+  color: #4b5563;
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+`;
+
+const FotoObservacao = styled.div`
+  color: #6b7280;
+  font-size: 0.8rem;
+  font-style: italic;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e5e7eb;
+`;
+
+const PreviewFooter = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding: 1.5rem;
+  border-top: 1px solid #e5e7eb;
 `;
 
 const ButtonGroup = styled.div`
@@ -53,6 +200,16 @@ const Button = styled.button<{ variant?: string }>`
       background: #10b981;
       color: white;
       &:hover { background: #059669; }
+    `;
+    if (props.variant === 'info') return `
+      background: #0ea5e9;
+      color: white;
+      &:hover { background: #0284c7; }
+    `;
+    if (props.variant === 'secondary') return `
+      background: #6b7280;
+      color: white;
+      &:hover { background: #4b5563; }
     `;
     return `
       background: #6b7280;
@@ -201,6 +358,9 @@ const LaudoForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewData, setPreviewData] = useState<any>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
   
   const [formData, setFormData] = useState<Partial<Laudo>>({
     versao: 'BS 2021-01',
@@ -215,15 +375,28 @@ const LaudoForm: React.FC = () => {
     } else if (vistoriaId) {
       tentarCarregarLaudoExistente();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, vistoriaId]);
 
   const carregarLaudo = async () => {
     try {
       setLoading(true);
       const data = await laudoService.buscarPorId(Number(id));
-      setFormData(data);
-    } catch (err) {
+      if (data) {
+        // Se local_guarda não estiver preenchido, usar local_vistoria
+        if (!data.local_guarda && data.local_vistoria) {
+          data.local_guarda = data.local_vistoria;
+        }
+        setFormData(data);
+      } else {
+        alert('Laudo não encontrado');
+        navigate('/laudos');
+      }
+    } catch (err: any) {
       console.error('Erro ao carregar laudo:', err);
+      const errorMessage = err.response?.data?.error || err.message || 'Erro ao carregar laudo';
+      alert(errorMessage);
+      navigate('/laudos');
     } finally {
       setLoading(false);
     }
@@ -233,24 +406,40 @@ const LaudoForm: React.FC = () => {
     try {
       // Primeiro, tentar buscar laudo existente
       const data = await laudoService.buscarPorVistoria(Number(vistoriaId));
-      setFormData(data);
-    } catch (err) {
-      console.log('Nenhum laudo existente, criando novo');
-      // Se não existir laudo, carregar dados da vistoria para preencher o formulário
-      try {
-        const vistoria = await vistoriaService.getById(Number(vistoriaId));
-        setFormData(prev => ({
-          ...prev,
-          vistoria_id: vistoria.id,
-          nome_moto_aquatica: vistoria.Embarcacao?.nome || '',
-          proprietario: vistoria.Embarcacao?.proprietario_nome || vistoria.Embarcacao?.Cliente?.nome || '',
-          cpf_cnpj: vistoria.Embarcacao?.proprietario_cpf || vistoria.Embarcacao?.Cliente?.cpf || vistoria.Embarcacao?.Cliente?.cnpj || '',
-          data_inspecao: vistoria.data_conclusao || vistoria.data_inicio || new Date().toISOString().split('T')[0],
-          valor_risco: vistoria.valor_embarcacao || 0
-        }));
-      } catch (vistoriaErr) {
-        console.error('Erro ao carregar dados da vistoria:', vistoriaErr);
+      if (data && data.id) {
+        // Se existe laudo, redirecionar para edição
+        navigate(`/laudos/${data.id}/editar`);
+        return;
       }
+    } catch (err: any) {
+      // Se não existir laudo (404), continuar para criar novo
+      if (err.response?.status !== 404) {
+        console.error('Erro ao buscar laudo existente:', err);
+      }
+    }
+    
+    // Se não existir laudo, carregar dados da vistoria para preencher o formulário
+    try {
+      const vistoria = await vistoriaService.getById(Number(vistoriaId));
+      // Construir endereço completo do local de vistoria
+      const localVistoria = vistoria.Local ? 
+        `${vistoria.Local.logradouro || ''}, ${vistoria.Local.numero || ''} - ${vistoria.Local.bairro || ''}, ${vistoria.Local.cidade || ''}/${vistoria.Local.estado || ''}`.trim().replace(/^,\s*-\s*,?\s*\/?,?/, '') : 
+        '';
+      
+      setFormData(prev => ({
+        ...prev,
+        vistoria_id: vistoria.id,
+        nome_moto_aquatica: vistoria.Embarcacao?.nome || '',
+        proprietario: vistoria.Embarcacao?.proprietario_nome || vistoria.Embarcacao?.Cliente?.nome || '',
+        cpf_cnpj: vistoria.Embarcacao?.proprietario_cpf || vistoria.Embarcacao?.Cliente?.cpf || vistoria.Embarcacao?.Cliente?.cnpj || '',
+        data_inspecao: vistoria.data_conclusao || vistoria.data_inicio || new Date().toISOString().split('T')[0],
+        valor_risco: vistoria.valor_embarcacao || 0,
+        local_vistoria: localVistoria,
+        local_guarda: localVistoria // Local da guarda = Local de vistoria
+      }));
+    } catch (vistoriaErr: any) {
+      console.error('Erro ao carregar dados da vistoria:', vistoriaErr);
+      alert(vistoriaErr.response?.data?.error || 'Erro ao carregar dados da vistoria');
     }
   };
 
@@ -279,15 +468,49 @@ const LaudoForm: React.FC = () => {
         return;
       }
 
-      const laudoSalvo = await laudoService.criar(Number(targetVistoriaId), formData);
+      let laudoSalvo;
+      if (formData.id) {
+        // Atualizar laudo existente
+        laudoSalvo = await laudoService.atualizar(formData.id, formData);
+        alert('Laudo atualizado com sucesso!');
+      } else {
+        // Criar novo laudo
+        laudoSalvo = await laudoService.criar(Number(targetVistoriaId), formData);
+        alert('Laudo salvo com sucesso!');
+      }
       
-      alert('Laudo salvo com sucesso!');
-      navigate(`/laudos/${laudoSalvo.id}/editar`);
+      // Atualizar formData com o laudo salvo
+      setFormData(laudoSalvo);
+      
+      // Se não tinha ID, navegar para a página de edição
+      if (!formData.id) {
+        navigate(`/laudos/${laudoSalvo.id}/editar`);
+      }
     } catch (err: any) {
       console.error('Erro ao salvar laudo:', err);
-      alert(err.response?.data?.error || err.response?.data?.message || 'Erro ao salvar laudo');
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || 'Erro ao salvar laudo';
+      alert(errorMessage);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePreview = async () => {
+    try {
+      if (!formData.id) {
+        alert('Salve o laudo antes de visualizar o preview');
+        return;
+      }
+
+      setLoadingPreview(true);
+      const preview = await laudoService.preview(formData.id);
+      setPreviewData(preview);
+      setShowPreview(true);
+    } catch (err: any) {
+      console.error('Erro ao carregar preview:', err);
+      alert(err.response?.data?.error || 'Erro ao carregar preview');
+    } finally {
+      setLoadingPreview(false);
     }
   };
 
@@ -315,6 +538,7 @@ const LaudoForm: React.FC = () => {
       window.URL.revokeObjectURL(url);
       
       carregarLaudo();
+      setShowPreview(false);
     } catch (err: any) {
       console.error('Erro ao gerar PDF:', err);
       alert(err.response?.data?.error || 'Erro ao gerar PDF');
@@ -366,10 +590,16 @@ const LaudoForm: React.FC = () => {
             {saving ? 'Salvando...' : 'Salvar Rascunho'}
           </Button>
           {formData.id && (
-            <Button variant="success" onClick={handleGerarPDF} disabled={generating}>
-              <FileCheck size={18} />
-              {generating ? 'Gerando...' : 'Gerar PDF'}
-            </Button>
+            <>
+              <Button variant="info" onClick={handlePreview} disabled={loadingPreview}>
+                <Eye size={18} />
+                {loadingPreview ? 'Carregando...' : 'Preview'}
+              </Button>
+              <Button variant="success" onClick={handleGerarPDF} disabled={generating}>
+                <FileCheck size={18} />
+                {generating ? 'Gerando...' : 'Gerar PDF'}
+              </Button>
+            </>
           )}
         </ButtonGroup>
       </Header>
@@ -412,10 +642,15 @@ const LaudoForm: React.FC = () => {
               <FormGroup fullWidth>
                 <Label>Local de Guarda</Label>
                 <Input
-                  value={formData.local_guarda || ''}
+                  value={formData.local_guarda || formData.local_vistoria || ''}
                   onChange={(e) => handleChange('local_guarda', e.target.value)}
                   placeholder="Ex: Em vaga seca e coberta na Marina..."
                 />
+                {!formData.local_guarda && formData.local_vistoria && (
+                  <small style={{ color: '#6b7280', fontSize: '0.875rem', marginTop: '0.25rem', display: 'block' }}>
+                    Usando local de vistoria como padrão
+                  </small>
+                )}
               </FormGroup>
 
               <FormGroup>
@@ -466,7 +701,13 @@ const LaudoForm: React.FC = () => {
                 <Label>Local da Vistoria</Label>
                 <Input
                   value={formData.local_vistoria || ''}
-                  onChange={(e) => handleChange('local_vistoria', e.target.value)}
+                  onChange={(e) => {
+                    handleChange('local_vistoria', e.target.value);
+                    // Atualizar local_guarda automaticamente se estiver vazio ou igual ao valor anterior
+                    if (!formData.local_guarda || formData.local_guarda === formData.local_vistoria) {
+                      handleChange('local_guarda', e.target.value);
+                    }
+                  }}
                   placeholder="Endereço completo do local"
                 />
               </FormGroup>
@@ -1229,12 +1470,114 @@ const LaudoForm: React.FC = () => {
           {saving ? 'Salvando...' : 'Salvar Rascunho'}
         </Button>
         {formData.id && (
-          <Button variant="success" onClick={handleGerarPDF} disabled={generating}>
-            <FileCheck size={18} />
-            {generating ? 'Gerando PDF...' : 'Gerar PDF'}
-          </Button>
+          <>
+            <Button variant="info" onClick={handlePreview} disabled={loadingPreview}>
+              <Eye size={18} />
+              {loadingPreview ? 'Carregando...' : 'Preview'}
+            </Button>
+            <Button variant="success" onClick={handleGerarPDF} disabled={generating}>
+              <FileCheck size={18} />
+              {generating ? 'Gerando PDF...' : 'Gerar PDF'}
+            </Button>
+          </>
         )}
       </div>
+
+      {/* Modal de Preview */}
+      {showPreview && previewData && (
+        <PreviewModal>
+          <PreviewContent>
+            <PreviewHeader>
+              <h2>Pré-visualização do Laudo PDF</h2>
+              <CloseButton onClick={() => setShowPreview(false)}>
+                <X size={24} />
+              </CloseButton>
+            </PreviewHeader>
+            
+            <PreviewBody>
+              <PreviewSection>
+                <PreviewLabel>Template:</PreviewLabel>
+                <PreviewValue>{previewData.template}</PreviewValue>
+                <PreviewLabel>Tipo de Embarcação:</PreviewLabel>
+                <PreviewValue>{previewData.tipoEmbarcacao}</PreviewValue>
+              </PreviewSection>
+
+              <PreviewSection>
+                <h3>Dados Principais</h3>
+                <PreviewGrid>
+                  <PreviewItem>
+                    <PreviewLabel>Número do Laudo:</PreviewLabel>
+                    <PreviewValue>{previewData.numero_laudo}</PreviewValue>
+                  </PreviewItem>
+                  <PreviewItem>
+                    <PreviewLabel>Nome da Embarcação:</PreviewLabel>
+                    <PreviewValue>{previewData.nome_embarcacao}</PreviewValue>
+                  </PreviewItem>
+                  <PreviewItem>
+                    <PreviewLabel>Proprietário:</PreviewLabel>
+                    <PreviewValue>{previewData.proprietario}</PreviewValue>
+                  </PreviewItem>
+                  <PreviewItem>
+                    <PreviewLabel>CPF/CNPJ:</PreviewLabel>
+                    <PreviewValue>{previewData.cpf_cnpj}</PreviewValue>
+                  </PreviewItem>
+                  <PreviewItem>
+                    <PreviewLabel>Data de Inspeção:</PreviewLabel>
+                    <PreviewValue>{previewData.data_inspecao}</PreviewValue>
+                  </PreviewItem>
+                  <PreviewItem>
+                    <PreviewLabel>Inscrição:</PreviewLabel>
+                    <PreviewValue>{previewData.inscricao_capitania}</PreviewValue>
+                  </PreviewItem>
+                  <PreviewItem>
+                    <PreviewLabel>Tipo:</PreviewLabel>
+                    <PreviewValue>{previewData.tipo_embarcacao}</PreviewValue>
+                  </PreviewItem>
+                  <PreviewItem>
+                    <PreviewLabel>Ano:</PreviewLabel>
+                    <PreviewValue>{previewData.ano_fabricacao}</PreviewValue>
+                  </PreviewItem>
+                  <PreviewItem>
+                    <PreviewLabel>Valor em Risco:</PreviewLabel>
+                    <PreviewValue>R$ {previewData.valor_risco}</PreviewValue>
+                  </PreviewItem>
+                </PreviewGrid>
+              </PreviewSection>
+
+              <PreviewSection>
+                <h3>Fotos ({previewData.totalFotos})</h3>
+                {previewData.fotos.length > 0 ? (
+                  <FotosGrid>
+                    {previewData.fotos.map((foto: any, index: number) => (
+                      <FotoItem key={foto.id || index}>
+                        <FotoTipo>{foto.tipo}</FotoTipo>
+                        {foto.descricao && (
+                          <FotoDescricao>{foto.descricao}</FotoDescricao>
+                        )}
+                        {foto.observacao && (
+                          <FotoObservacao>Obs: {foto.observacao}</FotoObservacao>
+                        )}
+                      </FotoItem>
+                    ))}
+                  </FotosGrid>
+                ) : (
+                  <p>Nenhuma foto anexada</p>
+                )}
+              </PreviewSection>
+            </PreviewBody>
+
+            <PreviewFooter>
+              <Button variant="secondary" onClick={() => setShowPreview(false)}>
+                Fechar
+              </Button>
+              <Button variant="success" onClick={handleGerarPDF} disabled={generating}>
+                <FileCheck size={18} />
+                {generating ? 'Gerando...' : 'Gerar PDF'}
+              </Button>
+            </PreviewFooter>
+          </PreviewContent>
+        </PreviewModal>
+      )}
     </Container>
   );
 };
