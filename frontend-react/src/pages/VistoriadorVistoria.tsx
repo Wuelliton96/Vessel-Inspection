@@ -27,6 +27,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { vistoriadorService, checklistService } from '../services/api';
 import { API_CONFIG } from '../config/api';
 import { ChecklistStatus, ChecklistItem, VistoriaChecklistItem, ChecklistProgresso } from '../types';
+import PreloadedImage from '../components/PreloadedImage';
 
 // Styled Components
 const Container = styled.div`
@@ -318,6 +319,8 @@ const CameraVideo = styled.video`
   display: block;
   object-fit: contain;
   transform: scaleX(-1); /* Espelhar para parecer mais natural */
+  background: #000;
+  min-height: 300px;
 `;
 
 const CameraControls = styled.div`
@@ -611,6 +614,7 @@ const VistoriadorVistoria: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [uploading, setUploading] = useState<number | null>(null);
+  const [uploadingItemId, setUploadingItemId] = useState<number | null>(null);
   const [selectedItemForPhoto, setSelectedItemForPhoto] = useState<VistoriaChecklistItem | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -666,7 +670,13 @@ const VistoriadorVistoria: React.FC = () => {
       // Carregar tipos de foto
       try {
         const tipos = await vistoriadorService.getTiposFotoChecklist();
-        setTiposFoto(tipos);
+        if (tipos && tipos.length > 0) {
+          setTiposFoto(tipos);
+          console.log(`Tipos de foto carregados: ${tipos.length}`);
+        } else {
+          console.log('ATENCAO: Nenhum tipo de foto encontrado. O backend criara automaticamente na proxima requisicao.');
+          // Não definir erro aqui, pois o backend criará automaticamente
+        }
       } catch (tiposErr) {
         console.error('Erro ao carregar tipos de foto:', tiposErr);
       }
@@ -687,6 +697,46 @@ const VistoriadorVistoria: React.FC = () => {
       stopCamera();
     };
   }, [loadVistoria]);
+
+  // Efeito para garantir que o vídeo seja iniciado quando o modal abrir
+  useEffect(() => {
+    if (showCamera && cameraStream && videoRef.current) {
+      const video = videoRef.current;
+      
+      // Se o srcObject não está definido, definir agora
+      if (!video.srcObject) {
+        video.srcObject = cameraStream;
+      }
+      
+      // Tentar iniciar reprodução
+      const startPlay = async () => {
+        try {
+          if (video.paused) {
+            await video.play();
+            console.log('Vídeo iniciado via useEffect');
+          }
+        } catch (error) {
+          console.error('Erro ao iniciar vídeo no useEffect:', error);
+          // Tentar novamente após um delay
+          setTimeout(() => {
+            if (video && video.paused) {
+              video.play().catch(err => {
+                console.error('Erro ao iniciar vídeo (retry):', err);
+              });
+            }
+          }, 500);
+        }
+      };
+      
+      // Aguardar metadata se necessário
+      if (video.readyState >= 1) {
+        startPlay();
+      } else {
+        video.addEventListener('loadedmetadata', startPlay, { once: true });
+        video.addEventListener('canplay', startPlay, { once: true });
+      }
+    }
+  }, [showCamera, cameraStream]);
 
   const handleIniciarVistoria = async () => {
     if (!id) return;
@@ -713,23 +763,87 @@ const VistoriadorVistoria: React.FC = () => {
 
   const handleMarcarConcluido = async (itemId: number) => {
     try {
-      await checklistService.atualizarStatusItem(itemId, { status: 'CONCLUIDO' });
-      setSuccess('Item marcado como concluído!');
-      setTimeout(() => setSuccess(''), 2000);
-      loadVistoria(); // Recarregar para atualizar progresso
-    } catch (err) {
-      setError('Erro ao marcar item como concluído');
+      console.log('[FRONTEND] Marcando item como concluído:', itemId);
+      setError('');
+      setSuccess('');
+      
+      const result = await checklistService.atualizarStatusItem(itemId, { status: 'CONCLUIDO' });
+      console.log('[FRONTEND] Item atualizado com sucesso:', result);
+      
+      if (result && result.status === 'CONCLUIDO') {
+        console.log('[FRONTEND] Item atualizado com sucesso no backend');
+        console.log('[FRONTEND] Status retornado:', result.status);
+        console.log('[FRONTEND] Foto ID:', result.foto_id);
+        console.log('[FRONTEND] Concluído em:', result.concluido_em);
+        
+        setSuccess('Item marcado como concluído sem foto!');
+        setTimeout(() => setSuccess(''), 3000);
+        
+        // Atualizar estado local imediatamente para feedback visual
+        setChecklistItens(prevItens => {
+          const updated = prevItens.map(item => 
+            item.id === itemId 
+              ? { ...item, status: 'CONCLUIDO' as const, concluido_em: result.concluido_em || new Date().toISOString(), foto_id: null, foto: null }
+              : item
+          );
+          console.log('[FRONTEND] Estado atualizado. Itens pendentes:', updated.filter(i => i.status !== 'CONCLUIDO').length);
+          console.log('[FRONTEND] Itens concluídos:', updated.filter(i => i.status === 'CONCLUIDO').length);
+          return updated;
+        });
+        
+        // Recarregar para atualizar progresso e garantir sincronização
+        await loadVistoria();
+      } else {
+        console.error('[FRONTEND] Resultado inesperado:', result);
+        throw new Error('Item não foi atualizado corretamente');
+      }
+    } catch (err: any) {
+      console.error('[FRONTEND] Erro ao marcar item como concluído:', err);
+      console.error('[FRONTEND] Resposta do erro:', err.response?.data);
+      console.error('[FRONTEND] Status do erro:', err.response?.status);
+      console.error('[FRONTEND] Mensagem completa:', err.message);
+      
+      const errorMessage = err.response?.data?.error || err.message || 'Erro ao marcar item como concluído';
+      setError(`Erro ao marcar item como concluído: ${errorMessage}`);
+      setTimeout(() => setError(''), 5000);
     }
   };
 
   const handleMarcarPendente = async (itemId: number) => {
     try {
-      await checklistService.atualizarStatusItem(itemId, { status: 'PENDENTE' });
-      setSuccess('Item marcado como pendente!');
-      setTimeout(() => setSuccess(''), 2000);
-      loadVistoria();
-    } catch (err) {
-      setError('Erro ao atualizar item');
+      console.log('[FRONTEND] Marcando item como pendente:', itemId);
+      setError('');
+      setSuccess('');
+      
+      const result = await checklistService.atualizarStatusItem(itemId, { status: 'PENDENTE', foto_id: null });
+      console.log('[FRONTEND] Item atualizado com sucesso:', result);
+      
+      if (result && result.status === 'PENDENTE') {
+        setSuccess('Item marcado como pendente!');
+        setTimeout(() => setSuccess(''), 3000);
+        
+        // Atualizar estado local imediatamente
+        setChecklistItens(prevItens => {
+          const updated = prevItens.map(item => 
+            item.id === itemId 
+              ? { ...item, status: 'PENDENTE' as const, concluido_em: null, foto_id: null, foto: null }
+              : item
+          );
+          console.log('[FRONTEND] Estado atualizado. Itens pendentes:', updated.filter(i => i.status !== 'CONCLUIDO').length);
+          return updated;
+        });
+        
+        await loadVistoria();
+      } else {
+        throw new Error('Item não foi atualizado corretamente');
+      }
+    } catch (err: any) {
+      console.error('[FRONTEND] Erro ao marcar item como pendente:', err);
+      console.error('[FRONTEND] Resposta do erro:', err.response?.data);
+      
+      const errorMessage = err.response?.data?.error || err.message || 'Erro ao atualizar item';
+      setError(`Erro ao atualizar item: ${errorMessage}`);
+      setTimeout(() => setError(''), 5000);
     }
   };
 
@@ -851,6 +965,9 @@ const VistoriadorVistoria: React.FC = () => {
     setPhotoPreview(null);
     setPhotoFile(null);
     setShowCamera(false);
+    // Limpar estados de upload ao fechar o modal
+    setUploading(null);
+    setUploadingItemId(null);
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -893,14 +1010,51 @@ const VistoriadorVistoria: React.FC = () => {
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // Aguardar o vídeo carregar
-        await new Promise((resolve) => {
-          if (videoRef.current) {
-            videoRef.current.onloadedmetadata = () => {
-              console.log('Vídeo carregado. Dimensões:', 
-                videoRef.current?.videoWidth, 'x', videoRef.current?.videoHeight);
-              resolve(true);
-            };
+        
+        // Aguardar o vídeo estar pronto e iniciar reprodução
+        await new Promise<void>((resolve, reject) => {
+          if (!videoRef.current) {
+            reject(new Error('Elemento de vídeo não encontrado'));
+            return;
+          }
+          
+          const video = videoRef.current;
+          
+          const handleLoadedMetadata = () => {
+            console.log('Vídeo carregado. Dimensões:', 
+              video.videoWidth, 'x', video.videoHeight);
+            
+            // Iniciar reprodução explicitamente
+            video.play()
+              .then(() => {
+                console.log('Vídeo iniciado com sucesso');
+                resolve();
+              })
+              .catch((playError) => {
+                console.error('Erro ao iniciar vídeo:', playError);
+                // Mesmo com erro de play, continuar (pode ser bloqueio de autoplay)
+                resolve();
+              });
+          };
+          
+          const handleError = () => {
+            reject(new Error('Erro ao carregar vídeo'));
+          };
+          
+          // Se já tem metadata, chamar imediatamente
+          if (video.readyState >= 1) {
+            handleLoadedMetadata();
+          } else {
+            video.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
+            video.addEventListener('error', handleError, { once: true });
+            
+            // Timeout de segurança
+            setTimeout(() => {
+              if (video.readyState < 1) {
+                console.warn('Timeout aguardando metadata do vídeo');
+                resolve(); // Continuar mesmo sem metadata
+              }
+            }, 3000);
           }
         });
       }
@@ -925,6 +1079,14 @@ const VistoriadorVistoria: React.FC = () => {
           setShowCamera(true);
           if (videoRef.current) {
             videoRef.current.srcObject = simpleStream;
+            // Aguardar um pouco e iniciar reprodução
+            setTimeout(() => {
+              if (videoRef.current) {
+                videoRef.current.play().catch(err => {
+                  console.error('Erro ao iniciar vídeo (fallback):', err);
+                });
+              }
+            }, 100);
           }
           return;
         } catch (fallbackError) {
@@ -1087,10 +1249,23 @@ const VistoriadorVistoria: React.FC = () => {
       // Tentar carregar tipos de foto
       try {
         const tiposRecarregados = await vistoriadorService.getTiposFotoChecklist();
-        setTiposFoto(tiposRecarregados);
-        if (tiposRecarregados.length === 0) {
-          setError('Nenhum tipo de foto configurado no sistema. Por favor, entre em contato com o administrador.');
-          return;
+        if (tiposRecarregados && tiposRecarregados.length > 0) {
+          setTiposFoto(tiposRecarregados);
+          setError(''); // Limpar erro se tipos foram carregados
+            console.log(`Tipos de foto carregados: ${tiposRecarregados.length}`);
+        } else {
+          // Se ainda não houver tipos, aguardar um pouco e tentar novamente
+          console.log('ATENCAO: Ainda nao ha tipos de foto. Aguardando criacao automatica...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          const tiposSegundaTentativa = await vistoriadorService.getTiposFotoChecklist();
+          if (tiposSegundaTentativa && tiposSegundaTentativa.length > 0) {
+            setTiposFoto(tiposSegundaTentativa);
+            setError(''); // Limpar erro se tipos foram carregados
+            console.log(`Tipos de foto carregados na segunda tentativa: ${tiposSegundaTentativa.length}`);
+          } else {
+            setError('Nenhum tipo de foto configurado no sistema. Por favor, entre em contato com o administrador.');
+            return;
+          }
         }
       } catch (err) {
         console.error('Erro ao carregar tipos de foto:', err);
@@ -1112,6 +1287,7 @@ const VistoriadorVistoria: React.FC = () => {
     
     try {
       setUploading(tipoFoto.id);
+      setUploadingItemId(selectedItemForPhoto.id);
       
       const formData = new FormData();
       formData.append('foto', photoFile);
@@ -1134,21 +1310,49 @@ const VistoriadorVistoria: React.FC = () => {
       console.log('  - URL da API:', `${API_CONFIG.BASE_URL}/api/fotos`);
       console.log('[FRONTEND] Enviando requisição...\n');
       
-      const response = await fetch(`${API_CONFIG.BASE_URL}/api/fotos`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      });
+      // Verificar se a URL da API está configurada
+      if (!API_CONFIG.BASE_URL) {
+        throw new Error('URL da API não configurada. Verifique as configurações.');
+      }
+
+      // Verificar se o token está disponível
+      if (!token) {
+        throw new Error('Token de autenticação não encontrado. Por favor, faça login novamente.');
+      }
+
+      let response;
+      try {
+        response = await fetch(`${API_CONFIG.BASE_URL}/api/fotos`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+            // NÃO definir Content-Type para FormData - o browser faz isso automaticamente com boundary
+          },
+          body: formData
+        });
+      } catch (fetchError: any) {
+        console.error('[FRONTEND] Erro na requisição fetch:', fetchError);
+        console.error('[FRONTEND] Tipo do erro:', fetchError.name);
+        console.error('[FRONTEND] Mensagem:', fetchError.message);
+        console.error('[FRONTEND] URL tentada:', `${API_CONFIG.BASE_URL}/api/fotos`);
+        
+        // Verificar se é erro de conexão
+        if (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('NetworkError') || fetchError.name === 'TypeError') {
+          throw new Error(`Não foi possível conectar ao servidor. Verifique se o backend está rodando em ${API_CONFIG.BASE_URL}. Erro: ${fetchError.message}`);
+        }
+        
+        throw new Error(`Erro de conexão: ${fetchError.message}`);
+      }
       
       if (!response.ok) {
         let errorMessage = 'Erro ao fazer upload da foto';
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
+          console.error('[FRONTEND] Erro do servidor:', errorData);
         } catch (e) {
           errorMessage = `Erro ${response.status}: ${response.statusText}`;
+          console.error('[FRONTEND] Status da resposta:', response.status, response.statusText);
         }
         throw new Error(errorMessage);
       }
@@ -1230,6 +1434,10 @@ const VistoriadorVistoria: React.FC = () => {
       setSuccess(`Foto anexada com sucesso! Foto ID: ${responseData.id}. Item marcado como concluído.`);
       setTimeout(() => setSuccess(''), 8000);
       
+      // Limpar estados de upload antes de fechar o modal
+      setUploading(null);
+      setUploadingItemId(null);
+      
       handleClosePhotoModal();
       
       // Aguardar um pouco para garantir que o backend processou tudo
@@ -1274,10 +1482,26 @@ const VistoriadorVistoria: React.FC = () => {
       }
       
     } catch (err: any) {
-      console.error('Erro ao fazer upload:', err);
-      setError('Erro ao fazer upload da foto: ' + err.message);
+      console.error('[FRONTEND] Erro completo ao fazer upload:', err);
+      console.error('[FRONTEND] Tipo do erro:', err.name);
+      console.error('[FRONTEND] Mensagem:', err.message);
+      console.error('[FRONTEND] Stack:', err.stack);
+      
+      let errorMessage = 'Erro ao fazer upload da foto';
+      
+      if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('conectar ao servidor')) {
+        errorMessage = `Não foi possível conectar ao servidor. Verifique se o backend está rodando em ${API_CONFIG.BASE_URL}. Se estiver usando localhost, certifique-se de que o servidor está iniciado.`;
+      } else if (err.message.includes('Token')) {
+        errorMessage = 'Sessão expirada. Por favor, faça login novamente.';
+      } else {
+        errorMessage = err.message || 'Erro desconhecido ao fazer upload da foto';
+      }
+      
+      setError(errorMessage);
+      setTimeout(() => setError(''), 10000); // Manter erro visível por 10 segundos
     } finally {
       setUploading(null);
+      setUploadingItemId(null);
     }
   };
 
@@ -1386,6 +1610,7 @@ const VistoriadorVistoria: React.FC = () => {
       setError('Erro ao fazer upload da foto: ' + err.message);
     } finally {
       setUploading(null);
+      setUploadingItemId(null);
     }
   };
 
@@ -1514,40 +1739,93 @@ const VistoriadorVistoria: React.FC = () => {
               {vistoria.Embarcacao?.nome || 'N/A'} - {vistoria.Embarcacao?.nr_inscricao_barco || 'N/A'}
             </InfoValue>
           </InfoItem>
-          <InfoItem>
-            <InfoLabel>Local</InfoLabel>
-            <InfoValue>
-              {vistoria.Local?.nome_local || 'N/A'} - {vistoria.Local?.cidade || 'N/A'}, {vistoria.Local?.estado || 'N/A'}
-            </InfoValue>
-          </InfoItem>
-          <InfoItem>
-            <InfoLabel>Vistoriador</InfoLabel>
-            <InfoValue>{vistoria.vistoriador?.nome || 'N/A'}</InfoValue>
-          </InfoItem>
-          <InfoItem>
-            <InfoLabel>Data de Criação</InfoLabel>
-            <InfoValue>{new Date(vistoria.createdAt).toLocaleDateString('pt-BR')}</InfoValue>
-          </InfoItem>
-          {vistoria.data_inicio && (
+          {vistoria.StatusVistoria?.nome === 'EM_ANDAMENTO' && vistoria.data_inicio ? (
             <InfoItem>
               <InfoLabel>Data de Início</InfoLabel>
               <InfoValue>{new Date(vistoria.data_inicio).toLocaleString('pt-BR')}</InfoValue>
             </InfoItem>
-          )}
-          {vistoria.data_conclusao && (
-            <InfoItem>
-              <InfoLabel>Data de Conclusão</InfoLabel>
-              <InfoValue>{new Date(vistoria.data_conclusao).toLocaleString('pt-BR')}</InfoValue>
-            </InfoItem>
+          ) : (
+            <>
+              <InfoItem>
+                <InfoLabel>Local</InfoLabel>
+                <InfoValue>
+                  {(() => {
+                    const local = vistoria.Local;
+                    if (!local) return 'N/A';
+                    
+                    const partes = [];
+                    // Se tem nome_local, adiciona primeiro
+                    if (local.nome_local) partes.push(local.nome_local);
+                    
+                    // Monta endereço completo
+                    if (local.logradouro) {
+                      const endereco = `${local.logradouro}${local.numero ? `, ${local.numero}` : ''}`;
+                      partes.push(endereco);
+                    }
+                    if (local.bairro) partes.push(local.bairro);
+                    if (local.cidade || local.estado) {
+                      const cidadeEstado = [local.cidade, local.estado].filter(Boolean).join(', ');
+                      if (cidadeEstado) partes.push(cidadeEstado);
+                    }
+                    
+                    // Se não tem nenhuma parte, retorna tipo ou N/A
+                    if (partes.length === 0) {
+                      return local.tipo || 'N/A';
+                    }
+                    
+                    return partes.join(' - ');
+                  })()}
+                </InfoValue>
+              </InfoItem>
+              <InfoItem>
+                <InfoLabel>Vistoriador</InfoLabel>
+                <InfoValue>{vistoria.vistoriador?.nome || 'N/A'}</InfoValue>
+              </InfoItem>
+              <InfoItem>
+                <InfoLabel>Data de Criação</InfoLabel>
+                <InfoValue>
+                  {vistoria.createdAt 
+                    ? new Date(vistoria.createdAt).toLocaleDateString('pt-BR', { 
+                        day: '2-digit', 
+                        month: '2-digit', 
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })
+                    : vistoria.created_at
+                      ? new Date(vistoria.created_at).toLocaleDateString('pt-BR', { 
+                          day: '2-digit', 
+                          month: '2-digit', 
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })
+                      : 'N/A'}
+                </InfoValue>
+              </InfoItem>
+              {vistoria.data_inicio && (
+                <InfoItem>
+                  <InfoLabel>Data de Início</InfoLabel>
+                  <InfoValue>{new Date(vistoria.data_inicio).toLocaleString('pt-BR')}</InfoValue>
+                </InfoItem>
+              )}
+              {vistoria.data_conclusao && (
+                <InfoItem>
+                  <InfoLabel>Data de Conclusão</InfoLabel>
+                  <InfoValue>{new Date(vistoria.data_conclusao).toLocaleString('pt-BR')}</InfoValue>
+                </InfoItem>
+              )}
+            </>
           )}
         </InfoGrid>
       </VistoriaInfo>
 
-      {/* Contato e Localização */}
-      <VistoriaInfo style={{ background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)' }}>
-        <h2 style={{ margin: '0 0 1rem 0', fontSize: '1.25rem', fontWeight: '600', color: '#0369a1' }}>
-          Contato e Localização
-        </h2>
+      {/* Contato e Localização - Ocultar quando em andamento */}
+      {vistoria.StatusVistoria?.nome !== 'EM_ANDAMENTO' && (
+        <VistoriaInfo style={{ background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)' }}>
+          <h2 style={{ margin: '0 0 1rem 0', fontSize: '1.25rem', fontWeight: '600', color: '#0369a1' }}>
+            Contato e Localização
+          </h2>
         
         <div style={{ display: 'grid', gap: '1rem' }}>
           {/* WhatsApp */}
@@ -1702,9 +1980,50 @@ const VistoriadorVistoria: React.FC = () => {
           )}
         </div>
       </VistoriaInfo>
+      )}
 
-      {/* NOVO SISTEMA DE CHECKLIST */}
-      {checklistItens.length > 0 && (
+      {/* MENSAGEM DE TODAS AS FOTOS OBRIGATÓRIAS CONCLUÍDAS - NO INÍCIO */}
+      {vistoria.StatusVistoria?.nome === 'EM_ANDAMENTO' && progresso && progresso.obrigatoriosPendentes === 0 && progresso.concluidos > 0 && (
+        <div style={{
+          background: '#dcfce7',
+          border: '2px solid #10b981',
+          borderRadius: '1rem',
+          padding: '2.5rem',
+          textAlign: 'center',
+          marginTop: '2rem',
+          marginBottom: '2rem',
+          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+        }}>
+          <CheckCircle size={48} style={{ color: '#10b981', marginBottom: '1rem' }} />
+          <h3 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#166534', marginBottom: '0.75rem' }}>
+            Todas as fotos obrigatórias foram concluídas!
+          </h3>
+          <p style={{ color: '#065f46', marginBottom: '2rem', fontSize: '1.125rem' }}>
+            Você pode finalizar a vistoria agora.
+          </p>
+          <ActionButton 
+            variant="primary" 
+            onClick={() => handleStatusUpdate(3)} // CONCLUIDA
+            disabled={loading}
+            style={{
+              fontSize: '1.25rem',
+              padding: '1.25rem 3rem',
+              minWidth: '300px',
+              height: 'auto',
+              fontWeight: '600',
+              background: '#10b981',
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            <CheckCircle size={28} style={{ marginRight: '0.75rem' }} />
+            {loading ? 'Finalizando...' : 'Finalizar Vistoria'}
+          </ActionButton>
+        </div>
+      )}
+
+      {/* NOVO SISTEMA DE CHECKLIST - APENAS QUANDO EM_ANDAMENTO */}
+      {vistoria.StatusVistoria?.nome === 'EM_ANDAMENTO' && checklistItens.length > 0 && (
         <ChecklistSection>
           <SectionTitle>
             <CheckSquare size={24} />
@@ -1740,13 +2059,31 @@ const VistoriadorVistoria: React.FC = () => {
                   gap: '0.5rem'
                 }}>
                   <CheckCircle size={16} />
-                  Todos os itens obrigatórios concluídos!
+                  Todos os itens obrigatórios concluídos! Você pode finalizar a vistoria.
                 </div>
               )}
             </>
           )}
 
-          {checklistItens.map((item) => (
+          {/* SEÇÃO: ITENS PENDENTES */}
+          {checklistItens.filter(item => item.status !== 'CONCLUIDO').length > 0 && (
+            <div style={{ marginBottom: '2rem' }}>
+              <h3 style={{ 
+                fontSize: '1.25rem', 
+                fontWeight: '600', 
+                color: '#1f2937',
+                marginBottom: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <Clock size={20} style={{ color: '#f59e0b' }} />
+                Pendentes ({checklistItens.filter(item => item.status !== 'CONCLUIDO').length})
+              </h3>
+              {checklistItens
+                .filter(item => item.status !== 'CONCLUIDO')
+                .map((item) => {
+                  return (
             <ChecklistItemStyled key={item.id} completed={item.status === 'CONCLUIDO'}>
               <ChecklistHeader>
                 <ChecklistInfo>
@@ -1914,10 +2251,10 @@ const VistoriadorVistoria: React.FC = () => {
                         <PhotoUploadButton 
                           variant="primary" 
                           onClick={() => handleOpenPhotoModal(item)}
-                          disabled={uploading !== null}
+                          disabled={uploadingItemId === item.id}
                         >
                           <Camera size={18} />
-                          {uploading ? 'Enviando...' : 'Anexar Foto'}
+                          {uploadingItemId === item.id ? 'Enviando...' : 'Anexar Foto'}
                         </PhotoUploadButton>
                         {!item.obrigatorio && (
                           <ActionButton variant="danger" onClick={() => handleMarcarPendente(item.id)}>
@@ -1933,10 +2270,10 @@ const VistoriadorVistoria: React.FC = () => {
                         <PhotoUploadButton 
                           variant="primary" 
                           onClick={() => handleOpenPhotoModal(item)}
-                          disabled={uploading !== null}
+                          disabled={uploadingItemId === item.id}
                         >
                           <Camera size={18} />
-                          {uploading ? 'Enviando...' : 'Tirar/Anexar Foto'}
+                          {uploadingItemId === item.id ? 'Enviando...' : 'Tirar/Anexar Foto'}
                         </PhotoUploadButton>
                         {!item.obrigatorio && (
                           <ActionButton onClick={() => handleMarcarConcluido(item.id)}>
@@ -1960,31 +2297,243 @@ const VistoriadorVistoria: React.FC = () => {
                 </ChecklistActions>
               </ChecklistHeader>
             </ChecklistItemStyled>
-          ))}
+                  );
+                })}
+            </div>
+          )}
+
+          {/* SEÇÃO: ITENS CONCLUÍDOS */}
+          {checklistItens.filter(item => item.status === 'CONCLUIDO').length > 0 && (
+            <div style={{ marginTop: '2rem' }}>
+              <h3 style={{ 
+                fontSize: '1.25rem', 
+                fontWeight: '600', 
+                color: '#1f2937',
+                marginBottom: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <CheckCircle size={20} style={{ color: '#10b981' }} />
+                Concluídos ({checklistItens.filter(item => item.status === 'CONCLUIDO').length})
+              </h3>
+              {checklistItens
+                .filter(item => item.status === 'CONCLUIDO')
+                .map((item) => (
+                  <ChecklistItemStyled key={item.id} completed={true}>
+                    <ChecklistHeader>
+                      <ChecklistInfo>
+                        <ChecklistTitle>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <span style={{ 
+                              background: '#667eea', 
+                              color: 'white', 
+                              width: '28px', 
+                              height: '28px', 
+                              borderRadius: '50%', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              flexShrink: 0
+                            }}>
+                              {item.ordem}
+                            </span>
+                            <CheckCircle size={20} style={{ color: '#10b981' }} />
+                            <span style={{ fontWeight: '600' }}>{item.nome}</span>
+                            {item.obrigatorio && (
+                              <span style={{
+                                background: '#fee2e2',
+                                color: '#991b1b',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '0.25rem',
+                                fontSize: '0.7rem',
+                                fontWeight: '600'
+                              }}>
+                                Obrigatório
+                              </span>
+                            )}
+                          </div>
+                        </ChecklistTitle>
+                        {item.descricao && (
+                          <ChecklistDescription>{item.descricao}</ChecklistDescription>
+                        )}
+                        {item.concluido_em && (
+                          <div style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '0.25rem' }}>
+                            Concluído em: {new Date(item.concluido_em).toLocaleString('pt-BR')}
+                          </div>
+                        )}
+                      </ChecklistInfo>
+                      
+                      <ChecklistActions>
+                        {item.foto ? (
+                          <>
+                            <PhotoDisplay>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                <CheckCircle size={16} color="#10b981" />
+                                <strong style={{ color: '#065f46' }}>Foto anexada</strong>
+                                <span style={{
+                                  background: '#dcfce7',
+                                  color: '#166534',
+                                  padding: '0.125rem 0.5rem',
+                                  borderRadius: '0.25rem',
+                                  fontSize: '0.7rem',
+                                  fontWeight: '600'
+                                }}>
+                                  ID: {item.foto.id}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem', marginBottom: '1rem' }}>
+                                Enviada em: {new Date(item.concluido_em || item.updatedAt).toLocaleString('pt-BR')}
+                              </div>
+                            </PhotoDisplay>
+                            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                              <ActionButton 
+                                variant="primary" 
+                                onClick={async () => {
+                                  setFotoVisualizada({ id: item.foto.id, nome: item.nome });
+                                  setErroCarregamentoImagem(false);
+                                  setCarregandoImagem(true);
+                                  setUrlImagem(null);
+                                  
+                                  try {
+                                    const response = await fetch(`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem-url`, {
+                                      headers: {
+                                        'Authorization': `Bearer ${token}`
+                                      }
+                                    });
+                                    
+                                    if (response.ok) {
+                                      const data = await response.json();
+                                      if (data.encontrada && data.url) {
+                                        setUrlImagem(data.url);
+                                        setCarregandoImagem(false);
+                                      } else {
+                                        setErroCarregamentoImagem(true);
+                                        setCarregandoImagem(false);
+                                      }
+                                    } else {
+                                      setErroCarregamentoImagem(true);
+                                      setCarregandoImagem(false);
+                                    }
+                                  } catch (error) {
+                                    setErroCarregamentoImagem(true);
+                                    setCarregandoImagem(false);
+                                  }
+                                }}
+                                style={{ background: '#3b82f6' }}
+                              >
+                                <Eye size={16} />
+                                Visualizar Foto
+                              </ActionButton>
+                              <ActionButton 
+                                variant="primary" 
+                                onClick={() => handleOpenPhotoModal(item)}
+                                style={{ background: '#10b981' }}
+                              >
+                                <Camera size={16} />
+                                Trocar Foto
+                              </ActionButton>
+                              <ActionButton variant="danger" onClick={() => handleMarcarPendente(item.id)}>
+                                <X size={16} />
+                                Voltar para Pendente
+                              </ActionButton>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: '#10b981' }}>
+                              <CheckCircle size={16} />
+                              <strong>Item concluído sem foto</strong>
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                              <PhotoUploadButton 
+                                variant="primary" 
+                                onClick={() => handleOpenPhotoModal(item)}
+                                disabled={uploadingItemId === item.id}
+                              >
+                                <Camera size={18} />
+                                {uploadingItemId === item.id ? 'Enviando...' : 'Anexar Foto'}
+                              </PhotoUploadButton>
+                              <ActionButton variant="danger" onClick={() => handleMarcarPendente(item.id)}>
+                                <X size={16} />
+                                Voltar para Pendente
+                              </ActionButton>
+                            </div>
+                          </>
+                        )}
+                      </ChecklistActions>
+                    </ChecklistHeader>
+                  </ChecklistItemStyled>
+                ))}
+            </div>
+          )}
         </ChecklistSection>
       )}
 
-      <StatusActions>
-        {vistoria.StatusVistoria?.nome === 'PENDENTE' && !vistoria.data_inicio && (
+      {/* MENSAGEM QUANDO VISTORIA NÃO ESTÁ INICIADA */}
+      {vistoria.StatusVistoria?.nome === 'PENDENTE' && !vistoria.data_inicio && (
+        <div style={{
+          background: '#fef3c7',
+          border: '2px solid #f59e0b',
+          borderRadius: '1rem',
+          padding: '2.5rem',
+          textAlign: 'center',
+          marginTop: '2rem',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+        }}>
+          <AlertCircle size={48} style={{ color: '#f59e0b', marginBottom: '1rem' }} />
+          <h3 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#92400e', marginBottom: '0.75rem' }}>
+            Vistoria não iniciada
+          </h3>
+          <p style={{ color: '#78350f', marginBottom: '2rem', fontSize: '1.125rem' }}>
+            Você precisa iniciar a vistoria para poder tirar as fotos do checklist.
+          </p>
           <ActionButton 
             variant="primary" 
             onClick={handleIniciarVistoria}
             disabled={loading}
+            style={{
+              fontSize: '1.25rem',
+              padding: '1.25rem 3rem',
+              minWidth: '300px',
+              height: 'auto',
+              fontWeight: '600',
+              boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)',
+              transition: 'all 0.3s ease'
+            }}
           >
-            <Play size={20} />
+            <Play size={28} style={{ marginRight: '0.75rem' }} />
             {loading ? 'Iniciando...' : 'Iniciar Vistoria'}
           </ActionButton>
-        )}
+        </div>
+      )}
+
+      <StatusActions>
         
         {vistoria.StatusVistoria?.nome === 'EM_ANDAMENTO' && (
-          <ActionButton 
-            variant="primary" 
-            onClick={() => handleStatusUpdate(3)} // CONCLUIDA
-            disabled={!checklistStatus?.resumo.checklistCompleto}
-          >
-            <CheckCircle size={20} />
-            Concluir Vistoria
-          </ActionButton>
+          <>
+            {progresso && progresso.obrigatoriosPendentes > 0 ? (
+              <div style={{ 
+                background: '#fef3c7', 
+                border: '1px solid #f59e0b', 
+                borderRadius: '0.5rem', 
+                padding: '1rem',
+                color: '#92400e'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <AlertCircle size={20} />
+                  <div>
+                    <strong>Ainda há {progresso.obrigatoriosPendentes} foto(s) obrigatória(s) pendente(s)</strong>
+                    <div style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                      Complete todas as fotos obrigatórias para finalizar a vistoria.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </>
         )}
         
         {vistoria.data_inicio && (
@@ -2043,6 +2592,13 @@ const VistoriadorVistoria: React.FC = () => {
                     autoPlay
                     playsInline
                     muted
+                    style={{ 
+                      width: '100%', 
+                      height: 'auto',
+                      minHeight: '300px',
+                      background: '#000',
+                      display: 'block'
+                    }}
                   />
                 </CameraContainer>
                 <CameraControls>
@@ -2073,9 +2629,9 @@ const VistoriadorVistoria: React.FC = () => {
                   <ActionButton 
                     variant="primary" 
                     onClick={handleConfirmPhotoUpload}
-                    disabled={uploading !== null}
+                    disabled={uploadingItemId !== null}
                   >
-                    {uploading ? 'Enviando...' : 'Confirmar e Enviar'}
+                    {uploadingItemId !== null ? 'Enviando...' : 'Confirmar e Enviar'}
                   </ActionButton>
                 </PhotoModalActions>
               </>
@@ -2139,34 +2695,26 @@ const VistoriadorVistoria: React.FC = () => {
                   URL: {urlImagem || `${API_CONFIG.BASE_URL}/api/fotos/${fotoVisualizada.id}/imagem`}
                 </FotoVisualizacaoErroDetalhes>
               </FotoVisualizacaoErro>
-            ) : urlImagem ? (
-              <FotoVisualizacaoImage 
-                src={urlImagem}
+            ) : (
+              <PreloadedImage
+                src={urlImagem || `${API_CONFIG.BASE_URL}/api/fotos/${fotoVisualizada.id}/imagem`}
                 alt={fotoVisualizada.nome}
-                onError={(e) => {
-                  console.error('[FRONTEND] ERRO ao carregar imagem:', fotoVisualizada.id);
-                  console.error('[FRONTEND] URL tentada:', urlImagem);
-                  setErroCarregamentoImagem(true);
-                  e.currentTarget.style.display = 'none';
+                fallbackSrc={urlImagem ? `${API_CONFIG.BASE_URL}/api/fotos/${fotoVisualizada.id}/imagem` : undefined}
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '70vh',
+                  objectFit: 'contain',
+                  borderRadius: '0.5rem'
                 }}
+                timeout={15000}
+                showLoading={true}
                 onLoad={() => {
                   console.log('[FRONTEND] OK: Imagem carregada com sucesso:', fotoVisualizada.id);
-                  console.log('[FRONTEND] URL usada:', urlImagem);
                   setErroCarregamentoImagem(false);
                 }}
-              />
-            ) : (
-              <FotoVisualizacaoImage 
-                src={`${API_CONFIG.BASE_URL}/api/fotos/${fotoVisualizada.id}/imagem`}
-                alt={fotoVisualizada.nome}
-                onError={(e) => {
-                  console.error('[FRONTEND] ERRO ao carregar imagem (fallback):', fotoVisualizada.id);
+                onError={(error) => {
+                  console.error('[FRONTEND] ERRO ao carregar imagem:', fotoVisualizada.id, error);
                   setErroCarregamentoImagem(true);
-                  e.currentTarget.style.display = 'none';
-                }}
-                onLoad={() => {
-                  console.log('[FRONTEND] OK: Imagem carregada com sucesso (fallback):', fotoVisualizada.id);
-                  setErroCarregamentoImagem(false);
                 }}
               />
             )}

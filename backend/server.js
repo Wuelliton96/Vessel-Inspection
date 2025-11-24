@@ -89,7 +89,20 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-app.use(express.json());
+// Configurar limites para JSON e URL encoded (importante para uploads)
+app.use(express.json({ limit: '50mb' })); // Aumentar limite para uploads grandes
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Timeout para requisições longas (30 segundos)
+app.use((req, res, next) => {
+  req.setTimeout(30000, () => {
+    if (!res.headersSent) {
+      res.status(408).json({ error: 'Request timeout' });
+    }
+  });
+  next();
+});
+
 app.use('/uploads', express.static('uploads'));
 
 app.use(morgan('combined', {
@@ -166,6 +179,24 @@ function getLocalIPAddress() {
   }
   return 'localhost';
 }
+
+// Tratamento de erros não capturados para evitar crash do servidor
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', { 
+    error: error.message, 
+    stack: error.stack 
+  });
+  // Não encerrar o processo imediatamente, permitir que o servidor continue
+  // Em produção, considere usar um processo manager como PM2
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection:', { 
+    reason: reason?.message || reason,
+    stack: reason?.stack 
+  });
+  // Não encerrar o processo, apenas logar o erro
+});
 
 app.listen(PORT, () => {
   // Em produção, não exibir informações de inicialização no console

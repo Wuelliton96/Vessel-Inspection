@@ -19,33 +19,20 @@ if (UPLOAD_STRATEGY === 's3') {
 const localStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     // IMPORTANTE: No multer, req.body pode não estar disponível ainda durante destination()
-    // Vamos extrair vistoria_id do req.body se disponível, senão usar 'unknown' temporariamente
-    let vistoriaId = req.body?.vistoria_id || req.body?.vistoriaId;
+    // Usar diretório temporário primeiro, depois moveremos para o diretório correto
+    const tempDir = path.join(__dirname, '../uploads/fotos/temp');
     
-    // Garantir que seja uma string válida
-    if (vistoriaId) {
-      vistoriaId = String(vistoriaId).trim();
-      if (vistoriaId === '' || vistoriaId === 'undefined' || vistoriaId === 'null') {
-        vistoriaId = 'unknown';
-      }
-    } else {
-      vistoriaId = 'unknown';
+    // Criar pasta temporária se não existir
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+      console.log(`[UPLOAD] Pasta temporária criada: ${tempDir}`);
     }
     
-    const uploadDir = path.join(__dirname, `../uploads/fotos/vistoria-${vistoriaId}`);
+    // Armazenar tempDir no req para uso posterior
+    req.uploadTempDir = tempDir;
     
-    // Criar pasta automaticamente se não existir
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-      console.log(`[UPLOAD] Pasta criada: ${uploadDir}`);
-    }
-    
-    // Armazenar uploadDir e vistoriaId no req para uso no filename
-    req.uploadDir = uploadDir;
-    req.uploadVistoriaId = vistoriaId;
-    
-    console.log(`[UPLOAD] Destination: vistoria-${vistoriaId}`);
-    cb(null, uploadDir);
+    console.log(`[UPLOAD] Destination temporário: temp`);
+    cb(null, tempDir);
   },
   
   filename: (req, file, cb) => {
@@ -231,20 +218,27 @@ const getS3Storage = () => {
 const getUploadConfig = () => {
   const config = {
     limits: {
-      fileSize: 10 * 1024 * 1024 // 10MB por arquivo
+      fileSize: 10 * 1024 * 1024, // 10MB por arquivo
+      files: 1, // Apenas um arquivo por vez
+      fieldSize: 10 * 1024 * 1024, // Limite para campos do formulário
+      fields: 10 // Máximo de campos no formulário
     },
     fileFilter: (req, file, cb) => {
-      // Tipos de arquivo permitidos
-      const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-      const allowedExts = /jpeg|jpg|png|gif/;
-      
-      const extname = allowedExts.test(path.extname(file.originalname).toLowerCase());
-      const mimetype = allowedMimes.includes(file.mimetype);
-      
-      if (mimetype && extname) {
-        return cb(null, true);
-      } else {
-        cb(new Error('Apenas imagens são permitidas (JPEG, JPG, PNG, GIF)'));
+      try {
+        // Tipos de arquivo permitidos
+        const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+        const allowedExts = /jpeg|jpg|png|gif/;
+        
+        const extname = allowedExts.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedMimes.includes(file.mimetype);
+        
+        if (mimetype && extname) {
+          return cb(null, true);
+        } else {
+          cb(new Error('Apenas imagens são permitidas (JPEG, JPG, PNG, GIF)'));
+        }
+      } catch (error) {
+        cb(new Error(`Erro ao validar arquivo: ${error.message}`));
       }
     }
   };

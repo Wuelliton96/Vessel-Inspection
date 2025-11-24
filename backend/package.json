@@ -26,6 +26,7 @@
     "test:password": "node scripts/testPasswordUpdate.js",
     "test:all": "node scripts/testAllRoutes.js",
     "test:quick": "node scripts/quickTest.js",
+    "test:completo": "node scripts/testBackendCompleto.js",
     "update:niveis": "node scripts/updateNiveisAcesso.js",
     "sync:db": "node scripts/syncDatabase.js",
     "migrate:prod": "echo 'Migrations executadas via Railway'",

@@ -14,15 +14,20 @@ router.get('/vistorias', async (req, res) => {
     console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
     console.log('Nível de acesso:', req.user?.NivelAcesso?.nome);
     
-    // Buscar status EM_ANDAMENTO e CONCLUIDA
+    // Buscar status PENDENTE, EM_ANDAMENTO e CONCLUIDA
+    // Vistoriador deve ver todas as vistorias atribuídas a ele, independente do status
+    const statusPendente = await StatusVistoria.findOne({ where: { nome: 'PENDENTE' } });
     const statusEmAndamento = await StatusVistoria.findOne({ where: { nome: 'EM_ANDAMENTO' } });
     const statusConcluida = await StatusVistoria.findOne({ where: { nome: 'CONCLUIDA' } });
     
     const statusIds = [];
+    if (statusPendente) statusIds.push(statusPendente.id);
     if (statusEmAndamento) statusIds.push(statusEmAndamento.id);
     if (statusConcluida) statusIds.push(statusConcluida.id);
     
-    // Filtrar apenas vistorias que foram iniciadas (EM_ANDAMENTO ou CONCLUIDA)
+    console.log('Status permitidos:', statusIds);
+    
+    // Filtrar vistorias atribuídas ao vistoriador (PENDENTE, EM_ANDAMENTO ou CONCLUIDA)
     const vistorias = await Vistoria.findAll({
       where: {
         vistoriador_id: req.user.id,
@@ -102,9 +107,107 @@ router.get('/tipos-foto-checklist', async (req, res) => {
     console.log('=== ROTA GET /api/vistoriador/tipos-foto-checklist ===');
     console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
     
-    const tipos = await TipoFotoChecklist.findAll({
+    let tipos = await TipoFotoChecklist.findAll({
       order: [['codigo', 'ASC']]
     });
+    
+    // Se não houver tipos, criar tipos padrão automaticamente
+    if (tipos.length === 0) {
+      console.log('ATENCAO: Nenhum tipo de foto encontrado. Criando tipos padrão...');
+      
+      const tiposPadrao = [
+        {
+          codigo: 'CONFIRMACAO_INSCRICAO',
+          nome_exibicao: 'Confirmação do nº de inscrição e nome',
+          descricao: 'Foto mostrando claramente o número de inscrição e nome da embarcação',
+          obrigatorio: true
+        },
+        {
+          codigo: 'NOME_ACOMPANHANTE',
+          nome_exibicao: 'Nome do acompanhante',
+          descricao: 'Foto ou identificação da pessoa que acompanha a vistoria',
+          obrigatorio: true
+        },
+        {
+          codigo: 'PROA',
+          nome_exibicao: 'Proa (frente)',
+          descricao: 'Foto da parte frontal da embarcação',
+          obrigatorio: true
+        },
+        {
+          codigo: 'ANCORA',
+          nome_exibicao: 'Âncora',
+          descricao: 'Foto da âncora e sistema de ancoragem',
+          obrigatorio: true
+        },
+        {
+          codigo: 'COSTADO_DIREITO',
+          nome_exibicao: 'Costado direito',
+          descricao: 'Foto do lado direito completo',
+          obrigatorio: true
+        },
+        {
+          codigo: 'COSTADO_ESQUERDO',
+          nome_exibicao: 'Costado esquerdo',
+          descricao: 'Foto do lado esquerdo completo',
+          obrigatorio: true
+        },
+        {
+          codigo: 'POPA',
+          nome_exibicao: 'Popa (traseira)',
+          descricao: 'Foto da parte traseira da embarcação',
+          obrigatorio: true
+        },
+        {
+          codigo: 'CONVES',
+          nome_exibicao: 'Convés',
+          descricao: 'Foto do convés da embarcação',
+          obrigatorio: true
+        },
+        {
+          codigo: 'CABINE',
+          nome_exibicao: 'Cabine',
+          descricao: 'Foto da cabine da embarcação',
+          obrigatorio: true
+        },
+        {
+          codigo: 'MOTOR',
+          nome_exibicao: 'Motor',
+          descricao: 'Foto do motor da embarcação',
+          obrigatorio: true
+        },
+        {
+          codigo: 'CASCO',
+          nome_exibicao: 'Casco',
+          descricao: 'Foto do casco da embarcação',
+          obrigatorio: true
+        },
+        {
+          codigo: 'DOCUMENTOS',
+          nome_exibicao: 'Documentos',
+          descricao: 'Foto dos documentos da embarcação',
+          obrigatorio: true
+        }
+      ];
+
+      for (const tipoData of tiposPadrao) {
+        try {
+          await TipoFotoChecklist.create(tipoData);
+          console.log(`  Criado: ${tipoData.codigo}`);
+        } catch (err) {
+          if (err.name !== 'SequelizeUniqueConstraintError') {
+            console.error(`  ERRO ao criar ${tipoData.codigo}:`, err.message);
+          }
+        }
+      }
+
+      // Buscar tipos novamente após criação
+      tipos = await TipoFotoChecklist.findAll({
+        order: [['codigo', 'ASC']]
+      });
+      
+      console.log(`Tipos padrao criados. Total: ${tipos.length}`);
+    }
     
     console.log('Tipos encontrados:', tipos.length);
     console.log('=== FIM ROTA GET /api/vistoriador/tipos-foto-checklist ===\n');

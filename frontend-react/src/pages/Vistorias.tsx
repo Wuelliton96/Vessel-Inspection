@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
   Plus, 
   Edit, 
@@ -22,11 +22,11 @@ import {
   X,
   Camera,
   Building2,
-  Phone,
-  FileText
+  FileText,
+  ExternalLink
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Vistoria, Usuario, Embarcacao, Cliente, TipoPessoa } from '../types';
+import { Vistoria, Embarcacao, Cliente, TipoPessoa } from '../types';
 import { vistoriaService, usuarioService, embarcacaoService, clienteService } from '../services/api';
 import { useAccessControl } from '../hooks/useAccessControl';
 import { buscarCEP, formatarCEP, validarCEP } from '../utils/cepUtils';
@@ -64,46 +64,6 @@ const Title = styled.h1`
   gap: 0.75rem;
 `;
 
-const AdminBadge = styled.div`
-  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
-  color: white;
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
-`;
-
-const AdminInfo = styled.div`
-  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-  border: 1px solid #3b82f6;
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1.5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-`;
-
-const InfoIcon = styled.div`
-  background: #3b82f6;
-  color: white;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-`;
-
-const InfoText = styled.div`
-  color: #1e40af;
-  font-weight: 500;
-  line-height: 1.4;
-`;
 
 const SearchContainer = styled.div`
   display: flex;
@@ -540,6 +500,7 @@ const Vistorias: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showClienteModal, setShowClienteModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [loadingEdit, setLoadingEdit] = useState(false);
   const [editingVistoria, setEditingVistoria] = useState<Vistoria | null>(null);
   const [deletingVistoria, setDeletingVistoria] = useState<Vistoria | null>(null);
   
@@ -612,6 +573,7 @@ const Vistorias: React.FC = () => {
     dados_rascunho: null as any,
     
     // Campos Financeiros
+    valor_embarcacao: '',
     valor_vistoria: '',
     valor_vistoriador: '',
     
@@ -647,6 +609,42 @@ const Vistorias: React.FC = () => {
   const invalidateVistorias = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['vistorias'] });
   }, [queryClient]);
+
+  // Carregar tipos permitidos quando o modal é aberto e há seguradora selecionada
+  useEffect(() => {
+    const carregarTiposPermitidos = async () => {
+      if (showModal && formData.seguradora_id && formData.seguradora_id > 0) {
+        try {
+          const { seguradoraService } = await import('../services/api');
+          const tipos = await seguradoraService.getTiposPermitidos(formData.seguradora_id);
+          if (tipos && Array.isArray(tipos) && tipos.length > 0) {
+            const tiposList = tipos.map((t: any) => t.tipo_embarcacao);
+            setTiposPermitidos(tiposList);
+          } else {
+            // Tentar buscar dos dados em cache
+            const seg = seguradoras.find((s: any) => s.id === formData.seguradora_id);
+            if (seg && seg.tiposPermitidos) {
+              const tipos = seg.tiposPermitidos.map((t: any) => t.tipo_embarcacao);
+              setTiposPermitidos(tipos);
+            }
+          }
+        } catch (err) {
+          console.error('Erro ao carregar tipos permitidos:', err);
+          // Tentar buscar dos dados em cache
+          const seg = seguradoras.find((s: any) => s.id === formData.seguradora_id);
+          if (seg && seg.tiposPermitidos) {
+            const tipos = seg.tiposPermitidos.map((t: any) => t.tipo_embarcacao);
+            setTiposPermitidos(tipos);
+          }
+        }
+      } else if (!showModal) {
+        // Limpar tipos quando o modal é fechado
+        setTiposPermitidos([]);
+      }
+    };
+
+    carregarTiposPermitidos();
+  }, [showModal, formData.seguradora_id, seguradoras]);
 
   // Buscar CLIENTE por CPF/CNPJ
   const buscarPorCPF = async () => {
@@ -829,129 +827,176 @@ const Vistorias: React.FC = () => {
     setTimeout(() => setSuccess(''), 3000);
   };
 
-  const handleCreate = () => {
-    setEditingVistoria(null);
-    // Resetar estados de busca
-    setCpfBusca('');
-    setClienteEncontrado(null);
-    setEmbarcacoesEncontradas([]);
-    setModoEmbarcacao('buscar');
-    setFormData({
-      // Campos da Embarcação
-      embarcacao_nome: '',
-      embarcacao_nr_inscricao_barco: '',
-      embarcacao_proprietario_nome: '',
-      embarcacao_proprietario_cpf: '',
-      embarcacao_proprietario_telefone_e164: '',
-      embarcacao_proprietario_email: '',
-      embarcacao_tipo: '',
-      seguradora_id: 0,
-      embarcacao_valor: '',
-      embarcacao_ano_fabricacao: '',
-      
-      // Dados do Cliente
-      cliente_nome: '',
-      cliente_documento: '',
-      cliente_telefone: '',
-      cliente_email: '',
-      cliente_endereco_completo: '',
-      
-      // Campos do Local
-      local_tipo: 'MARINA',
-      local_nome_local: '',
-      local_cep: '',
-      local_logradouro: '',
-      local_numero: '',
-      local_complemento: '',
-      local_bairro: '',
-      local_cidade: '',
-      local_estado: '',
-      
-      // Campos da Vistoria
-      vistoriador_id: vistoriadores.length > 0 ? vistoriadores[0].id : 0,
-      dados_rascunho: null,
-      
-      // Campos Financeiros
-      valor_vistoria: '',
-      valor_vistoriador: '',
-      
-      // Campos de Contato/Acompanhante
-      contato_acompanhante_tipo: '',
-      contato_acompanhante_nome: '',
-      contato_acompanhante_telefone_e164: '',
-      contato_acompanhante_email: '',
-      
-      // Campos da Corretora
-      corretora_nome: '',
-      corretora_telefone_e164: '',
-      corretora_email_laudo: ''
-    });
-    setShowModal(true);
+  // Função para abrir endereço no Google Maps
+  const abrirNoMapa = (vistoria: Vistoria) => {
+    const local = vistoria.Local || vistoria.local;
+    if (!local) return;
+    
+    const endereco = [
+      local.logradouro || '',
+      local.numero || '',
+      local.bairro || '',
+      local.cidade || '',
+      local.estado || ''
+    ].filter(Boolean).join(', ');
+    
+    if (endereco) {
+      const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`;
+      window.open(url, '_blank');
+    }
   };
 
-  const handleEdit = (vistoria: Vistoria) => {
+  // Função removida - não utilizada
+
+  const handleEdit = async (vistoria: Vistoria) => {
     console.log('=== INICIANDO EDIÇÃO DE VISTORIA ===');
     console.log('Vistoria selecionada:', vistoria);
-    console.log('Estrutura da vistoria:', JSON.stringify(vistoria, null, 2));
     
-    setEditingVistoria(vistoria);
-    
-    const formDataToSet = {
-      // Campos da Embarcação
-      embarcacao_nome: vistoria.Embarcacao?.nome || vistoria.embarcacao?.nome || '',
-      embarcacao_nr_inscricao_barco: vistoria.Embarcacao?.nr_inscricao_barco || vistoria.embarcacao?.nr_inscricao_barco || '',
-      embarcacao_proprietario_nome: vistoria.Embarcacao?.proprietario_nome || vistoria.embarcacao?.proprietario_nome || '',
-      embarcacao_proprietario_cpf: vistoria.Embarcacao?.proprietario_cpf || vistoria.embarcacao?.proprietario_cpf || '',
-      embarcacao_proprietario_telefone_e164: vistoria.Embarcacao?.proprietario_telefone_e164 || vistoria.embarcacao?.proprietario_telefone_e164 || '',
-      embarcacao_proprietario_email: vistoria.Embarcacao?.proprietario_email || vistoria.embarcacao?.proprietario_email || '',
-      embarcacao_tipo: vistoria.Embarcacao?.tipo_embarcacao || vistoria.embarcacao?.tipo_embarcacao || '',
-      seguradora_id: vistoria.Embarcacao?.seguradora_id || vistoria.embarcacao?.seguradora_id || 0,
-      embarcacao_valor: vistoria.Embarcacao?.valor_embarcacao ? formatarValorMonetario(vistoria.Embarcacao.valor_embarcacao) : '',
-      embarcacao_ano_fabricacao: vistoria.Embarcacao?.ano_fabricacao?.toString() || '',
+    try {
+      setLoadingEdit(true);
+      setError('');
       
-      // Dados do Cliente
-      cliente_nome: '',
-      cliente_documento: '',
-      cliente_telefone: '',
-      cliente_email: '',
-      cliente_endereco_completo: '',
+      // Buscar dados completos da vistoria
+      console.log('Buscando dados completos da vistoria ID:', vistoria.id);
+      const vistoriaCompleta = await vistoriaService.getById(vistoria.id);
+      console.log('Vistoria completa carregada:', vistoriaCompleta);
+      console.log('Cliente associado:', vistoriaCompleta.Embarcacao?.Cliente || vistoriaCompleta.embarcacao?.Cliente);
+      console.log('CPF do Cliente:', vistoriaCompleta.Embarcacao?.Cliente?.cpf || vistoriaCompleta.embarcacao?.Cliente?.cpf);
+      console.log('Estrutura da vistoria:', JSON.stringify(vistoriaCompleta, null, 2));
       
-      // Campos do Local
-      local_tipo: vistoria.Local?.tipo || vistoria.local?.tipo || 'MARINA',
-      local_nome_local: vistoria.Local?.nome_local || vistoria.local?.nome_local || '',
-      local_cep: vistoria.Local?.cep || vistoria.local?.cep || '',
-      local_logradouro: vistoria.Local?.logradouro || vistoria.local?.logradouro || '',
-      local_numero: vistoria.Local?.numero || vistoria.local?.numero || '',
-      local_complemento: vistoria.Local?.complemento || vistoria.local?.complemento || '',
-      local_bairro: vistoria.Local?.bairro || vistoria.local?.bairro || '',
-      local_cidade: vistoria.Local?.cidade || vistoria.local?.cidade || '',
-      local_estado: vistoria.Local?.estado || vistoria.local?.estado || '',
+      setEditingVistoria(vistoriaCompleta);
       
-      // Campos da Vistoria
-      vistoriador_id: vistoria.vistoriador_id,
-      dados_rascunho: vistoria.dados_rascunho,
+      // Determinar dados do proprietário - pode vir da embarcação, do cliente associado ou do contato_acompanhante
+      const isProprietarioContato = vistoriaCompleta.contato_acompanhante_tipo === 'PROPRIETARIO';
+      const cliente = vistoriaCompleta.Embarcacao?.Cliente || vistoriaCompleta.embarcacao?.Cliente;
       
-      // Campos Financeiros
-      valor_vistoria: vistoria.valor_vistoria ? formatarValorMonetario(vistoria.valor_vistoria) : '',
-      valor_vistoriador: vistoria.valor_vistoriador ? formatarValorMonetario(vistoria.valor_vistoriador) : '',
+      const proprietarioNome = isProprietarioContato 
+        ? (vistoriaCompleta.contato_acompanhante_nome || cliente?.nome || '')
+        : (vistoriaCompleta.Embarcacao?.proprietario_nome || vistoriaCompleta.embarcacao?.proprietario_nome || cliente?.nome || '');
       
-      // Campos de Contato/Acompanhante
-      contato_acompanhante_tipo: vistoria.contato_acompanhante_tipo || '',
-      contato_acompanhante_nome: vistoria.contato_acompanhante_nome || '',
-      contato_acompanhante_telefone_e164: vistoria.contato_acompanhante_telefone_e164 || '',
-      contato_acompanhante_email: vistoria.contato_acompanhante_email || '',
+      // CPF pode vir da embarcação, do cliente ou não estar disponível
+      // Prioridade: Cliente > Embarcação > vazio
+      const proprietarioCpf = cliente?.cpf 
+        || vistoriaCompleta.Embarcacao?.proprietario_cpf 
+        || vistoriaCompleta.embarcacao?.proprietario_cpf 
+        || '';
       
-      // Campos da Corretora
-      corretora_nome: vistoria.corretora_nome || '',
-      corretora_telefone_e164: vistoria.corretora_telefone_e164 || '',
-      corretora_email_laudo: vistoria.corretora_email_laudo || ''
-    };
-    
-    console.log('FormData configurado:', formDataToSet);
-    setFormData(formDataToSet);
-    setShowModal(true);
-    
-    console.log('=== EDIÇÃO INICIADA COM SUCESSO ===');
+      console.log('CPF encontrado (raw):', proprietarioCpf);
+      console.log('CPF formatado:', proprietarioCpf ? mascaraCPF(proprietarioCpf) : 'VAZIO');
+      
+      const proprietarioTelefone = isProprietarioContato
+        ? (vistoriaCompleta.contato_acompanhante_telefone_e164 || cliente?.telefone_e164 || '')
+        : (vistoriaCompleta.Embarcacao?.proprietario_telefone_e164 || vistoriaCompleta.embarcacao?.proprietario_telefone_e164 || cliente?.telefone_e164 || '');
+      
+      const proprietarioEmail = isProprietarioContato
+        ? (vistoriaCompleta.contato_acompanhante_email || cliente?.email || '')
+        : (vistoriaCompleta.Embarcacao?.proprietario_email || vistoriaCompleta.embarcacao?.proprietario_email || cliente?.email || '');
+
+      // Formatar CEP - garantir que está formatado corretamente
+      const cepRaw = vistoriaCompleta.Local?.cep || vistoriaCompleta.local?.cep || '';
+      const cepFormatado = cepRaw ? formatarCEP(cepRaw.replace(/\D/g, '')) : '';
+
+      const formDataToSet = {
+        // Campos da Embarcação
+        embarcacao_nome: vistoriaCompleta.Embarcacao?.nome || vistoriaCompleta.embarcacao?.nome || '',
+        embarcacao_nr_inscricao_barco: vistoriaCompleta.Embarcacao?.nr_inscricao_barco || vistoriaCompleta.embarcacao?.nr_inscricao_barco || '',
+        embarcacao_proprietario_nome: proprietarioNome,
+        embarcacao_proprietario_cpf: proprietarioCpf ? mascaraCPF(proprietarioCpf) : '',
+        embarcacao_proprietario_telefone_e164: proprietarioTelefone ? mascaraTelefone(proprietarioTelefone) : '',
+        embarcacao_proprietario_email: proprietarioEmail,
+        embarcacao_tipo: vistoriaCompleta.Embarcacao?.tipo_embarcacao || vistoriaCompleta.embarcacao?.tipo_embarcacao || '',
+        seguradora_id: vistoriaCompleta.Embarcacao?.seguradora_id || vistoriaCompleta.embarcacao?.seguradora_id || 0,
+        embarcacao_valor: vistoriaCompleta.Embarcacao?.valor_embarcacao ? formatarValorMonetario(vistoriaCompleta.Embarcacao.valor_embarcacao) : '',
+        embarcacao_ano_fabricacao: vistoriaCompleta.Embarcacao?.ano_fabricacao?.toString() || '',
+        
+        // Dados do Cliente
+        cliente_nome: '',
+        cliente_documento: '',
+        cliente_telefone: '',
+        cliente_email: '',
+        cliente_endereco_completo: '',
+        
+        // Campos do Local
+        local_tipo: vistoriaCompleta.Local?.tipo || vistoriaCompleta.local?.tipo || 'MARINA',
+        local_nome_local: vistoriaCompleta.Local?.nome_local || vistoriaCompleta.local?.nome_local || '',
+        local_cep: cepFormatado,
+        local_logradouro: vistoriaCompleta.Local?.logradouro || vistoriaCompleta.local?.logradouro || '',
+        local_numero: vistoriaCompleta.Local?.numero || vistoriaCompleta.local?.numero || '',
+        local_complemento: vistoriaCompleta.Local?.complemento || vistoriaCompleta.local?.complemento || '',
+        local_bairro: vistoriaCompleta.Local?.bairro || vistoriaCompleta.local?.bairro || '',
+        local_cidade: vistoriaCompleta.Local?.cidade || vistoriaCompleta.local?.cidade || '',
+        local_estado: vistoriaCompleta.Local?.estado || vistoriaCompleta.local?.estado || '',
+        
+        // Campos da Vistoria
+        vistoriador_id: vistoriaCompleta.vistoriador_id,
+        dados_rascunho: vistoriaCompleta.dados_rascunho,
+        
+        // Campos Financeiros
+        valor_embarcacao: vistoriaCompleta.valor_embarcacao ? formatarValorMonetario(vistoriaCompleta.valor_embarcacao) : '',
+        valor_vistoria: vistoriaCompleta.valor_vistoria ? formatarValorMonetario(vistoriaCompleta.valor_vistoria) : '',
+        valor_vistoriador: vistoriaCompleta.valor_vistoriador ? formatarValorMonetario(vistoriaCompleta.valor_vistoriador) : '',
+        
+        // Campos de Contato/Acompanhante
+        contato_acompanhante_tipo: vistoriaCompleta.contato_acompanhante_tipo || '',
+        contato_acompanhante_nome: vistoriaCompleta.contato_acompanhante_nome || '',
+        contato_acompanhante_telefone_e164: vistoriaCompleta.contato_acompanhante_telefone_e164 ? mascaraTelefone(vistoriaCompleta.contato_acompanhante_telefone_e164) : '',
+        contato_acompanhante_email: vistoriaCompleta.contato_acompanhante_email || '',
+        
+        // Campos da Corretora
+        corretora_nome: vistoriaCompleta.corretora_nome || '',
+        corretora_telefone_e164: vistoriaCompleta.corretora_telefone_e164 ? mascaraTelefone(vistoriaCompleta.corretora_telefone_e164) : '',
+        corretora_email_laudo: vistoriaCompleta.corretora_email_laudo || ''
+      };
+      
+      console.log('FormData configurado:', formDataToSet);
+      setFormData(formDataToSet);
+      
+      // Carregar tipos permitidos se houver seguradora selecionada
+      const seguradoraId = vistoriaCompleta.Embarcacao?.seguradora_id || vistoriaCompleta.embarcacao?.seguradora_id;
+      if (seguradoraId && seguradoraId > 0) {
+        try {
+          const { seguradoraService } = await import('../services/api');
+          const tipos = await seguradoraService.getTiposPermitidos(seguradoraId);
+          if (tipos && Array.isArray(tipos) && tipos.length > 0) {
+            const tiposList = tipos.map((t: any) => t.tipo_embarcacao);
+            setTiposPermitidos(tiposList);
+            console.log('Tipos permitidos carregados:', tiposList);
+          } else {
+            // Tentar buscar dos dados em cache
+            const seg = seguradoras.find((s: any) => s.id === seguradoraId);
+            if (seg && seg.tiposPermitidos) {
+              const tipos = seg.tiposPermitidos.map((t: any) => t.tipo_embarcacao);
+              setTiposPermitidos(tipos);
+              console.log('Tipos permitidos do cache:', tipos);
+            } else {
+              setTiposPermitidos([]);
+            }
+          }
+        } catch (err) {
+          console.error('Erro ao carregar tipos permitidos:', err);
+          // Tentar buscar dos dados em cache
+          const seg = seguradoras.find((s: any) => s.id === seguradoraId);
+          if (seg && seg.tiposPermitidos) {
+            const tipos = seg.tiposPermitidos.map((t: any) => t.tipo_embarcacao);
+            setTiposPermitidos(tipos);
+          } else {
+            setTiposPermitidos([]);
+          }
+        }
+      } else {
+        setTiposPermitidos([]);
+      }
+      
+      setShowModal(true);
+      
+      console.log('=== EDIÇÃO INICIADA COM SUCESSO ===');
+    } catch (err: any) {
+      console.error('Erro ao carregar dados da vistoria:', err);
+      setError('Erro ao carregar dados da vistoria: ' + (err.response?.data?.error || err.message));
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setLoadingEdit(false);
+    }
   };
 
   const handleDeleteClick = (vistoria: Vistoria) => {
@@ -1049,6 +1094,7 @@ const Vistorias: React.FC = () => {
         ...formData,
         seguradora_id: formData.seguradora_id || null,
         tipo_embarcacao: formData.embarcacao_tipo || null,
+        valor_embarcacao: limparValorMonetario(formData.valor_embarcacao),
         valor_vistoria: limparValorMonetario(formData.valor_vistoria),
         valor_vistoriador: limparValorMonetario(formData.valor_vistoriador),
         contato_acompanhante_tipo: formData.contato_acompanhante_tipo || null,
@@ -1064,9 +1110,27 @@ const Vistorias: React.FC = () => {
       
       if (editingVistoria) {
         console.log('Atualizando vistoria ID:', editingVistoria.id);
-        console.log('Dados para atualização:', dataToSend);
         
-        const response = await vistoriaService.update(editingVistoria.id, dataToSend);
+        // Ao editar, enviar apenas os campos editáveis: Local e Vistoriador
+        const dataToUpdate: any = {
+          // Campos do Local (todos editáveis)
+          local_tipo: formData.local_tipo,
+          local_nome_local: formData.local_nome_local || null,
+          local_cep: formData.local_cep ? formData.local_cep.replace(/\D/g, '') : null,
+          local_logradouro: formData.local_logradouro || null,
+          local_numero: formData.local_numero || null,
+          local_complemento: formData.local_complemento || null,
+          local_bairro: formData.local_bairro || null,
+          local_cidade: formData.local_cidade || null,
+          local_estado: formData.local_estado || null,
+          
+          // Vistoriador (editável)
+          vistoriador_id: formData.vistoriador_id
+        };
+        
+        console.log('Dados para atualização (apenas campos editáveis):', dataToUpdate);
+        
+        const response = await vistoriaService.update(editingVistoria.id, dataToUpdate);
         console.log('Resposta da atualização:', response);
         
         setSuccess('Vistoria atualizada com sucesso!');
@@ -1113,31 +1177,31 @@ const Vistorias: React.FC = () => {
   const filteredVistorias = useMemo(() => {
     return vistorias.filter(vistoria => {
       const searchLower = debouncedSearchTerm.toLowerCase();
-      const embarcacaoNome = (vistoria.Embarcacao?.nome || vistoria.embarcacao?.nome || '').toLowerCase();
-      const embarcacaoNumero = (vistoria.Embarcacao?.nr_inscricao_barco || vistoria.embarcacao?.nr_inscricao_barco || '').toLowerCase();
-      const proprietarioCPF = (vistoria.Embarcacao?.proprietario_cpf || vistoria.embarcacao?.proprietario_cpf || '');
-      const localNome = (vistoria.Local?.nome_local || vistoria.local?.nome_local || '').toLowerCase();
-      const vistoriadorNome = vistoria.vistoriador?.nome?.toLowerCase() || '';
-      const vistoriadorId = vistoria.vistoriador_id?.toString() || '';
-      const statusNome = (vistoria.StatusVistoria?.nome || vistoria.statusVistoria?.nome || '').toLowerCase();
-      
+    const embarcacaoNome = (vistoria.Embarcacao?.nome || vistoria.embarcacao?.nome || '').toLowerCase();
+    const embarcacaoNumero = (vistoria.Embarcacao?.nr_inscricao_barco || vistoria.embarcacao?.nr_inscricao_barco || '').toLowerCase();
+    const proprietarioCPF = (vistoria.Embarcacao?.proprietario_cpf || vistoria.embarcacao?.proprietario_cpf || '');
+    const localNome = (vistoria.Local?.nome_local || vistoria.local?.nome_local || '').toLowerCase();
+    const vistoriadorNome = vistoria.vistoriador?.nome?.toLowerCase() || '';
+    const vistoriadorId = vistoria.vistoriador_id?.toString() || '';
+    const statusNome = (vistoria.StatusVistoria?.nome || vistoria.statusVistoria?.nome || '').toLowerCase();
+    
       // Filtro de texto geral (usa debouncedSearchTerm)
       const matchSearch = !debouncedSearchTerm || (
-        embarcacaoNome.includes(searchLower) ||
-        embarcacaoNumero.includes(searchLower) ||
-        localNome.includes(searchLower) ||
-        vistoriadorNome.includes(searchLower) ||
-        statusNome.includes(searchLower)
-      );
-      
-      // Filtro de CPF do proprietário
-      const matchCPF = !filtroCPF || proprietarioCPF.includes(filtroCPF.replace(/\D/g, ''));
-      
-      // Filtro de vistoriador
-      const matchVistoriador = !filtroVistoriador || vistoriadorId === filtroVistoriador;
-      
-      return matchSearch && matchCPF && matchVistoriador;
-    });
+      embarcacaoNome.includes(searchLower) ||
+      embarcacaoNumero.includes(searchLower) ||
+      localNome.includes(searchLower) ||
+      vistoriadorNome.includes(searchLower) ||
+      statusNome.includes(searchLower)
+    );
+    
+    // Filtro de CPF do proprietário
+    const matchCPF = !filtroCPF || proprietarioCPF.includes(filtroCPF.replace(/\D/g, ''));
+    
+    // Filtro de vistoriador
+    const matchVistoriador = !filtroVistoriador || vistoriadorId === filtroVistoriador;
+    
+    return matchSearch && matchCPF && matchVistoriador;
+  });
   }, [vistorias, debouncedSearchTerm, filtroCPF, filtroVistoriador]);
 
   if (loading) {
@@ -1359,12 +1423,88 @@ const Vistorias: React.FC = () => {
                 <TableCell>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <MapPin size={20} color="#3b82f6" />
-                    <div>
-                      <div style={{ fontWeight: '600' }}>{vistoria.Local?.nome_local || vistoria.local?.nome_local || 'N/A'}</div>
-                      <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-                        {vistoria.Local?.cidade || vistoria.local?.cidade || 'N/A'}, {vistoria.Local?.estado || vistoria.local?.estado || 'N/A'}
+                    <div style={{ flex: 1 }}>
+                      {(() => {
+                        const local = vistoria.Local || vistoria.local;
+                        const nomeLocal = local?.nome_local;
+                        const logradouro = local?.logradouro;
+                        const numero = local?.numero;
+                        const bairro = local?.bairro;
+                        const cidade = local?.cidade;
+                        const estado = local?.estado;
+                        const tipo = local?.tipo;
+                        
+                        // Construir endereço completo
+                        const enderecoCompleto = [
+                          logradouro,
+                          numero ? `nº ${numero}` : '',
+                          bairro ? `- ${bairro}` : '',
+                          cidade,
+                          estado
+                        ].filter(Boolean).join(', ');
+                        
+                        // Se tem nome do local (MARINA), mostrar ele primeiro
+                        // Se não tem nome mas tem endereço, mostrar endereço
+                        const titulo = nomeLocal || (enderecoCompleto ? enderecoCompleto : 'N/A');
+                        
+                        return (
+                          <>
+                            <div style={{ fontWeight: '600' }}>{titulo}</div>
+                            {nomeLocal && enderecoCompleto && (
+                              <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                                {enderecoCompleto}
                       </div>
+                            )}
+                            {!nomeLocal && enderecoCompleto && (
+                              <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                                {cidade && estado ? `${cidade}, ${estado}` : ''}
                     </div>
+                            )}
+                            {tipo && (
+                              <div style={{ 
+                                fontSize: '0.75rem', 
+                                color: '#3b82f6',
+                                fontWeight: '600',
+                                marginTop: '0.25rem',
+                                display: 'inline-block',
+                                padding: '0.125rem 0.5rem',
+                                borderRadius: '4px',
+                                background: '#eff6ff'
+                              }}>
+                                {tipo === 'MARINA' ? 'MARINA' : 'RESIDÊNCIA'}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                    {(vistoria.Local?.logradouro || vistoria.local?.logradouro) && (
+                      <button
+                        onClick={() => abrirNoMapa(vistoria)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '0.25rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#3b82f6',
+                          transition: 'all 0.2s'
+                        }}
+                        title="Abrir no Google Maps"
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = '#2563eb';
+                          e.currentTarget.style.transform = 'scale(1.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = '#3b82f6';
+                          e.currentTarget.style.transform = 'scale(1)';
+                        }}
+                      >
+                        <ExternalLink size={18} />
+                      </button>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -1416,31 +1556,38 @@ const Vistorias: React.FC = () => {
                       >
                         <Camera size={16} />
                       </IconButton>
-                      {vistoria.StatusVistoria?.nome === 'CONCLUIDA' && (
-                        <IconButton 
-                          variant="edit"
-                          onClick={() => navigate(`/vistorias/${vistoria.id}/laudo/novo`)}
-                          title="Criar/Editar Laudo"
-                          style={{ background: '#dcfce7', color: '#166534' }}
-                        >
-                          <FileText size={16} />
-                        </IconButton>
-                      )}
-                      <IconButton 
-                        variant="edit" 
-                        onClick={() => handleEdit(vistoria)}
-                        title="Editar vistoria (Admin)"
-                      >
-                        <Edit size={16} />
-                      </IconButton>
-                      {vistoria.StatusVistoria?.nome === 'PENDENTE' && (
-                        <IconButton 
-                          variant="delete" 
-                          onClick={() => handleDeleteClick(vistoria)}
-                          title="Excluir vistoria (apenas se PENDENTE)"
-                        >
-                          <Trash2 size={16} />
-                        </IconButton>
+                      {vistoria.StatusVistoria?.nome === 'EM_ANDAMENTO' ? (
+                        // Quando em andamento, mostrar apenas botão de fotos (já está acima)
+                        null
+                      ) : (
+                        <>
+                          {vistoria.StatusVistoria?.nome === 'CONCLUIDA' && (
+                            <IconButton 
+                              variant="edit"
+                              onClick={() => navigate(`/vistorias/${vistoria.id}/laudo/novo`)}
+                              title="Criar/Editar Laudo"
+                              style={{ background: '#dcfce7', color: '#166534' }}
+                            >
+                              <FileText size={16} />
+                            </IconButton>
+                          )}
+                          <IconButton 
+                            variant="edit" 
+                            onClick={() => handleEdit(vistoria)}
+                            title="Editar vistoria (Admin)"
+                          >
+                            <Edit size={16} />
+                          </IconButton>
+                          {vistoria.StatusVistoria?.nome === 'PENDENTE' && (
+                            <IconButton 
+                              variant="delete" 
+                              onClick={() => handleDeleteClick(vistoria)}
+                              title="Excluir vistoria (apenas se PENDENTE)"
+                            >
+                              <Trash2 size={16} />
+                            </IconButton>
+                          )}
+                        </>
                       )}
                     </ActionButtons>
                   </TableCell>
@@ -1473,6 +1620,27 @@ const Vistorias: React.FC = () => {
               </ModalTitle>
               <CloseButton onClick={() => setShowModal(false)}>&times;</CloseButton>
             </ModalHeader>
+
+            {editingVistoria && (
+              <div style={{
+                background: '#fef3c7',
+                border: '1px solid #f59e0b',
+                borderRadius: '8px',
+                padding: '1rem',
+                margin: '1rem 2rem',
+                fontSize: '0.875rem',
+                color: '#92400e'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <AlertCircle size={20} />
+                  <strong>Modo de Edição</strong>
+                </div>
+                <p style={{ margin: 0 }}>
+                  Você está editando uma vistoria existente. Apenas o <strong>endereço da vistoria</strong> e o <strong>vistoriador</strong> podem ser alterados.
+                  Os demais campos estão apenas para visualização. Para alterar outros dados, exclua esta vistoria e crie uma nova.
+                </p>
+              </div>
+            )}
 
             <Form onSubmit={handleSubmit}>
               {/* Seção da Embarcação */}
@@ -1790,6 +1958,11 @@ const Vistorias: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, embarcacao_nome: e.target.value })}
                   required
                   placeholder="Ex: Veleiro Azul"
+                  readOnly={!!editingVistoria}
+                  style={{
+                    backgroundColor: editingVistoria ? '#f9fafb' : 'white',
+                    cursor: editingVistoria ? 'not-allowed' : 'text'
+                  }}
                 />
               </FormGroup>
 
@@ -1802,6 +1975,11 @@ const Vistorias: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, embarcacao_nr_inscricao_barco: e.target.value })}
                   required
                   placeholder="Ex: BR123456789"
+                  readOnly={!!editingVistoria}
+                  style={{
+                    backgroundColor: editingVistoria ? '#f9fafb' : 'white',
+                    cursor: editingVistoria ? 'not-allowed' : 'text'
+                  }}
                 />
               </FormGroup>
 
@@ -1813,6 +1991,11 @@ const Vistorias: React.FC = () => {
                   value={formData.embarcacao_proprietario_nome}
                   onChange={(e) => setFormData({ ...formData, embarcacao_proprietario_nome: e.target.value })}
                   placeholder="Ex: João Silva"
+                  readOnly={!!editingVistoria}
+                  style={{
+                    backgroundColor: editingVistoria ? '#f9fafb' : 'white',
+                    cursor: editingVistoria ? 'not-allowed' : 'text'
+                  }}
                 />
               </FormGroup>
 
@@ -1825,7 +2008,11 @@ const Vistorias: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, embarcacao_proprietario_cpf: mascaraCPF(e.target.value) })}
                   placeholder="000.000.000-00"
                   maxLength={14}
-                  disabled={modoEmbarcacao === 'selecionar'}
+                  disabled={modoEmbarcacao === 'selecionar' || !!editingVistoria}
+                  style={{
+                    backgroundColor: (modoEmbarcacao === 'selecionar' || editingVistoria) ? '#f9fafb' : 'white',
+                    cursor: (modoEmbarcacao === 'selecionar' || editingVistoria) ? 'not-allowed' : 'text'
+                  }}
                 />
                 <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
                   {modoEmbarcacao === 'criar' && !cpfBusca 
@@ -1857,6 +2044,11 @@ const Vistorias: React.FC = () => {
                   }}
                   placeholder="(11) 99999-8888"
                   maxLength={15}
+                  readOnly={!!editingVistoria}
+                  style={{
+                    backgroundColor: editingVistoria ? '#f9fafb' : 'white',
+                    cursor: editingVistoria ? 'not-allowed' : 'text'
+                  }}
                 />
                 <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
                   Formato: (DD) 9XXXX-XXXX (opcional)
@@ -1871,6 +2063,11 @@ const Vistorias: React.FC = () => {
                   value={formData.embarcacao_proprietario_email}
                   onChange={(e) => setFormData({ ...formData, embarcacao_proprietario_email: e.target.value })}
                   placeholder="Ex: joao@email.com"
+                  readOnly={!!editingVistoria}
+                  style={{
+                    backgroundColor: editingVistoria ? '#f9fafb' : 'white',
+                    cursor: editingVistoria ? 'not-allowed' : 'text'
+                  }}
                 />
               </FormGroup>
 
@@ -1886,7 +2083,7 @@ const Vistorias: React.FC = () => {
                     // Carregar tipos permitidos da seguradora
                     if (segId > 0) {
                       try {
-                        const { seguradoraService } = await import('../services/api');
+                        // seguradoraService não é necessário aqui, os dados já vêm do cache
                         const seg = seguradoras.find((s: any) => s.id === segId);
                         if (seg && seg.tiposPermitidos) {
                           const tipos = seg.tiposPermitidos.map((t: any) => t.tipo_embarcacao);
@@ -1901,6 +2098,11 @@ const Vistorias: React.FC = () => {
                     }
                   }}
                   required
+                  disabled={!!editingVistoria}
+                  style={{
+                    backgroundColor: editingVistoria ? '#f9fafb' : 'white',
+                    cursor: editingVistoria ? 'not-allowed' : 'pointer'
+                  }}
                 >
                   <option value="0">Selecione a seguradora</option>
                   {seguradoras.map((seg: any) => (
@@ -1918,7 +2120,11 @@ const Vistorias: React.FC = () => {
                   value={formData.embarcacao_tipo}
                   onChange={(e) => setFormData({ ...formData, embarcacao_tipo: e.target.value })}
                   required
-                  disabled={!formData.seguradora_id || formData.seguradora_id === 0}
+                  disabled={!formData.seguradora_id || formData.seguradora_id === 0 || !!editingVistoria}
+                  style={{
+                    backgroundColor: editingVistoria ? '#f9fafb' : 'white',
+                    cursor: editingVistoria ? 'not-allowed' : 'pointer'
+                  }}
                 >
                   <option value="">
                     {formData.seguradora_id === 0 ? 'Selecione a seguradora primeiro' : 'Selecione o tipo'}
@@ -1948,6 +2154,11 @@ const Vistorias: React.FC = () => {
                   placeholder="Ex: 2020"
                   min="1900"
                   max="2100"
+                  readOnly={!!editingVistoria}
+                  style={{
+                    backgroundColor: editingVistoria ? '#f9fafb' : 'white',
+                    cursor: editingVistoria ? 'not-allowed' : 'text'
+                  }}
                 />
                 <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
                   Ano de fabricação da embarcação
@@ -2167,6 +2378,25 @@ const Vistorias: React.FC = () => {
               </SectionTitle>
 
               <FormGroup>
+                <Label htmlFor="valor_embarcacao" className="optional">Valor da Embarcação (R$)</Label>
+                <Input
+                  id="valor_embarcacao"
+                  type="text"
+                  value={formData.valor_embarcacao}
+                  onChange={(e) => setFormData({ ...formData, valor_embarcacao: mascaraValorMonetario(e.target.value) })}
+                  placeholder="0,00"
+                  readOnly={!!editingVistoria}
+                  style={{
+                    backgroundColor: editingVistoria ? '#f9fafb' : 'white',
+                    cursor: editingVistoria ? 'not-allowed' : 'text'
+                  }}
+                />
+                <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                  Valor da embarcação para fins de seguro
+                </small>
+              </FormGroup>
+
+              <FormGroup>
                 <Label htmlFor="valor_vistoria">Valor Total da Vistoria (R$)</Label>
                 <Input
                   id="valor_vistoria"
@@ -2174,6 +2404,11 @@ const Vistorias: React.FC = () => {
                   value={formData.valor_vistoria}
                   onChange={(e) => setFormData({ ...formData, valor_vistoria: mascaraValorMonetario(e.target.value) })}
                   placeholder="0,00"
+                  readOnly={!!editingVistoria}
+                  style={{
+                    backgroundColor: editingVistoria ? '#f9fafb' : 'white',
+                    cursor: editingVistoria ? 'not-allowed' : 'text'
+                  }}
                 />
                 <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
                   Valor total cobrado pela vistoria
@@ -2188,6 +2423,11 @@ const Vistorias: React.FC = () => {
                   value={formData.valor_vistoriador}
                   onChange={(e) => setFormData({ ...formData, valor_vistoriador: mascaraValorMonetario(e.target.value) })}
                   placeholder="0,00"
+                  readOnly={!!editingVistoria}
+                  style={{
+                    backgroundColor: editingVistoria ? '#f9fafb' : 'white',
+                    cursor: editingVistoria ? 'not-allowed' : 'text'
+                  }}
                 />
                 <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
                   Valor a ser pago ao vistoriador
@@ -2209,6 +2449,11 @@ const Vistorias: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, corretora_nome: e.target.value })}
                   required
                   placeholder="Ex: XYZ Corretora de Seguros"
+                  readOnly={!!editingVistoria}
+                  style={{
+                    backgroundColor: editingVistoria ? '#f9fafb' : 'white',
+                    cursor: editingVistoria ? 'not-allowed' : 'text'
+                  }}
                 />
                 <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
                   Nome completo da corretora responsável
@@ -2225,6 +2470,11 @@ const Vistorias: React.FC = () => {
                   required
                   placeholder="(11) 99999-8888"
                   maxLength={15}
+                  readOnly={!!editingVistoria}
+                  style={{
+                    backgroundColor: editingVistoria ? '#f9fafb' : 'white',
+                    cursor: editingVistoria ? 'not-allowed' : 'text'
+                  }}
                 />
                 <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
                   Telefone principal para contato
@@ -2240,6 +2490,11 @@ const Vistorias: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, corretora_email_laudo: e.target.value })}
                   required
                   placeholder="Ex: laudos@corretora.com.br"
+                  readOnly={!!editingVistoria}
+                  style={{
+                    backgroundColor: editingVistoria ? '#f9fafb' : 'white',
+                    cursor: editingVistoria ? 'not-allowed' : 'text'
+                  }}
                 />
                 <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
                   E-mail onde o laudo será enviado após aprovação

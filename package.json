@@ -10,7 +10,12 @@
     "install:all": "npm install && cd backend && npm install && cd ../frontend-react && npm install",
     "build": "cd frontend-react && npm run build",
     "test": "cd backend && npm test",
-    "test:coverage": "cd backend && npm run test:coverage"
+    "test:coverage": "cd backend && npm run test:coverage",
+    "test:backend": "cd backend && node scripts/testBackendCompleto.js",
+    "test:frontend": "cd frontend-react && node scripts/testFrontendCompleto.js",
+    "test:frontend:build": "cd frontend-react && npm run build",
+    "test:all": "npm run test:backend && npm run test:frontend",
+    "test:all:build": "npm run test:backend && npm run test:frontend && npm run test:frontend:build"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

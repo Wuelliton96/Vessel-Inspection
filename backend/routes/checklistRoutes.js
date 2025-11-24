@@ -305,26 +305,88 @@ router.get('/vistoria/:vistoria_id', requireAuth, requireVistoriador, async (req
 // PATCH /api/checklists/vistoria/item/:id/status - Atualizar status do item
 router.patch('/vistoria/item/:id/status', requireAuth, requireVistoriador, async (req, res) => {
   try {
-    const item = await VistoriaChecklistItem.findByPk(req.params.id);
+    console.log('=== ROTA PATCH /api/checklists/vistoria/item/:id/status ===');
+    console.log('Item ID:', req.params.id);
+    console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
+    console.log('Dados recebidos:', req.body);
+    
+    const item = await VistoriaChecklistItem.findByPk(req.params.id, {
+      include: [
+        {
+          model: Vistoria,
+          as: 'vistoria',
+          attributes: ['id', 'vistoriador_id']
+        }
+      ]
+    });
     
     if (!item) {
+      console.log('Item não encontrado');
+      console.log('=== FIM ROTA PATCH (404) ===\n');
       return res.status(404).json({ error: 'Item não encontrado' });
+    }
+    
+    // Verificar se o vistoriador pode atualizar este item
+    const isAdmin = req.user.NivelAcesso?.id === 1;
+    const isOwner = item.vistoria?.vistoriador_id === req.user.id;
+    
+    if (!isAdmin && !isOwner) {
+      console.log('Acesso negado - usuário não é admin nem dono da vistoria');
+      console.log('Vistoria vistoriador_id:', item.vistoria?.vistoriador_id);
+      console.log('Usuário ID:', req.user.id);
+      console.log('=== FIM ROTA PATCH (403) ===\n');
+      return res.status(403).json({ error: 'Acesso negado. Você não tem permissão para atualizar este item.' });
     }
     
     const { status, foto_id, observacao } = req.body;
     
+    console.log('Atualizando item com:');
+    console.log('  - status:', status);
+    console.log('  - foto_id:', foto_id);
+    console.log('  - observacao:', observacao);
+    
     const updateData = {};
-    if (status) updateData.status = status;
-    if (foto_id !== undefined) updateData.foto_id = foto_id;
-    if (observacao !== undefined) updateData.observacao = observacao;
-    if (status === 'CONCLUIDO') updateData.concluido_em = new Date();
+    if (status) {
+      updateData.status = status;
+      // Se está marcando como CONCLUIDO, definir concluido_em
+      if (status === 'CONCLUIDO') {
+        updateData.concluido_em = new Date();
+      } else if (status === 'PENDENTE') {
+        // Se está voltando para PENDENTE, limpar concluido_em
+        updateData.concluido_em = null;
+      }
+    }
+    if (foto_id !== undefined) {
+      updateData.foto_id = foto_id;
+    }
+    // Se status é CONCLUIDO e foto_id não foi fornecido, limpar foto_id (concluir sem foto)
+    if (status === 'CONCLUIDO' && foto_id === undefined) {
+      updateData.foto_id = null;
+    }
+    if (observacao !== undefined) {
+      updateData.observacao = observacao;
+    }
+    
+    console.log('Dados para atualização:', updateData);
     
     await item.update(updateData);
+    
+    // Recarregar item atualizado
+    await item.reload();
+    
+    console.log('Item atualizado com sucesso:');
+    console.log('  - ID:', item.id);
+    console.log('  - Status:', item.status);
+    console.log('  - Foto ID:', item.foto_id);
+    console.log('  - Concluído em:', item.concluido_em);
+    console.log('=== FIM ROTA PATCH (200) ===\n');
     
     res.json(item);
   } catch (error) {
     console.error('Erro ao atualizar status:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    console.error('Stack:', error.stack);
+    console.log('=== FIM ROTA PATCH (500) ===\n');
+    res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
   }
 });
 

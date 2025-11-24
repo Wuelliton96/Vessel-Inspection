@@ -14,6 +14,10 @@ const getImageCompressTransform = () => {
       quality: 75,
       mozjpeg: true,
       progressive: true
+    })
+    .on('error', (err) => {
+      // Tratar erros do sharp para evitar crash
+      console.error('[IMAGE_COMPRESS] Erro ao processar imagem:', err.message);
     });
 };
 

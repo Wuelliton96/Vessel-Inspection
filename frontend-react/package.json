@@ -28,6 +28,7 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "test:completo": "node scripts/testFrontendCompleto.js",
     "test:ci": "react-scripts test --coverage --watchAll=false --passWithNoTests",
     "test:coverage": "react-scripts test --coverage --watchAll=false",
     "eject": "react-scripts eject"

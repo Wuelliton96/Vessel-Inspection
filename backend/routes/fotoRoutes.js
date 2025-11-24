@@ -2,6 +2,8 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { Foto, Vistoria, TipoFotoChecklist, VistoriaChecklistItem } = require('../models');
 const { requireAuth, requireVistoriador } = require('../middleware/auth');
 const { getUploadConfig, getFileUrl, getFullPath, deleteFile, getStorageInfo, UPLOAD_STRATEGY } = require('../services/uploadService');
@@ -9,6 +11,38 @@ const logger = require('../utils/logger');
 
 // Configurar upload usando o service
 const upload = multer(getUploadConfig());
+
+// Middleware para tratar erros do multer
+const handleMulterError = (err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      logger.error('Erro de upload: Arquivo muito grande', { 
+        maxSize: '10MB',
+        error: err.message 
+      });
+      return res.status(400).json({ 
+        error: 'Arquivo muito grande. Tamanho máximo: 10MB' 
+      });
+    }
+    if (err.code === 'LIMIT_FILE_COUNT') {
+      logger.error('Erro de upload: Muitos arquivos', { error: err.message });
+      return res.status(400).json({ 
+        error: 'Muitos arquivos enviados. Envie apenas um arquivo por vez.' 
+      });
+    }
+    logger.error('Erro do multer:', { code: err.code, message: err.message });
+    return res.status(400).json({ 
+      error: `Erro no upload: ${err.message}` 
+    });
+  }
+  if (err) {
+    logger.error('Erro no upload:', { error: err.message, stack: err.stack });
+    return res.status(500).json({ 
+      error: 'Erro interno ao processar upload' 
+    });
+  }
+  next();
+};
 
 // Log das configurações ao iniciar (apenas em desenvolvimento)
 if (process.env.NODE_ENV !== 'production') {
@@ -66,7 +100,18 @@ router.get('/vistoria/:id', async (req, res) => {
 });
 
 // POST /api/fotos - Upload de foto para vistoria
-router.post('/', upload.single('foto'), async (req, res) => {
+router.post('/', upload.single('foto'), handleMulterError, async (req, res) => {
+  // Timeout específico para esta rota (25 segundos)
+  const timeout = setTimeout(() => {
+    if (!res.headersSent) {
+      logger.error('Timeout no upload de foto', { 
+        userId: req.user?.id,
+        vistoriaId: req.body?.vistoria_id 
+      });
+      res.status(408).json({ error: 'Upload timeout. Tente novamente com uma imagem menor.' });
+    }
+  }, 25000);
+
   try {
     console.log('=== ROTA POST /api/fotos ===');
     console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
@@ -146,12 +191,39 @@ router.post('/', upload.single('foto'), async (req, res) => {
       console.log(`Usando tipo de foto padrão: ${tipoFoto.nome_exibicao} (ID: ${tipoFoto.id})`);
     }
     
+    // Mover arquivo do diretório temporário para o diretório correto (se necessário)
+    if (UPLOAD_STRATEGY === 'local' && req.file.path) {
+      const tempPath = req.file.path;
+      const tempDir = path.dirname(tempPath);
+      
+      // Se o arquivo está no diretório temp, mover para o diretório correto
+      if (tempDir.includes('temp')) {
+        const vistoriaDir = path.join(__dirname, `../uploads/fotos/vistoria-${vistoria_id}`);
+        
+        // Criar diretório da vistoria se não existir
+        if (!fs.existsSync(vistoriaDir)) {
+          fs.mkdirSync(vistoriaDir, { recursive: true });
+          console.log(`[UPLOAD] Pasta criada: ${vistoriaDir}`);
+        }
+        
+        // Mover arquivo
+        const newPath = path.join(vistoriaDir, req.file.filename);
+        fs.renameSync(tempPath, newPath);
+        req.file.path = newPath;
+        req.file.destination = vistoriaDir;
+        
+        console.log(`[UPLOAD] Arquivo movido de temp para: vistoria-${vistoria_id}`);
+      }
+    }
+    
     // Obter key (S3) ou nome do arquivo (local) para salvar no banco
     console.log('\n[UPLOAD] Processando arquivo...');
     console.log('[UPLOAD] Estratégia:', UPLOAD_STRATEGY);
     console.log('[UPLOAD] req.file.key:', req.file.key);
     console.log('[UPLOAD] req.file.location:', req.file.location);
     console.log('[UPLOAD] req.file.filename:', req.file.filename);
+    console.log('[UPLOAD] req.file.path:', req.file.path);
+    console.log('[UPLOAD] req.file.destination:', req.file.destination);
     
     const filename = getFileUrl(req.file);
     console.log('[UPLOAD] Key/Filename a salvar no banco:', filename);
@@ -767,34 +839,83 @@ router.post('/', upload.single('foto'), async (req, res) => {
     }
     console.log('[UPLOAD] === FIM DO RESUMO ===\n');
     
-    res.status(201).json(resposta);
+    // Limpar timeout antes de enviar resposta
+    clearTimeout(timeout);
+    
+    if (!res.headersSent) {
+      res.status(201).json(resposta);
+    }
   } catch (error) {
+    // Limpar timeout em caso de erro
+    clearTimeout(timeout);
+    
     console.error('Erro ao criar foto:', error);
     console.error('Stack trace:', error.stack);
+    
+    // Limpar arquivo temporário se houver erro
+    if (req.file && req.file.path && UPLOAD_STRATEGY === 'local') {
+      try {
+        if (fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+          console.log('[UPLOAD] Arquivo temporário removido após erro');
+        }
+      } catch (cleanupError) {
+        console.error('[UPLOAD] Erro ao limpar arquivo temporário:', cleanupError);
+      }
+    }
+    
+    // Limpar arquivo do S3 se houver erro
+    if (req.file && req.file.key && UPLOAD_STRATEGY === 's3') {
+      try {
+        const { s3Client, bucket } = require('../config/aws');
+        const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
+        
+        const deleteCommand = new DeleteObjectCommand({
+          Bucket: bucket,
+          Key: req.file.key
+        });
+        
+        await s3Client.send(deleteCommand);
+        console.log('[UPLOAD] Arquivo removido do S3 após erro');
+      } catch (cleanupError) {
+        console.error('[UPLOAD] Erro ao limpar arquivo do S3:', cleanupError);
+      }
+    }
     
     // Garantir que sempre retornamos JSON
     const errorMessage = error.message || 'Erro interno do servidor';
     
     // Tratar erros específicos do S3
     if (error.name === 'AccessControlListNotSupported') {
-      return res.status(400).json({ 
-        error: 'O bucket S3 não permite ACLs. Configure as políticas do bucket para permitir acesso público aos objetos.' 
-      });
+      if (!res.headersSent) {
+        return res.status(400).json({ 
+          error: 'O bucket S3 não permite ACLs. Configure as políticas do bucket para permitir acesso público aos objetos.' 
+        });
+      }
+      return;
     }
     
     if (error.name === 'NoSuchBucket') {
-      return res.status(400).json({ 
-        error: 'Bucket S3 não encontrado. Verifique a configuração do AWS_S3_BUCKET.' 
-      });
+      if (!res.headersSent) {
+        return res.status(400).json({ 
+          error: 'Bucket S3 não encontrado. Verifique a configuração do AWS_S3_BUCKET.' 
+        });
+      }
+      return;
     }
     
     if (error.name === 'InvalidAccessKeyId' || error.name === 'SignatureDoesNotMatch') {
-      return res.status(401).json({ 
-        error: 'Credenciais AWS inválidas. Verifique AWS_ACCESS_KEY_ID e AWS_SECRET_ACCESS_KEY.' 
-      });
+      if (!res.headersSent) {
+        return res.status(401).json({ 
+          error: 'Credenciais AWS inválidas. Verifique AWS_ACCESS_KEY_ID e AWS_SECRET_ACCESS_KEY.' 
+        });
+      }
+      return;
     }
     
-    res.status(500).json({ error: errorMessage });
+    if (!res.headersSent) {
+      res.status(500).json({ error: errorMessage });
+    }
   }
 });
 
