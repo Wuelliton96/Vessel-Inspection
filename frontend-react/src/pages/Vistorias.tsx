@@ -1547,62 +1547,71 @@ const Vistorias: React.FC = () => {
                 </TableCell>
                 {isAdmin && (
                   <TableCell>
-                    <ActionButtons>
-                      <IconButton 
-                        variant="edit" 
-                        onClick={() => navigate(`/vistoria/${vistoria.id}/fotos`)}
-                        title="Ver fotos da vistoria"
-                        style={{ background: '#dbeafe', color: '#1e40af' }}
-                      >
-                        <Camera size={16} />
-                      </IconButton>
-                      {vistoria.StatusVistoria?.nome === 'EM_ANDAMENTO' ? (
-                        // Quando em andamento, mostrar apenas botão de fotos (já está acima)
-                        null
-                      ) : (
-                        <>
-                          {vistoria.StatusVistoria?.nome === 'CONCLUIDA' && (
-                            <IconButton 
-                              variant="edit"
-                              onClick={() => navigate(`/vistorias/${vistoria.id}/laudo/novo`)}
-                              title="Criar/Editar Laudo"
-                              style={{ background: '#dcfce7', color: '#166534' }}
-                            >
-                              <FileText size={16} />
-                            </IconButton>
-                          )}
+                    {vistoria.StatusVistoria?.nome === 'CONCLUIDA' ? (
+                      // Quando concluída, não mostrar nenhuma ação
+                      <span style={{ color: '#6b7280', fontSize: '0.875rem', fontStyle: 'italic' }}>
+                        Nenhuma ação disponível
+                      </span>
+                    ) : (
+                      <ActionButtons>
+                        {vistoria.StatusVistoria?.nome === 'EM_ANDAMENTO' ? (
+                          // Quando em andamento, mostrar apenas botão de fotos
                           <IconButton 
                             variant="edit" 
-                            onClick={() => handleEdit(vistoria)}
-                            title="Editar vistoria (Admin)"
+                            onClick={() => navigate(`/vistoria/${vistoria.id}/fotos`)}
+                            title="Ver fotos da vistoria"
+                            style={{ background: '#dbeafe', color: '#1e40af' }}
                           >
-                            <Edit size={16} />
+                            <Camera size={16} />
                           </IconButton>
-                          {vistoria.StatusVistoria?.nome === 'PENDENTE' && (
+                        ) : (
+                          <>
                             <IconButton 
-                              variant="delete" 
-                              onClick={() => handleDeleteClick(vistoria)}
-                              title="Excluir vistoria (apenas se PENDENTE)"
+                              variant="edit" 
+                              onClick={() => navigate(`/vistoria/${vistoria.id}/fotos`)}
+                              title="Ver fotos da vistoria"
+                              style={{ background: '#dbeafe', color: '#1e40af' }}
                             >
-                              <Trash2 size={16} />
+                              <Camera size={16} />
                             </IconButton>
-                          )}
-                        </>
-                      )}
-                    </ActionButtons>
+                            <IconButton 
+                              variant="edit" 
+                              onClick={() => handleEdit(vistoria)}
+                              title="Editar vistoria (Admin)"
+                            >
+                              <Edit size={16} />
+                            </IconButton>
+                            {vistoria.StatusVistoria?.nome === 'PENDENTE' && (
+                              <IconButton 
+                                variant="delete" 
+                                onClick={() => handleDeleteClick(vistoria)}
+                                title="Excluir vistoria (apenas se PENDENTE)"
+                              >
+                                <Trash2 size={16} />
+                              </IconButton>
+                            )}
+                          </>
+                        )}
+                      </ActionButtons>
+                    )}
                   </TableCell>
                 )}
                 {!isAdmin && (
                   <TableCell>
-                    <ActionButtons>
-                      <IconButton 
-                        variant="edit" 
-                        onClick={() => navigate(`/vistoria/${vistoria.id}`)}
-                        title="Realizar vistoria"
-                      >
-                        <ClipboardCheck size={16} />
-                      </IconButton>
-                    </ActionButtons>
+                    {vistoria.StatusVistoria?.nome === 'CONCLUIDA' ? (
+                      // Quando concluída, não mostrar nenhuma ação
+                      <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Nenhuma ação disponível</span>
+                    ) : (
+                      <ActionButtons>
+                        <IconButton 
+                          variant="edit" 
+                          onClick={() => navigate(`/vistoria/${vistoria.id}`)}
+                          title="Realizar vistoria"
+                        >
+                          <ClipboardCheck size={16} />
+                        </IconButton>
+                      </ActionButtons>
+                    )}
                   </TableCell>
                 )}
               </TableRow>
