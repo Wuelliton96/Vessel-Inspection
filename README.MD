@@ -1,4 +1,4 @@
-# 🚢 SGVN - Sistema de Gerenciamento de Vistorias Náuticas
+# SGVN - Sistema de Gerenciamento de Vistorias Náuticas
 
 [![CI/CD](https://github.com/Wuelliton96/Vessel-Inspection/actions/workflows/ci.yml/badge.svg)](https://github.com/Wuelliton96/Vessel-Inspection/actions)
 [![Coverage](https://codecov.io/gh/Wuelliton96/Vessel-Inspection/branch/main/graph/badge.svg)](https://codecov.io/gh/Wuelliton96/Vessel-Inspection)
@@ -8,26 +8,26 @@ Sistema completo para gerenciamento de vistorias náuticas com geração automá
 
 ---
 
-## 🎯 Sobre o Projeto
+## Sobre o Projeto
 
 Sistema desenvolvido como Trabalho de Conclusão de Curso (TCC) para gerenciar vistorias náuticas, incluindo:
 
-- ✅ Cadastro de embarcações e locais
-- ✅ Gerenciamento de vistorias
-- ✅ Upload de fotos com checklist
-- ✅ **Geração automática de laudos em PDF**
-- ✅ Sistema de pagamentos para vistoriadores
-- ✅ Dashboard administrativo
-- ✅ Controle de acesso (Admin/Vistoriador)
-- ✅ **Integração com API ViaCEP** (consulta de endereços)
-- ✅ **Segurança robusta** (Rate Limiting, XSS Protection, Helmet)
-- ✅ **Testes automatizados** (75% backend, 25% frontend)
-- ✅ **CI/CD completo** (GitHub Actions)
-- ✅ **Monitoramento em produção** (New Relic APM)
+- Cadastro de embarcações e locais
+- Gerenciamento de vistorias
+- Upload de fotos com checklist
+- **Geração automática de laudos em PDF**
+- Sistema de pagamentos para vistoriadores
+- Dashboard administrativo
+- Controle de acesso (Admin/Vistoriador)
+- **Integração com API ViaCEP** (consulta de endereços)
+- **Segurança robusta** (Rate Limiting, XSS Protection, Helmet)
+- **Testes automatizados** (75% backend, 25% frontend)
+- **CI/CD completo** (GitHub Actions)
+- **Monitoramento em produção** (New Relic APM)
 
 ---
 
-## 🏗️ Arquitetura
+## Arquitetura
 
 ```
 ┌─────────────┐      ┌──────────────┐      ┌──────────────┐
@@ -69,7 +69,7 @@ Sistema desenvolvido como Trabalho de Conclusão de Curso (TCC) para gerenciar v
 
 ---
 
-## 📋 Pré-requisitos
+## Pré-requisitos
 
 - **Node.js** 18.x ou superior
 - **PostgreSQL** 15.x ou superior
@@ -78,7 +78,7 @@ Sistema desenvolvido como Trabalho de Conclusão de Curso (TCC) para gerenciar v
 
 ---
 
-## ⚙️ Instalação Local
+## Instalação Local
 
 ### 1. Clone o repositório
 ```bash
@@ -142,7 +142,7 @@ echo "REACT_APP_API_URL=http://localhost:3000" > .env
 
 ---
 
-## ▶️ Executando o Projeto
+## Executando o Projeto
 
 ### Modo Desenvolvimento:
 
@@ -168,7 +168,7 @@ Senha: admin123
 
 ---
 
-## 🧪 Testes
+## Testes
 
 ### Backend (Meta: 75% cobertura)
 ```bash
@@ -196,14 +196,14 @@ npm test -- --coverage --watchAll=false
 ```
 
 ### Cobertura Atual:
-- ✅ Backend: **107 testes** criados
-- ✅ Frontend: **36 testes** criados
-- ✅ Model Laudo: **100%** cobertura
-- ✅ Utils Validators: **100%** cobertura
+- Backend: **107 testes** criados
+- Frontend: **36 testes** criados
+- Model Laudo: **100%** cobertura
+- Utils Validators: **100%** cobertura
 
 ---
 
-## 🚀 Deploy em Produção
+## Deploy em Produção
 
 ### 1. Backend - AWS Elastic Beanstalk
 
@@ -262,7 +262,7 @@ Após configurar, todo push na branch `main` fará deploy automático!
 
 ---
 
-## 📊 Monitoramento - New Relic
+## Monitoramento - New Relic
 
 ### Ativar New Relic:
 
@@ -276,13 +276,13 @@ NODE_ENV=production
 ```
 
 ### O que é monitorado:
-- ✅ Performance de todas as rotas
-- ✅ Tempo de resposta de cada endpoint
-- ✅ Erros e exceções em tempo real
-- ✅ Performance do banco de dados
-- ✅ Memória e CPU
-- ✅ Throughput (requisições/segundo)
-- ✅ Distributed tracing
+- Performance de todas as rotas
+- Tempo de resposta de cada endpoint
+- Erros e exceções em tempo real
+- Performance do banco de dados
+- Memória e CPU
+- Throughput (requisições/segundo)
+- Distributed tracing
 
 ### Acessar dashboards:
 ```
@@ -291,7 +291,7 @@ https://one.newrelic.com
 
 ---
 
-## 🔍 Análise de Código - SonarCloud
+## Análise de Código - SonarCloud
 
 ### Configuração:
 
@@ -308,7 +308,7 @@ https://one.newrelic.com
 
 ---
 
-## 📁 Estrutura do Projeto
+## Estrutura do Projeto
 
 ```
 Vessel-Inspection/
@@ -347,7 +347,7 @@ Vessel-Inspection/
 
 ---
 
-## 🎓 Funcionalidades Principais
+## Funcionalidades Principais
 
 ### 1. **Sistema de Vistorias**
 - Criar e gerenciar vistorias
@@ -376,30 +376,30 @@ Vessel-Inspection/
 
 ---
 
-## 🔐 Níveis de Acesso
+## Níveis de Acesso
 
 ### ADMINISTRADOR
-- ✅ Gerenciar usuários
-- ✅ Criar vistorias
-- ✅ **Criar e gerenciar laudos**
-- ✅ Aprovar vistorias
-- ✅ Processar pagamentos
-- ✅ Acesso total ao sistema
+- Gerenciar usuários
+- Criar vistorias
+- **Criar e gerenciar laudos**
+- Aprovar vistorias
+- Processar pagamentos
+- Acesso total ao sistema
 
 ### VISTORIADOR
-- ✅ Ver vistorias atribuídas
-- ✅ Realizar vistorias
-- ✅ Upload de fotos
-- ✅ Preencher checklists
+- Ver vistorias atribuídas
+- Realizar vistorias
+- Upload de fotos
+- Preencher checklists
 
 ---
 
-## 📊 Monitoramento e Qualidade
+## Monitoramento e Qualidade
 
 ### Métricas de Cobertura de Testes:
 ```bash
-Backend:  107 testes (Meta: 75%) ✅
-Frontend:  36 testes (Meta: 25%) ✅
+Backend:  107 testes (Meta: 75%)
+Frontend:  36 testes (Meta: 25%)
 ```
 
 ### Health Check:
@@ -424,11 +424,123 @@ backend/logs/
 
 ---
 
-## 🤝 Contribuindo
+## Convenções de Commit
+
+Este projeto segue o padrão **Conventional Commits** para facilitar a leitura do histórico e a geração automática de changelogs. Abaixo está a explicação de cada tipo de commit:
+
+### Tipos de Commit:
+
+**feat:** Nova funcionalidade
+- Adiciona uma nova feature ao sistema
+- Exemplo: `feat: adicionar geração de PDF para laudos`
+- Quando usar: Ao implementar algo novo que o usuário vai usar
+
+**fix:** Correção de bug
+- Corrige um problema existente no código
+- Exemplo: `fix: corrigir erro ao salvar vistoria sem local`
+- Quando usar: Ao corrigir algo que estava quebrado
+
+**chore:** Tarefas de manutenção
+- Mudanças que não afetam o código de produção diretamente
+- Exemplo: `chore: atualizar dependências do package.json`
+- Quando usar: Para atualizar dependências, configurar ferramentas, ajustar scripts de build, etc.
+
+**docs:** Documentação
+- Mudanças apenas na documentação
+- Exemplo: `docs: atualizar README com instruções de instalação`
+- Quando usar: Ao atualizar README, comentários no código, ou qualquer documentação
+
+**style:** Formatação de código
+- Mudanças que não alteram a lógica (espaços, ponto e vírgula, etc.)
+- Exemplo: `style: corrigir indentação no arquivo LaudoForm.tsx`
+- Quando usar: Ao ajustar formatação, espaçamento, ou estilo do código sem mudar funcionalidade
+
+**refactor:** Refatoração
+- Reorganização do código sem mudar funcionalidade
+- Exemplo: `refactor: reorganizar estrutura de pastas do backend`
+- Quando usar: Ao melhorar a estrutura do código sem adicionar features ou corrigir bugs
+
+**test:** Testes
+- Adição ou correção de testes
+- Exemplo: `test: adicionar testes para geração de laudo PDF`
+- Quando usar: Ao criar ou modificar testes automatizados
+
+**perf:** Melhorias de performance
+- Otimizações que melhoram a velocidade ou uso de recursos
+- Exemplo: `perf: otimizar consulta de vistorias no banco de dados`
+- Quando usar: Ao melhorar a performance do sistema
+
+**ci:** Configuração de CI/CD
+- Mudanças em arquivos de integração contínua
+- Exemplo: `ci: adicionar step de análise SonarCloud no GitHub Actions`
+- Quando usar: Ao modificar workflows, scripts de deploy, ou configurações de CI/CD
+
+**build:** Sistema de build
+- Mudanças que afetam o processo de build ou dependências
+- Exemplo: `build: atualizar webpack para versão 5`
+- Quando usar: Ao modificar ferramentas de build, compiladores, ou dependências de desenvolvimento
+
+**revert:** Reverter commit anterior
+- Desfaz mudanças de um commit anterior
+- Exemplo: `revert: reverter commit abc123 que causou erro`
+- Quando usar: Ao desfazer um commit que causou problemas
+
+### Formato do Commit:
+
+```
+<tipo>(<escopo>): <descrição curta>
+
+<corpo opcional com mais detalhes>
+
+<rodapé opcional com referências>
+```
+
+**Exemplos práticos:**
+
+```
+feat(laudos): adicionar geração de PDF com fotos
+
+Implementa a funcionalidade de gerar PDFs dos laudos incluindo
+as fotos anexadas na vistoria. O PDF é gerado usando pdf-lib
+e salvo no diretório uploads/laudos.
+
+Closes #123
+```
+
+```
+fix(vistorias): corrigir erro ao editar vistoria sem local
+
+O sistema estava quebrando quando tentava editar uma vistoria
+que não tinha local associado. Agora valida se o local existe
+antes de tentar acessar suas propriedades.
+
+Fixes #456
+```
+
+```
+chore: atualizar dependências do backend
+
+Atualiza todas as dependências do package.json para suas
+versões mais recentes, incluindo express, sequelize e jwt.
+
+BREAKING CHANGE: Sequelize agora requer Node.js 18+
+```
+
+### Por que usar essas convenções?
+
+1. **Histórico claro:** Facilita entender o que cada commit fez
+2. **Changelog automático:** Ferramentas podem gerar changelogs automaticamente
+3. **Filtragem:** Permite filtrar commits por tipo (ex: ver só correções de bugs)
+4. **Padrão da indústria:** É o padrão usado por grandes projetos open source
+5. **Melhor colaboração:** Outros desenvolvedores entendem rapidamente o que mudou
+
+---
+
+## Contribuindo
 
 1. Fork o projeto
 2. Crie uma branch (`git checkout -b feature/NovaFuncionalidade`)
-3. Commit suas mudanças (`git commit -m 'feat: Nova funcionalidade'`)
+3. Commit suas mudanças seguindo as [Convenções de Commit](#convenções-de-commit) (`git commit -m 'feat: Nova funcionalidade'`)
 4. Push para a branch (`git push origin feature/NovaFuncionalidade`)
 5. Abra um Pull Request
 
@@ -440,33 +552,33 @@ backend/logs/
 
 ---
 
-## 📝 Licença
+## Licença
 
 Este projeto é um Trabalho de Conclusão de Curso (TCC).
 
 ---
 
-## 👨‍💻 Autor
+## Autor
 
 **Wuelliton**  
 Projeto TCC - Sistema de Gerenciamento de Vistorias Náuticas
 
 ---
 
-## 📞 Suporte e Documentação
+## Suporte e Documentação
 
-### 📚 Documentação Completa (NOVA!)
+### Documentação Completa (NOVA!)
 
 **Criamos uma documentação abrangente do projeto:**
 
-- 📑 **[ÍNDICE](./INDICE_DOCUMENTACAO.md)** - Comece aqui para navegar pela documentação
-- ⭐ **[COMO USAR](./COMO_USAR_DOCUMENTACAO.md)** - Guia de como usar os documentos
-- 📄 **[RESUMO EXECUTIVO](./RESUMO_EXECUTIVO.md)** - Visão resumida do projeto (5 páginas)
-- 📖 **[WIKI COMPLETO](./WIKI.md)** - Documentação técnica completa (100+ páginas)
-- 🔍 **[REVIEW RFC vs IMPLEMENTAÇÃO](./REVIEW_RFC_VS_IMPLEMENTACAO.md)** - Análise comparativa (60 páginas)
-- 🗺️ **[ROADMAP](./ROADMAP.md)** - Próximos passos e pendências (30 páginas)
+- **[ÍNDICE](./INDICE_DOCUMENTACAO.md)** - Comece aqui para navegar pela documentação
+- **[COMO USAR](./COMO_USAR_DOCUMENTACAO.md)** - Guia de como usar os documentos
+- **[RESUMO EXECUTIVO](./RESUMO_EXECUTIVO.md)** - Visão resumida do projeto (5 páginas)
+- **[WIKI COMPLETO](./WIKI.md)** - Documentação técnica completa (100+ páginas)
+- **[REVIEW RFC vs IMPLEMENTAÇÃO](./REVIEW_RFC_VS_IMPLEMENTACAO.md)** - Análise comparativa (60 páginas)
+- **[ROADMAP](./ROADMAP.md)** - Próximos passos e pendências (30 páginas)
 
-### 📋 Documentação Anterior
+### Documentação Anterior
 
 Para dúvidas ou problemas:
 - Abra uma [Issue](https://github.com/Wuelliton96/Vessel-Inspection/issues)
@@ -476,14 +588,14 @@ Para dúvidas ou problemas:
 
 ---
 
-## 🎓 Critérios TCC - STATUS
+## Critérios TCC - STATUS
 
 | Critério | Status |
 |----------|--------|
-| ✅ Projeto em produção | Configurado (AWS + Render) |
-| ✅ Deploy automático | GitHub Actions |
-| ✅ Cobertura 75%/25% | 129 testes backend, 40 frontend |
-| ✅ Análise de código | SonarCloud |
-| ✅ Monitoramento | New Relic APM |
+| Projeto em produção | Configurado (AWS + Render) |
+| Deploy automático | GitHub Actions |
+| Cobertura 75%/25% | 129 testes backend, 40 frontend |
+| Análise de código | SonarCloud |
+| Monitoramento | New Relic APM |
 
-**Sistema pronto para apresentação! 🚀**
+**Sistema pronto para apresentação!**
