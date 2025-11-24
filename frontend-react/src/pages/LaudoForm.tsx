@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { FileText, Save, FileCheck, ArrowLeft, Loader } from 'lucide-react';
-import { laudoService } from '../services/api';
-import { Laudo, ChecklistEletrica, ChecklistHidraulica, ChecklistGeral } from '../types';
+import { laudoService, vistoriaService } from '../services/api';
+import { Laudo } from '../types';
 
 const Container = styled.div`
   padding: 2rem;
@@ -231,10 +231,26 @@ const LaudoForm: React.FC = () => {
 
   const tentarCarregarLaudoExistente = async () => {
     try {
+      // Primeiro, tentar buscar laudo existente
       const data = await laudoService.buscarPorVistoria(Number(vistoriaId));
       setFormData(data);
     } catch (err) {
       console.log('Nenhum laudo existente, criando novo');
+      // Se não existir laudo, carregar dados da vistoria para preencher o formulário
+      try {
+        const vistoria = await vistoriaService.getById(Number(vistoriaId));
+        setFormData(prev => ({
+          ...prev,
+          vistoria_id: vistoria.id,
+          nome_moto_aquatica: vistoria.Embarcacao?.nome || '',
+          proprietario: vistoria.Embarcacao?.proprietario_nome || vistoria.Embarcacao?.Cliente?.nome || '',
+          cpf_cnpj: vistoria.Embarcacao?.proprietario_cpf || vistoria.Embarcacao?.Cliente?.cpf || vistoria.Embarcacao?.Cliente?.cnpj || '',
+          data_inspecao: vistoria.data_conclusao || vistoria.data_inicio || new Date().toISOString().split('T')[0],
+          valor_risco: vistoria.valor_embarcacao || 0
+        }));
+      } catch (vistoriaErr) {
+        console.error('Erro ao carregar dados da vistoria:', vistoriaErr);
+      }
     }
   };
 
@@ -284,7 +300,7 @@ const LaudoForm: React.FC = () => {
 
       setGenerating(true);
       
-      const resultado = await laudoService.gerarPDF(formData.id);
+      await laudoService.gerarPDF(formData.id);
       
       alert('PDF gerado com sucesso!');
       

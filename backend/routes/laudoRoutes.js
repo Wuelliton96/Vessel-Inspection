@@ -15,19 +15,28 @@ router.get('/', async (req, res) => {
         {
           model: Vistoria,
           as: 'Vistoria',
+          required: false, // LEFT JOIN para não excluir laudos sem vistoria
           include: [
-            { model: Embarcacao, as: 'Embarcacao' },
-            { model: StatusVistoria, as: 'StatusVistoria' }
+            { 
+              model: Embarcacao, 
+              as: 'Embarcacao',
+              required: false 
+            },
+            { 
+              model: StatusVistoria, 
+              as: 'StatusVistoria',
+              required: false 
+            }
           ]
         }
       ],
       order: [['created_at', 'DESC']]
     });
     
-    res.json(laudos);
+    res.json(laudos || []);
   } catch (error) {
     console.error('Erro ao listar laudos:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
   }
 });
 

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { FileText, Download, Plus, Edit2, Trash2, Eye, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
-import { laudoService } from '../services/api';
-import { Laudo } from '../types';
+import { FileText, Download, Plus, Edit2, Trash2, CheckCircle, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { laudoService, vistoriaService } from '../services/api';
+import { Laudo, Vistoria } from '../types';
 
 const Container = styled.div`
   padding: 2rem;
@@ -117,14 +118,13 @@ const Laudos: React.FC = () => {
   const [laudos, setLaudos] = useState<Laudo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [laudoToDelete, setLaudoToDelete] = useState<Laudo | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const [vistoriasConcluidas, setVistoriasConcluidas] = useState<Vistoria[]>([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
     carregarLaudos();
+    carregarVistoriasConcluidas();
   }, []);
 
   const carregarLaudos = async () => {
@@ -132,12 +132,36 @@ const Laudos: React.FC = () => {
       setLoading(true);
       setError(null);
       const data = await laudoService.listar();
-      setLaudos(data);
+      setLaudos(data || []);
     } catch (err: any) {
       console.error('Erro ao carregar laudos:', err);
       setError(err.response?.data?.error || 'Erro ao carregar laudos');
+      setLaudos([]); // Garantir que laudos seja um array vazio em caso de erro
     } finally {
       setLoading(false);
+    }
+  };
+
+  const carregarVistoriasConcluidas = async () => {
+    try {
+      const todasVistorias = await vistoriaService.getAll();
+      // Filtrar apenas vistorias concluídas
+      const concluidas = todasVistorias.filter(v => 
+        v.StatusVistoria?.nome === 'CONCLUIDA' || v.status_id === 3
+      );
+      
+      // Buscar quais já têm laudo
+      const laudosExistentes = await laudoService.listar().catch(() => []);
+      const vistoriaIdsComLaudo = new Set(
+        (laudosExistentes || []).map((l: Laudo) => l.vistoria_id)
+      );
+      
+      // Filtrar apenas as que não têm laudo
+      const semLaudo = concluidas.filter(v => !vistoriaIdsComLaudo.has(v.id));
+      setVistoriasConcluidas(semLaudo);
+    } catch (err: any) {
+      console.error('Erro ao carregar vistorias concluídas:', err);
+      setVistoriasConcluidas([]);
     }
   };
 
@@ -206,13 +230,64 @@ const Laudos: React.FC = () => {
         </ErrorState>
       )}
 
+      {/* Seção de Vistorias Concluídas sem Laudo */}
+      {vistoriasConcluidas.length > 0 && (
+        <Card style={{ marginBottom: '2rem' }}>
+          <div style={{ padding: '1.5rem', borderBottom: '1px solid #e5e7eb' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1f2937', marginBottom: '0.5rem' }}>
+              Vistorias Concluídas Aguardando Laudo
+            </h2>
+            <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+              {vistoriasConcluidas.length} vistoria(s) concluída(s) sem laudo. Clique para criar o laudo.
+            </p>
+          </div>
+          <div style={{ padding: '1rem' }}>
+            {vistoriasConcluidas.map((vistoria) => (
+              <div
+                key={vistoria.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '1rem',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '0.5rem',
+                  marginBottom: '0.5rem',
+                  background: '#f9fafb'
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: '600', color: '#1f2937', marginBottom: '0.25rem' }}>
+                    Vistoria #{vistoria.id} - {vistoria.Embarcacao?.nome || 'N/A'}
+                  </div>
+                  <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                    Concluída em: {vistoria.data_conclusao ? new Date(vistoria.data_conclusao).toLocaleDateString('pt-BR') : 'N/A'}
+                  </div>
+                </div>
+                <ActionButton
+                  variant="edit"
+                  onClick={() => navigate(`/vistorias/${vistoria.id}/laudo/novo`)}
+                  title="Criar Laudo"
+                  style={{ background: '#10b981' }}
+                >
+                  <Plus size={16} />
+                  Criar Laudo
+                </ActionButton>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <Card>
         {laudos.length === 0 ? (
           <EmptyState>
             <FileText size={48} style={{ margin: '0 auto 1rem' }} />
             <p>Nenhum laudo encontrado</p>
             <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
-              Os laudos são criados após a conclusão das vistorias
+              {vistoriasConcluidas.length > 0 
+                ? 'Crie um laudo para uma das vistorias concluídas acima'
+                : 'Os laudos são criados após a conclusão das vistorias'}
             </p>
           </EmptyState>
         ) : (

@@ -41,25 +41,8 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false
 }));
 
-// Rate Limiting - Prevencao contra brute force
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // Limite de 100 requisicoes por IP
-  message: 'Muitas requisicoes deste IP, tente novamente em 15 minutos.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 5, // Apenas 5 tentativas de login
-  message: 'Muitas tentativas de login. Tente novamente em 15 minutos.',
-  skipSuccessfulRequests: true,
-});
-
-app.use('/api/', limiter);
-app.use('/api/auth/login', authLimiter);
-
+// Configuração CORS - DEVE VIR ANTES DO RATE LIMITING
+// Permitir origens do Vercel e localhost
 app.use(cors({
   origin: function(origin, callback) {
     const allowedOrigins = [
@@ -71,23 +54,97 @@ app.use(cors({
       'http://127.0.0.1:5173'
     ];
     
-    // Permitir requisições sem origin (mobile apps, curl, etc)
-    if (!origin) return callback(null, true);
+    // Adicionar origens do Vercel se configuradas
+    if (process.env.FRONTEND_URL) {
+      allowedOrigins.push(process.env.FRONTEND_URL);
+    }
+    if (process.env.VERCEL_URL) {
+      allowedOrigins.push(`https://${process.env.VERCEL_URL}`);
+    }
     
+    // Permitir requisições sem origin (mobile apps, curl, Postman, etc)
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    // Verificar se a origem está na lista permitida
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      // Em produção, não logar origens bloqueadas
+      // Em produção, permitir todas as origens do Vercel (vercel.app, vercel.com)
+      if (process.env.NODE_ENV === 'production') {
+        // Permitir qualquer subdomínio do Vercel
+        if (origin.includes('.vercel.app') || origin.includes('.vercel.com')) {
+          return callback(null, true);
+        }
+        // Permitir domínios customizados configurados
+        if (process.env.ALLOWED_ORIGINS) {
+          const customOrigins = process.env.ALLOWED_ORIGINS.split(',');
+          if (customOrigins.includes(origin)) {
+            return callback(null, true);
+          }
+        }
+      }
+      
+      // Em desenvolvimento, logar e permitir para debug
       if (process.env.NODE_ENV !== 'production') {
         logger.warn('Origem não permitida pelo CORS:', origin);
+        callback(null, true); // Permitir em desenvolvimento
+      } else {
+        // Em produção, bloquear origens não permitidas
+        callback(new Error('Not allowed by CORS'));
       }
-      callback(null, true); // Temporariamente permitir todas para debug
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
+  maxAge: 86400 // Cache preflight por 24 horas
 }));
+
+// Handler explícito para OPTIONS (preflight) - garantir que sempre funcione
+// DEVE VIR ANTES DO RATE LIMITING
+// Usar middleware ao invés de rota específica para evitar conflito com path-to-regexp
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400'); // Cache por 24 horas
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// Rate Limiting - Prevencao contra brute force
+// IMPORTANTE: Ignorar requisições OPTIONS (preflight CORS) para não bloquear
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100, // Limite de 100 requisicoes por IP
+  message: 'Muitas requisicoes deste IP, tente novamente em 15 minutos.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    // Ignorar requisições OPTIONS (preflight CORS)
+    return req.method === 'OPTIONS';
+  }
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 5, // Apenas 5 tentativas de login
+  message: 'Muitas tentativas de login. Tente novamente em 15 minutos.',
+  skipSuccessfulRequests: true,
+  skip: (req) => {
+    // Ignorar requisições OPTIONS (preflight CORS)
+    return req.method === 'OPTIONS';
+  }
+});
+
+app.use('/api/', limiter);
+app.use('/api/auth/login', authLimiter);
 
 // Configurar limites para JSON e URL encoded (importante para uploads)
 app.use(express.json({ limit: '50mb' })); // Aumentar limite para uploads grandes

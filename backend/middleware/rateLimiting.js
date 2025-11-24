@@ -39,12 +39,18 @@ function createRateLimiter(options = {}) {
   const {
     windowMs = 15 * 60 * 1000, // 15 minutos
     max = 100, // 100 requisições
+    skip = (req) => req.method === 'OPTIONS', // Ignorar OPTIONS por padrão
     blockDuration = 60 * 60 * 1000, // 1 hora de bloqueio
     message = 'Muitas requisições deste IP. Tente novamente mais tarde.',
     skipSuccessfulRequests = false
   } = options;
 
   return (req, res, next) => {
+    // Ignorar requisições OPTIONS (preflight CORS) - não contar no rate limit
+    if (skip && skip(req)) {
+      return next();
+    }
+    
     const ip = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'];
     const now = Date.now();
 
