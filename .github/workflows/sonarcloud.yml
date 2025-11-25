@@ -21,17 +21,46 @@ jobs:
     name: SonarCloud Backend Analysis
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: sgvn_test
+          POSTGRES_PASSWORD: sgvn_test_password
+          POSTGRES_DB: sgvn_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       NODE_ENV: test
       JWT_SECRET: test-secret-key-for-ci
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL || secrets.DATABASE_URL }}
 
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Configurar variáveis de ambiente do banco
+        run: |
+          if [ -n "${{ secrets.DATABASE_URL }}" ]; then
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
+          else
+            echo "DATABASE_URL=postgresql://sgvn_test:sgvn_test_password@localhost:5432/sgvn_test" >> $GITHUB_ENV
+          fi
+          
+          if [ -n "${{ secrets.TEST_DATABASE_URL }}" ]; then
+            echo "TEST_DATABASE_URL=${{ secrets.TEST_DATABASE_URL }}" >> $GITHUB_ENV
+          elif [ -n "${{ secrets.DATABASE_URL }}" ]; then
+            echo "TEST_DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
+          else
+            echo "TEST_DATABASE_URL=postgresql://sgvn_test:sgvn_test_password@localhost:5432/sgvn_test" >> $GITHUB_ENV
+          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -58,20 +87,20 @@ jobs:
       - name: Verificar coverage backend
         run: |
           if [ ! -f backend/coverage/lcov.info ]; then
-            echo "⚠️ lcov.info não encontrado, tentando gerar novamente..."
+            echo "AVISO: lcov.info não encontrado, tentando gerar novamente..."
             cd backend
             npm run test:coverage || true
             cd ..
           fi
           # Se ainda não existir, cria um arquivo lcov.info vazio válido
           if [ ! -f backend/coverage/lcov.info ]; then
-            echo "📝 Criando lcov.info vazio (formato válido)..."
+            echo "Criando lcov.info vazio (formato válido)..."
             mkdir -p backend/coverage
             echo "TN:" > backend/coverage/lcov.info
             echo "SF:" >> backend/coverage/lcov.info
             echo "end_of_record" >> backend/coverage/lcov.info
           fi
-          echo "✅ Coverage backend verificado"
+          echo "Coverage backend verificado"
 
       - name: Corrigir caminhos LCOV backend
         run: |
@@ -80,7 +109,7 @@ jobs:
           # Garante que caminhos sejam relativos à raiz do backend
           sed -i 's#SF:\./#SF:backend/#g' backend/coverage/lcov.info || true
           sed -i 's#SF:backend/\.\./#SF:backend/#g' backend/coverage/lcov.info || true
-          echo "✅ Caminhos LCOV backend corrigidos"
+          echo "Caminhos LCOV backend corrigidos"
 
       - name: Validar cobertura backend ≥ 75%
         shell: bash
@@ -90,7 +119,7 @@ jobs:
           const path = 'backend/coverage/lcov.info';
           
           if (!fs.existsSync(path)) {
-            console.error(`❌ Arquivo de coverage não encontrado: ${path}`);
+            console.error(`ERRO: Arquivo de coverage não encontrado: ${path}`);
             process.exit(1);
           }
           
@@ -106,14 +135,14 @@ jobs:
           }
           
           const pct = total ? (covered / total) * 100 : 0;
-          console.log(`📊 Backend coverage: ${pct.toFixed(2)}% (${covered}/${total})`);
+          console.log(`Backend coverage: ${pct.toFixed(2)}% (${covered}/${total})`);
           
           if (pct < 75) {
-            console.error(`❌ Cobertura do backend abaixo de 75% (atual: ${pct.toFixed(2)}%)`);
+            console.error(`ERRO: Cobertura do backend abaixo de 75% (atual: ${pct.toFixed(2)}%)`);
             process.exit(1);
           }
           
-          console.log(`✅ Cobertura do backend OK (${pct.toFixed(2)}% ≥ 75%)`);
+          console.log(`Cobertura do backend OK (${pct.toFixed(2)}% >= 75%)`);
           NODE
 
       - name: SonarCloud Scan Backend
@@ -164,20 +193,20 @@ jobs:
       - name: Verificar coverage frontend
         run: |
           if [ ! -f frontend-react/coverage/lcov.info ]; then
-            echo "⚠️ lcov.info não encontrado, tentando gerar novamente..."
+            echo "AVISO: lcov.info não encontrado, tentando gerar novamente..."
             cd frontend-react
             npm run test:coverage || true
             cd ..
           fi
           # Se ainda não existir, cria um arquivo lcov.info vazio válido
           if [ ! -f frontend-react/coverage/lcov.info ]; then
-            echo "📝 Criando lcov.info vazio (formato válido)..."
+            echo "Criando lcov.info vazio (formato válido)..."
             mkdir -p frontend-react/coverage
             echo "TN:" > frontend-react/coverage/lcov.info
             echo "SF:" >> frontend-react/coverage/lcov.info
             echo "end_of_record" >> frontend-react/coverage/lcov.info
           fi
-          echo "✅ Coverage frontend verificado"
+          echo "Coverage frontend verificado"
 
       - name: Corrigir caminhos LCOV frontend
         run: |
@@ -186,7 +215,7 @@ jobs:
           # Garante que caminhos sejam relativos à raiz do frontend-react
           sed -i 's#SF:src/#SF:frontend-react/src/#g' frontend-react/coverage/lcov.info || true
           sed -i 's#SF:frontend-react/src/\.\./#SF:frontend-react/src/#g' frontend-react/coverage/lcov.info || true
-          echo "✅ Caminhos LCOV frontend corrigidos"
+          echo "Caminhos LCOV frontend corrigidos"
 
       - name: Validar cobertura frontend ≥ 25%
         shell: bash
@@ -196,7 +225,7 @@ jobs:
           const path = 'frontend-react/coverage/lcov.info';
           
           if (!fs.existsSync(path)) {
-            console.error(`❌ Arquivo de coverage não encontrado: ${path}`);
+            console.error(`ERRO: Arquivo de coverage não encontrado: ${path}`);
             process.exit(1);
           }
           
@@ -212,14 +241,14 @@ jobs:
           }
           
           const pct = total ? (covered / total) * 100 : 0;
-          console.log(`📊 Frontend coverage: ${pct.toFixed(2)}% (${covered}/${total})`);
+          console.log(`Frontend coverage: ${pct.toFixed(2)}% (${covered}/${total})`);
           
           if (pct < 25) {
-            console.error(`❌ Cobertura do frontend abaixo de 25% (atual: ${pct.toFixed(2)}%)`);
+            console.error(`ERRO: Cobertura do frontend abaixo de 25% (atual: ${pct.toFixed(2)}%)`);
             process.exit(1);
           }
           
-          console.log(`✅ Cobertura do frontend OK (${pct.toFixed(2)}% ≥ 25%)`);
+          console.log(`Cobertura do frontend OK (${pct.toFixed(2)}% >= 25%)`);
           NODE
 
       - name: SonarCloud Scan Frontend
