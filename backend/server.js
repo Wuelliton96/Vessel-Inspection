@@ -160,7 +160,13 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use('/uploads', express.static('uploads'));
+// Servir arquivos estáticos de uploads com CORS
+app.use('/uploads', (req, res, next) => {
+  // Adicionar headers CORS para arquivos estáticos
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  next();
+}, express.static('uploads'));
 
 app.use(morgan('combined', {
   stream: {

@@ -1416,7 +1416,8 @@ const VistoriadorVistoria: React.FC = () => {
       }
       
       // VALIDAÇÃO: Testar se a imagem realmente existe e é acessível
-      const imageUrl = responseData.url_completa || `${API_CONFIG.BASE_URL}/uploads/fotos/vistoria-${id}/${responseData.url_arquivo}`;
+      // Se não tem url_completa, usar a rota da API que serve a imagem corretamente (S3 ou local)
+      const imageUrl = responseData.url_completa || `${API_CONFIG.BASE_URL}/api/fotos/${responseData.id}/imagem`;
       console.log('Validando se a imagem existe:', imageUrl);
       
       try {
@@ -1560,7 +1561,8 @@ const VistoriadorVistoria: React.FC = () => {
       }
       
       // VALIDAÇÃO: Testar se a imagem realmente existe e é acessível
-      const imageUrl = responseData.url_completa || `${API_CONFIG.BASE_URL}/uploads/fotos/vistoria-${id}/${responseData.url_arquivo}`;
+      // Se não tem url_completa, usar a rota da API que serve a imagem corretamente (S3 ou local)
+      const imageUrl = responseData.url_completa || `${API_CONFIG.BASE_URL}/api/fotos/${responseData.id}/imagem`;
       console.log('Validando se a imagem existe:', imageUrl);
       
       try {

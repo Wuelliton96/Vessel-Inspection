@@ -19,6 +19,7 @@
     "test:upload-validacao": "node scripts/testUploadCompletoValidacao.js",
     "test:frontend-visualizacao": "node scripts/testFrontendVisualizacao.js",
     "test:verificar-imagem-s3": "node scripts/verificarImagemS3.js",
+    "test:frontend-imagem": "node scripts/testFrontendImagem.js",
     "dev": "nodemon server.js",
     "setup:auth": "node scripts/setupLocalAuth.js",
     "migrate:password": "node scripts/addPasswordUpdateField.js",
