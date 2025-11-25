@@ -12,26 +12,42 @@ Se você está recebendo o erro `Project not found`, significa que o projeto ain
    - Vá para: https://sonarcloud.io
    - Faça login com sua conta GitHub
 
-2. **Criar Novo Projeto:**
+2. **Criar Novo Projeto Backend:**
    - Clique em "Projects" no menu superior
    - Clique em "Create Project" ou "Analyze a new project"
    - Selecione "From GitHub"
    - Escolha a organização: `wuelliton96`
    - Selecione o repositório: `Vessel-Inspection`
+   - Configure o projeto com:
+     - **Project Key:** `Wuelliton96_Vessel-Inspection`
+     - **Name:** `backend`
 
-3. **Configurar o Projeto:**
-   - O SonarCloud criará automaticamente o projeto com a chave: `Wuelliton96_Vessel-Inspection`
-   - Se necessário, ajuste as configurações
+3. **Criar Novo Projeto Frontend:**
+   - Repita o processo acima para criar um segundo projeto
+   - Configure o projeto com:
+     - **Project Key:** `Wuelliton96_Vessel-Inspection-Frontend`
+     - **Name:** `frontend`
+   - **Nota:** Você precisa criar os dois projetos separadamente
 
 ### Opção 2: Criar Manualmente via API
 
 Se preferir criar via API, você pode usar:
 
+**Para o Backend:**
 ```bash
 curl -X POST "https://sonarcloud.io/api/projects/create" \
   -u "SEU_SONAR_TOKEN:" \
   -d "project=Wuelliton96_Vessel-Inspection" \
   -d "name=backend" \
+  -d "organization=wuelliton96"
+```
+
+**Para o Frontend:**
+```bash
+curl -X POST "https://sonarcloud.io/api/projects/create" \
+  -u "SEU_SONAR_TOKEN:" \
+  -d "project=Wuelliton96_Vessel-Inspection-Frontend" \
+  -d "name=frontend" \
   -d "organization=wuelliton96"
 ```
 
