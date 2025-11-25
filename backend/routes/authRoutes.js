@@ -418,7 +418,7 @@ router.put('/force-password-update', async (req, res) => {
       deve_atualizar_senha: false
     });
 
-    // Gerar novo token
+    // Gerar novo token (reutilizar jwtSecret já declarado acima)
     const tokenPayload = {
       userId: usuario.id,
       cpf: usuario.cpf,
@@ -428,8 +428,8 @@ router.put('/force-password-update', async (req, res) => {
       nivelAcessoId: usuario.NivelAcesso.id
     };
 
-    const newToken = jwt.sign(tokenPayload, process.env.JWT_SECRET || 'sua-chave-secreta-jwt', {
-      expiresIn: '24h'
+    const newToken = jwt.sign(tokenPayload, jwtSecret, {
+      expiresIn: getJwtExpiration()
     });
 
     res.json({

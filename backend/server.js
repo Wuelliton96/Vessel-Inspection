@@ -223,6 +223,10 @@ app.use('/api/laudos', laudoRoutes);
 app.use('/api/cep', cepRoutes);
 app.use('/api/auditoria', auditoriaRoutes);
 
+// Middleware de tratamento de erro centralizado (deve ser o último)
+const { errorHandler } = require('./middleware/errorHandler');
+app.use(errorHandler);
+
 const os = require('os');
 
 function getLocalIPAddress() {
