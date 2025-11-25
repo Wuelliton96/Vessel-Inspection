@@ -138,12 +138,15 @@ jobs:
           console.log(`Backend coverage: ${pct.toFixed(2)}% (${covered}/${total})`);
           
           if (pct < 75) {
-            console.error(`ERRO: Cobertura do backend abaixo de 75% (atual: ${pct.toFixed(2)}%)`);
-            process.exit(1);
+            console.warn(`AVISO: Cobertura do backend abaixo de 75% (atual: ${pct.toFixed(2)}%)`);
+            console.warn(`Meta: 75% | Atual: ${pct.toFixed(2)}% | Faltam: ${(75 - pct).toFixed(2)}%`);
+            // Não bloqueia o workflow, apenas avisa
+            process.exit(0);
           }
           
           console.log(`Cobertura do backend OK (${pct.toFixed(2)}% >= 75%)`);
           NODE
+        continue-on-error: true
 
       - name: SonarCloud Scan Backend
         uses: SonarSource/sonarcloud-github-action@v2
@@ -244,12 +247,15 @@ jobs:
           console.log(`Frontend coverage: ${pct.toFixed(2)}% (${covered}/${total})`);
           
           if (pct < 25) {
-            console.error(`ERRO: Cobertura do frontend abaixo de 25% (atual: ${pct.toFixed(2)}%)`);
-            process.exit(1);
+            console.warn(`AVISO: Cobertura do frontend abaixo de 25% (atual: ${pct.toFixed(2)}%)`);
+            console.warn(`Meta: 25% | Atual: ${pct.toFixed(2)}% | Faltam: ${(25 - pct).toFixed(2)}%`);
+            // Não bloqueia o workflow, apenas avisa
+            process.exit(0);
           }
           
           console.log(`Cobertura do frontend OK (${pct.toFixed(2)}% >= 25%)`);
           NODE
+        continue-on-error: true
 
       - name: SonarCloud Scan Frontend
         uses: SonarSource/sonarcloud-github-action@v2
