@@ -192,6 +192,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       - name: SonarCloud Scan Backend
+        id: sonarcloud-backend
         uses: SonarSource/sonarcloud-github-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -204,6 +205,22 @@ jobs:
             -Dsonar.organization=wuelliton96
             -Dsonar.projectVersion=${{ github.run_number }}
             -Dsonar.sourceEncoding=UTF-8
+        continue-on-error: true
+
+      - name: Verificar Quality Gate Backend
+        if: always() && steps.sonarcloud-backend.outcome != 'success'
+        run: |
+          echo "AVISO: Quality Gate do backend não passou ou análise falhou"
+          echo "Isso não bloqueia o workflow, mas você deve revisar os problemas no SonarCloud:"
+          echo "https://sonarcloud.io/project/overview?id=Wuelliton96_Vessel-Inspection"
+          echo ""
+          echo "Problemas comuns:"
+          echo "- Security Hotspots: Revise e corrija vulnerabilidades de segurança"
+          echo "- Code Duplication: Reduza código duplicado"
+          echo "- Security/Reliability Rating: Melhore a qualidade do código"
+          echo ""
+          echo "Para ajustar o Quality Gate, acesse:"
+          echo "https://sonarcloud.io/project/quality_gate?id=Wuelliton96_Vessel-Inspection"
         continue-on-error: true
 
   sonarcloud-frontend:
@@ -346,6 +363,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       - name: SonarCloud Scan Frontend
+        id: sonarcloud-frontend
         uses: SonarSource/sonarcloud-github-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -358,5 +376,22 @@ jobs:
             -Dsonar.organization=wuelliton96
             -Dsonar.projectVersion=${{ github.run_number }}
             -Dsonar.sourceEncoding=UTF-8
+        continue-on-error: true
+
+      - name: Verificar Quality Gate Frontend
+        if: always() && steps.sonarcloud-frontend.outcome != 'success'
+        run: |
+          echo "AVISO: Quality Gate do frontend não passou ou análise falhou"
+          echo "Isso não bloqueia o workflow, mas você deve revisar os problemas no SonarCloud:"
+          echo "https://sonarcloud.io/project/overview?id=Wuelliton96_Vessel-Inspection-Frontend"
+          echo ""
+          echo "Problemas comuns:"
+          echo "- Security Hotspots: Revise e corrija vulnerabilidades de segurança"
+          echo "- Code Duplication: Reduza código duplicado (atual: 4.6%, meta: <= 3%)"
+          echo "- Security Rating: Melhore a segurança (atual: E, meta: >= A)"
+          echo "- Reliability Rating: Melhore a confiabilidade (atual: D, meta: >= A)"
+          echo ""
+          echo "Para ajustar o Quality Gate, acesse:"
+          echo "https://sonarcloud.io/project/quality_gate?id=Wuelliton96_Vessel-Inspection-Frontend"
         continue-on-error: true
 
