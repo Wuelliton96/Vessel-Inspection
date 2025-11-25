@@ -555,17 +555,18 @@ const FotosVistoria: React.FC = () => {
                 </FotoHeader>
 
                 <FotoImageContainer>
-                  {item.foto?.id && imagemUrls[item.foto.id] ? (
+                  {item.foto?.id ? (
                     <PreloadedImage
-                      src={imagemUrls[item.foto.id]}
+                      src={imagemUrls[item.foto.id] || `${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`}
                       alt={item.nome}
+                      fallbackSrc={imagemUrls[item.foto.id] ? `${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem` : undefined}
                       style={{
                         width: '100%',
                         height: '100%',
                         objectFit: 'cover',
                         borderRadius: '0.5rem'
                       }}
-                      timeout={15000}
+                      timeout={20000}
                       showLoading={true}
                       loadingComponent={
                         <div style={{ textAlign: 'center', padding: '2rem' }}>
@@ -577,6 +578,9 @@ const FotosVistoria: React.FC = () => {
                         <div style={{ textAlign: 'center', padding: '2rem' }}>
                           <ImageIcon size={48} color="#ef4444" />
                           <div style={{ marginTop: '0.5rem', color: '#ef4444' }}>Erro ao carregar imagem</div>
+                          <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#9ca3af' }}>
+                            Foto ID: {item.foto.id}
+                          </div>
                         </div>
                       }
                     />
@@ -599,29 +603,26 @@ const FotosVistoria: React.FC = () => {
                   {item.foto?.id && (
                     <IconButton 
                       variant="primary"
-                      onClick={async () => {
-                        try {
-                          // Buscar URL da imagem primeiro
-                          const response = await fetch(`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem-url`, {
-                            headers: {
-                              'Authorization': `Bearer ${localStorage.getItem('token')}`
-                            }
-                          });
-                          
-                          if (response.ok) {
-                            const data = await response.json();
-                            if (data.encontrada && data.url) {
-                              setImagemAmpliada(data.url);
-                              return;
-                            }
-                          }
-                          
-                          // Fallback: usar rota antiga
-                          setImagemAmpliada(`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`);
-                        } catch (error) {
-                          console.error('Erro ao buscar URL da imagem:', error);
-                          // Fallback: usar rota antiga
-                          setImagemAmpliada(`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`);
+                      onClick={() => {
+                        // SOMENTE usar imagem já carregada se ela estiver visível/aparecendo
+                        // Buscar a imagem no DOM pelo alt text
+                        const imgElement = document.querySelector(`img[alt="${item.nome}"]`) as HTMLImageElement;
+                        
+                        // Verificar se a imagem está realmente carregada e visível
+                        if (imgElement && 
+                            imgElement.src && 
+                            imgElement.complete && 
+                            imgElement.naturalWidth > 0 &&
+                            imgElement.offsetParent !== null) { // Verifica se está visível
+                          // Imagem já está carregada e visível, usar o src dela (SEM nova requisição)
+                          console.log('[FotosVistoria] ✅ Imagem já carregada e visível, usando do DOM:', imgElement.src);
+                          setImagemAmpliada(imgElement.src);
+                        } else {
+                          // Imagem não está carregada ainda ou não está visível
+                          // Fazer requisição normal ao backend
+                          console.log('[FotosVistoria] ⚠️ Imagem não está carregada ainda, fazendo requisição ao backend');
+                          const url = imagemUrls[item.foto.id] || `${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`;
+                          setImagemAmpliada(url);
                         }
                       }}
                       style={{ marginRight: '0.5rem' }}
@@ -651,20 +652,39 @@ const FotosVistoria: React.FC = () => {
 
       {imagemAmpliada && (
         <Modal onClick={() => setImagemAmpliada(null)}>
-          <CloseButton onClick={() => setImagemAmpliada(null)}>
+          <CloseButton onClick={(e) => {
+            e.stopPropagation();
+            setImagemAmpliada(null);
+          }}>
             <X size={20} />
           </CloseButton>
-          <PreloadedImage
-            src={imagemAmpliada || ''}
+          <img
+            src={imagemAmpliada}
             alt="Foto ampliada"
-            style={{
-              maxWidth: '100%',
-              maxHeight: '90vh',
-              objectFit: 'contain',
-              borderRadius: '0.5rem'
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setImagemAmpliada(null);
+              }
             }}
-            timeout={15000}
-            showLoading={true}
+            tabIndex={0}
+            role="img"
+            style={{
+              maxWidth: '95%',
+              maxHeight: '95vh',
+              objectFit: 'contain',
+              borderRadius: '0.5rem',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+              background: '#000',
+              padding: '1rem',
+              cursor: 'default'
+            }}
+            onError={(e) => {
+              console.error('[FotosVistoria] Erro ao carregar imagem no modal:', imagemAmpliada);
+              // Se falhar, tentar recarregar
+              const img = e.target as HTMLImageElement;
+              img.src = imagemAmpliada + '?t=' + Date.now();
+            }}
           />
         </Modal>
       )}

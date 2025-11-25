@@ -100,15 +100,22 @@ const PreloadedImage: React.FC<PreloadedImageProps> = ({
           }
           
           // Se falhar e tiver fallback, tentar fallback
-          if (fallbackSrc && url !== fallbackSrc && retryCountRef.current === 0) {
+          if (fallbackSrc && url !== fallbackSrc) {
             console.log('[PreloadedImage] Tentando fallback:', fallbackSrc);
-            return await loadImage(fallbackSrc, false);
+            const fallbackResult = await loadImage(fallbackSrc, false);
+            if (fallbackResult) {
+              return true;
+            }
           }
           
-          setError(result.error || 'Erro ao carregar imagem');
+          // ÚLTIMA TENTATIVA: sempre usar URL diretamente na tag img (mesmo se preload falhar)
+          // Isso garante que a imagem seja exibida se o servidor conseguir servir
+          console.log('[PreloadedImage] Usando URL diretamente (última tentativa):', url);
+          setImageSrc(url);
+          setError(null);
           setLoading(false);
-          onError?.(result.error || 'Erro ao carregar imagem');
-          return false;
+          // Não chamar onLoad aqui, deixar a tag img chamar quando carregar
+          return true; // Sempre retornar true para tentar exibir
         }
       } catch (err: any) {
         if (cancelled) return false;
@@ -121,11 +128,21 @@ const PreloadedImage: React.FC<PreloadedImageProps> = ({
           return await loadImage(url, true);
         }
         
-        const errorMsg = err.message || 'Erro desconhecido ao carregar imagem';
-        setError(errorMsg);
+        // Se falhou tudo, tentar fallback
+        if (fallbackSrc && url !== fallbackSrc) {
+          console.log('[PreloadedImage] Erro no preload, tentando fallback:', fallbackSrc);
+          const fallbackResult = await loadImage(fallbackSrc, false);
+          if (fallbackResult) {
+            return true;
+          }
+        }
+        
+        // ÚLTIMA TENTATIVA: sempre usar URL diretamente
+        console.log('[PreloadedImage] Erro no preload, usando URL diretamente:', url);
+        setImageSrc(url);
+        setError(null);
         setLoading(false);
-        onError?.(errorMsg);
-        return false;
+        return true; // Sempre tentar exibir
       }
     };
 
@@ -135,6 +152,16 @@ const PreloadedImage: React.FC<PreloadedImageProps> = ({
       cancelled = true;
     };
   }, [currentSrc, fallbackSrc, timeout, onLoad, onError]);
+
+  // Limpar blob URLs quando o componente desmontar ou imageSrc mudar
+  // IMPORTANTE: Este hook deve vir ANTES de qualquer return condicional
+  React.useEffect(() => {
+    return () => {
+      if (imageSrc && imageSrc.startsWith('blob:')) {
+        URL.revokeObjectURL(imageSrc);
+      }
+    };
+  }, [imageSrc]);
 
   if (loading && showLoading) {
     return (
@@ -198,13 +225,26 @@ const PreloadedImage: React.FC<PreloadedImageProps> = ({
       alt={alt}
       className={className}
       style={style}
+      crossOrigin="anonymous"
+      onLoad={() => {
+        console.log('[PreloadedImage] Imagem carregada com sucesso:', imageSrc);
+        onLoad?.();
+      }}
       onError={(e) => {
         console.error('[PreloadedImage] Erro ao renderizar imagem:', imageSrc);
+        // Tentar fallback se disponível
         if (fallbackSrc && imageSrc !== fallbackSrc) {
+          console.log('[PreloadedImage] Tentando fallback:', fallbackSrc);
           setCurrentSrc(fallbackSrc);
         } else {
-          setError('Erro ao renderizar imagem');
-          onError?.('Erro ao renderizar imagem');
+          // Última tentativa: usar src original diretamente (pode funcionar mesmo com erro de preload)
+          if (src && imageSrc !== src) {
+            console.log('[PreloadedImage] Última tentativa: usando src original');
+            setCurrentSrc(src);
+          } else {
+            setError('Erro ao renderizar imagem');
+            onError?.('Erro ao renderizar imagem');
+          }
         }
       }}
     />

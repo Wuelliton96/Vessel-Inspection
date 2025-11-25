@@ -1,7 +1,6 @@
 // backend/config/aws.js
 const { S3Client } = require('@aws-sdk/client-s3');
 const path = require('path');
-const logger = require('../utils/logger');
 
 // Carregar variáveis de ambiente
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
@@ -17,17 +16,16 @@ const s3Client = new S3Client({
 
 // Verificar se as credenciais estão configuradas
 if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
-  logger.warn('[AWS] Credenciais AWS não configuradas no .env');
+  console.warn('[AWS] Credenciais AWS não configuradas no .env');
 }
 
 if (!process.env.AWS_S3_BUCKET) {
-  logger.warn('[AWS] AWS_S3_BUCKET não configurado no .env');
+  console.warn('[AWS] AWS_S3_BUCKET não configurado no .env');
 }
 
-logger.info('[AWS] Configuração S3 inicializada', {
-  region: process.env.AWS_REGION || 'us-east-1',
-  hasBucket: !!process.env.AWS_S3_BUCKET
-});
+console.log('[AWS] Configuração S3 inicializada');
+console.log('[AWS] Região:', process.env.AWS_REGION || 'us-east-1');
+console.log('[AWS] Bucket:', process.env.AWS_S3_BUCKET || 'não configurado');
 
 module.exports = {
   s3Client,

@@ -1,22 +1,8 @@
 'use strict'
 
-// Security: License key deve ser configurada via variável de ambiente
-// Nunca usar fallback hardcoded em produção
-const getNewRelicLicenseKey = () => {
-  const key = process.env.NEW_RELIC_LICENSE_KEY;
-  if (!key) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('NEW_RELIC_LICENSE_KEY não configurado em produção');
-    }
-    // Em desenvolvimento, usar chave de exemplo (não funcional)
-    return 'dev-license-key-not-for-production';
-  }
-  return key;
-};
-
 exports.config = {
   app_name: [process.env.NEW_RELIC_APP_NAME || 'SGVN-Backend-Production'],
-  license_key: getNewRelicLicenseKey(),
+  license_key: process.env.NEW_RELIC_LICENSE_KEY || '8e63814058ad11aa968515539c3994a7FFFFNRAL',
   logging: {
     level: 'info',
     enabled: process.env.NODE_ENV === 'production'

@@ -5,8 +5,7 @@ const { Usuario, NivelAcesso } = require('../models');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { registrarAuditoria, auditoriaMiddleware, salvarDadosOriginais } = require('../middleware/auditoria');
 const { strictRateLimiter, moderateRateLimiter } = require('../middleware/rateLimiting');
-const { validarTelefoneE164, converterParaE164, validarEstado, validarCPF, limparCPF, validatePassword } = require('../utils/validators');
-const logger = require('../utils/logger');
+const { validarTelefoneE164, converterParaE164, validarEstado, validarCPF, limparCPF } = require('../utils/validators');
 
 router.get('/', requireAuth, requireAdmin, async (req, res) => {
   try {
@@ -32,7 +31,7 @@ router.get('/', requireAuth, requireAdmin, async (req, res) => {
       updatedAt: user.updatedAt
     })));
   } catch (error) {
-    logger.error('Erro ao listar usuários', { error: error.message, stack: error.stack });
+    console.error('Erro ao listar usuários:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -65,7 +64,7 @@ router.get('/:id', requireAuth, requireAdmin, async (req, res) => {
       updatedAt: usuario.updatedAt
     });
   } catch (error) {
-    logger.error('Erro ao obter usuário', { error: error.message, stack: error.stack, userId: req.params.id });
+    console.error('Erro ao obter usuário:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -179,7 +178,7 @@ router.post('/', requireAuth, requireAdmin, moderateRateLimiter, async (req, res
       updatedAt: usuarioCompleto.updatedAt
     });
   } catch (error) {
-    logger.error('Erro ao criar usuário', { error: error.message, stack: error.stack });
+    console.error('Erro ao criar usuário:', error);
     
     if (error.name === 'SequelizeUniqueConstraintError') {
       // Verificar qual campo causou o erro de duplicação
@@ -364,7 +363,7 @@ router.put('/:id', requireAuth, requireAdmin, moderateRateLimiter, salvarDadosOr
       updatedAt: usuarioAtualizado.updatedAt
     });
   } catch (error) {
-    logger.error('Erro ao atualizar usuário', { error: error.message, stack: error.stack, userId: req.params.id });
+    console.error('Erro ao atualizar usuário:', error);
     
     if (error.name === 'SequelizeUniqueConstraintError') {
       // Verificar qual campo causou o erro de duplicação
@@ -399,7 +398,7 @@ router.delete(
       
       // Proteção 1: Não permitir que o usuário delete a si mesmo
       if (req.user.id === usuarioId) {
-        logger.warn('[SEGURANÇA] Usuário tentou deletar a si mesmo', { userId: req.user.id, email: req.user.email });
+        console.warn(`[SEGURANÇA] Usuário ${req.user.email} tentou deletar a si mesmo`);
         return res.status(403).json({ 
           error: 'Operação não permitida',
           message: 'Você não pode deletar sua própria conta. Solicite a outro administrador.' 
@@ -419,7 +418,7 @@ router.delete(
 
       // Proteção 2: Não permitir deletar o primeiro admin do sistema (ID 1)
       if (usuarioId === 1) {
-        logger.error('[SEGURANÇA] Tentativa de deletar o admin principal', { userId: req.user.id, email: req.user.email, targetId: 1 });
+        console.error(`[SEGURANÇA] Tentativa de deletar o admin principal (ID: 1) por ${req.user.email}`);
         await registrarAuditoria({
           req,
           acao: 'DELETE_BLOCKED',
@@ -442,7 +441,7 @@ router.delete(
         });
 
         if (totalAdmins <= 1) {
-          logger.error('[SEGURANÇA] Tentativa de deletar o último admin do sistema', { userId: req.user.id, email: req.user.email });
+          console.error(`[SEGURANÇA] Tentativa de deletar o último admin do sistema por ${req.user.email}`);
           await registrarAuditoria({
             req,
             acao: 'DELETE_BLOCKED',
@@ -473,19 +472,48 @@ router.delete(
         detalhes: `Usuário ${usuario.nome} (${usuario.email}) marcado como deletado`
       });
 
-      logger.info('[SEGURANÇA] Usuário deletado (soft delete)', { deletedUserId: usuario.id, deletedEmail: usuario.email, deletedBy: req.user.id });
+      console.log(`[SEGURANÇA] Usuário deletado (soft delete): ${usuario.email} por ${req.user.email}`);
       
       res.json({ 
         success: true,
         message: 'Usuário excluído com sucesso.' 
       });
   } catch (error) {
-    logger.error('Erro ao excluir usuário', { error: error.message, stack: error.stack, userId: req.params.id });
+    console.error('Erro ao excluir usuário:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
   }
 );
 
+// Função para validar critérios de senha
+const validatePassword = (senha) => {
+  const errors = [];
+  
+  if (senha.length < 8) {
+    errors.push('Senha deve ter pelo menos 8 caracteres');
+  }
+  
+  if (!/[A-Z]/.test(senha)) {
+    errors.push('Senha deve conter pelo menos uma letra maiúscula');
+  }
+  
+  if (!/[a-z]/.test(senha)) {
+    errors.push('Senha deve conter pelo menos uma letra minúscula');
+  }
+  
+  if (!/[0-9]/.test(senha)) {
+    errors.push('Senha deve conter pelo menos um número');
+  }
+  
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(senha)) {
+    errors.push('Senha deve conter pelo menos um caractere especial');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors: errors
+  };
+};
 
 // POST /api/usuarios/:id/reset-password - Redefinir senha (apenas admin)
 router.post('/:id/reset-password', requireAuth, requireAdmin, strictRateLimiter, async (req, res) => {
@@ -529,7 +557,7 @@ router.post('/:id/reset-password', requireAuth, requireAdmin, strictRateLimiter,
 
     res.json({ message: 'Senha redefinida com sucesso.' });
   } catch (error) {
-    logger.error('Erro ao redefinir senha', { error: error.message, stack: error.stack, userId: req.params.id });
+    console.error('Erro ao redefinir senha:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -580,7 +608,7 @@ router.patch('/:id/toggle-status', requireAuth, requireAdmin, strictRateLimiter,
       updatedAt: usuarioAtualizado.updatedAt
     });
   } catch (error) {
-    logger.error('Erro ao alterar status do usuário', { error: error.message, stack: error.stack, userId: req.params.id });
+    console.error('Erro ao alterar status do usuário:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });

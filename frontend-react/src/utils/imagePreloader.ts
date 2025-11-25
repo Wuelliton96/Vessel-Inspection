@@ -13,6 +13,7 @@ export interface ImagePreloadResult {
 
 /**
  * Preload uma imagem e retorna uma Promise que resolve quando a imagem está carregada
+ * Suporta autenticação via token JWT
  */
 export function preloadImage(url: string, timeout: number = 10000): Promise<ImagePreloadResult> {
   return new Promise((resolve) => {
@@ -21,34 +22,155 @@ export function preloadImage(url: string, timeout: number = 10000): Promise<Imag
       return;
     }
 
-    const img = new Image();
-    let resolved = false;
+    // Se a URL é da nossa API, precisamos usar fetch com autenticação
+    const isApiUrl = url.includes('/api/fotos/') || url.includes('/uploads/');
+    
+    if (isApiUrl) {
+      // Usar IIFE para executar async/await dentro do Promise executor
+      (async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const headers: HeadersInit = {
+            'Accept': 'image/*'
+          };
+          
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+          }
 
-    const timeoutId = setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        resolve({ success: false, url, error: 'Timeout ao carregar imagem' });
-      }
-    }, timeout);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    img.onload = () => {
-      if (!resolved) {
-        resolved = true;
-        clearTimeout(timeoutId);
-        resolve({ success: true, url });
-      }
-    };
+          const response = await fetch(url, {
+            method: 'GET',
+            headers,
+            signal: controller.signal,
+            credentials: 'include',
+            mode: 'cors',
+            redirect: 'follow' // Seguir redirects automaticamente
+          });
 
-    img.onerror = () => {
-      if (!resolved) {
-        resolved = true;
-        clearTimeout(timeoutId);
-        resolve({ success: false, url, error: 'Erro ao carregar imagem' });
-      }
-    };
+          clearTimeout(timeoutId);
 
-    // Iniciar carregamento
-    img.src = url;
+          // Verificar se é um redirect (302, 301, etc)
+          if (response.status >= 300 && response.status < 400) {
+            // Se for redirect, tentar usar a URL final
+            const finalUrl = response.url || url;
+            console.log(`[preloadImage] Redirect detectado: ${url} -> ${finalUrl}`);
+            // Tentar carregar a URL final diretamente (pode ser S3 presigned URL)
+            const img = new Image();
+            let resolved = false;
+            const timeoutId = setTimeout(() => {
+              if (!resolved) {
+                resolved = true;
+                // Se timeout, retornar URL original para tentar diretamente
+                resolve({ success: true, url });
+              }
+            }, 5000);
+            
+            img.onload = () => {
+              if (!resolved) {
+                resolved = true;
+                clearTimeout(timeoutId);
+                resolve({ success: true, url: finalUrl });
+              }
+            };
+            img.onerror = () => {
+              if (!resolved) {
+                resolved = true;
+                clearTimeout(timeoutId);
+                console.warn(`[preloadImage] Erro ao carregar URL após redirect, tentando original: ${finalUrl}`);
+                // Retornar URL original para tentar diretamente
+                resolve({ success: true, url });
+              }
+            };
+            img.src = finalUrl;
+            return;
+          }
+
+          if (!response.ok) {
+            console.error(`[preloadImage] Erro HTTP ${response.status} ao carregar: ${url}`);
+            // Se falhar, tentar usar a URL diretamente na tag img (pode funcionar mesmo com erro HTTP)
+            const img = new Image();
+            img.onload = () => {
+              resolve({ success: true, url });
+            };
+            img.onerror = () => {
+              resolve({ success: false, url, error: `Erro HTTP ${response.status}` });
+            };
+            img.src = url;
+            return;
+          }
+
+          const blob = await response.blob();
+          
+          // Verificar se é uma imagem válida
+          if (!blob.type.startsWith('image/')) {
+            console.warn(`[preloadImage] Resposta não tem tipo image/, mas tentando mesmo assim: ${blob.type}`);
+            // Mesmo sem tipo correto, tentar usar blob URL
+          }
+
+          const blobUrl = URL.createObjectURL(blob);
+
+          // Verificar se a imagem é válida carregando ela
+          const img = new Image();
+          img.onload = () => {
+            resolve({ success: true, url: blobUrl });
+          };
+          img.onerror = () => {
+            URL.revokeObjectURL(blobUrl);
+            console.warn(`[preloadImage] Erro ao validar blob, tentando URL original: ${url}`);
+            // Se blob falhar, tentar URL original diretamente
+            const img2 = new Image();
+            img2.onload = () => {
+              resolve({ success: true, url });
+            };
+            img2.onerror = () => {
+              resolve({ success: false, url, error: 'Erro ao validar imagem' });
+            };
+            img2.src = url;
+          };
+          img.src = blobUrl;
+        } catch (error: any) {
+          if (error.name === 'AbortError') {
+            resolve({ success: false, url, error: 'Timeout ao carregar imagem' });
+          } else {
+            console.error(`[preloadImage] Erro ao carregar: ${url}`, error);
+            resolve({ success: false, url, error: error.message || 'Erro ao carregar imagem' });
+          }
+        }
+      })();
+    } else {
+      // Para URLs externas, usar método tradicional
+      const img = new Image();
+      let resolved = false;
+
+      const timeoutId = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          resolve({ success: false, url, error: 'Timeout ao carregar imagem' });
+        }
+      }, timeout);
+
+      img.onload = () => {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeoutId);
+          resolve({ success: true, url });
+        }
+      };
+
+      img.onerror = () => {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeoutId);
+          resolve({ success: false, url, error: 'Erro ao carregar imagem' });
+        }
+      };
+
+      // Iniciar carregamento
+      img.src = url;
+    }
   });
 }
 

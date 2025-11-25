@@ -190,47 +190,6 @@ const formatarValorMonetario = (valor) => {
   }).format(valorNum);
 };
 
-/**
- * Valida critérios de senha forte
- * @param {string} senha - Senha a validar
- * @returns {Object} - { isValid: boolean, errors: string[] }
- */
-const validatePassword = (senha) => {
-  if (!senha || typeof senha !== 'string') {
-    return {
-      isValid: false,
-      errors: ['Senha é obrigatória']
-    };
-  }
-
-  const errors = [];
-  
-  if (senha.length < 8) {
-    errors.push('Senha deve ter pelo menos 8 caracteres');
-  }
-  
-  if (!/[A-Z]/.test(senha)) {
-    errors.push('Senha deve conter pelo menos uma letra maiúscula');
-  }
-  
-  if (!/[a-z]/.test(senha)) {
-    errors.push('Senha deve conter pelo menos uma letra minúscula');
-  }
-  
-  if (!/[0-9]/.test(senha)) {
-    errors.push('Senha deve conter pelo menos um número');
-  }
-  
-  if (!/[!@#$%^&*(),.?":{}|<>]/.test(senha)) {
-    errors.push('Senha deve conter pelo menos um caractere especial');
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors: errors
-  };
-};
-
 module.exports = {
   validarCPF,
   limparCPF,
@@ -241,7 +200,6 @@ module.exports = {
   validarEstado,
   validarValorMonetario,
   limparValorMonetario,
-  formatarValorMonetario,
-  validatePassword
+  formatarValorMonetario
 };
 

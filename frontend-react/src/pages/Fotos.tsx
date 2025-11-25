@@ -352,6 +352,87 @@ const Fotos: React.FC = () => {
     };
   }, []);
 
+  // Carregar URLs das imagens quando uma vistoria é selecionada
+  useEffect(() => {
+    if (!vistoriaSelecionada) {
+      setImagemUrls({});
+      return;
+    }
+
+    const carregarUrlsImagens = async () => {
+      const { checklist } = vistoriaSelecionada;
+      const fotosComImagem = checklist.filter(item => item.foto_id && item.foto);
+      
+      if (fotosComImagem.length === 0) {
+        setImagemUrls({});
+        return;
+      }
+
+      console.log(`[Fotos] Carregando URLs de ${fotosComImagem.length} imagem(ns)...`);
+      
+      const urls: Record<number, string> = {};
+      const token = localStorage.getItem('token');
+      const errosCountRef = { count: 0 };
+      
+      // Carregar URLs em paralelo (máximo 10 por vez para não sobrecarregar)
+      const batchSize = 10;
+      for (let i = 0; i < fotosComImagem.length; i += batchSize) {
+        const batch = fotosComImagem.slice(i, i + batchSize);
+        
+        await Promise.all(
+          batch.map(async (item) => {
+            if (!item.foto?.id) return;
+            
+            try {
+              const response = await fetch(`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem-url`, {
+                headers: {
+                  'Authorization': `Bearer ${token}`
+                }
+              });
+              
+              if (response.ok) {
+                const data = await response.json();
+                if (data.encontrada && data.url) {
+                  urls[item.foto.id] = data.url;
+                  console.log(`[Fotos] URL carregada para foto ${item.foto.id}`);
+                } else {
+                  errosCountRef.count++;
+                  // Fallback: usar rota direta
+                  urls[item.foto.id] = `${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`;
+                  console.log(`[Fotos] Fallback para foto ${item.foto.id}`);
+                }
+              } else {
+                errosCountRef.count++;
+                // Fallback: usar rota direta
+                urls[item.foto.id] = `${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`;
+                console.log(`[Fotos] Erro ${response.status} para foto ${item.foto.id}, usando fallback`);
+              }
+            } catch (error) {
+              console.error(`[Fotos] Erro ao buscar URL da foto ${item.foto.id}:`, error);
+              errosCountRef.count++;
+              // Fallback: usar rota direta
+              urls[item.foto.id] = `${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`;
+            }
+          })
+        );
+      }
+      
+      setImagemUrls(urls);
+      setErrosCarregamento(errosCountRef.count);
+      
+      // Se muitos erros, mostrar aviso para recarregar
+      if (errosCountRef.count > 3) {
+        setMostrarAvisoRecarregar(true);
+      } else {
+        setMostrarAvisoRecarregar(false);
+      }
+      
+      console.log(`[Fotos] URLs carregadas: ${Object.keys(urls).length} de ${fotosComImagem.length}`);
+    };
+
+    carregarUrlsImagens();
+  }, [vistoriaSelecionada]);
+
   const loadFotos = async () => {
     try {
       setLoading(true);
@@ -570,10 +651,11 @@ const Fotos: React.FC = () => {
                   
                   <div style={{ position: 'relative' }}>
                     <FotoImageContainer>
-                      {item.foto?.id && imagemUrls[item.foto.id] ? (
+                      {item.foto?.id ? (
                         <PreloadedImage 
-                          src={imagemUrls[item.foto.id]}
+                          src={`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`}
                           alt={item.nome}
+                          fallbackSrc={imagemUrls[item.foto.id] || `${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`}
                           style={{ 
                             height: '400px', 
                             width: '100%', 
@@ -581,7 +663,7 @@ const Fotos: React.FC = () => {
                             background: '#000',
                             borderRadius: '0.5rem'
                           }}
-                          timeout={15000}
+                          timeout={30000}
                           showLoading={true}
                           loadingComponent={
                             <div style={{ 
@@ -611,6 +693,12 @@ const Fotos: React.FC = () => {
                             }}>
                               <ImageIcon size={48} color="#ef4444" />
                               <div style={{ marginTop: '0.5rem', color: '#ef4444' }}>Erro ao carregar imagem</div>
+                              <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#9ca3af' }}>
+                                Foto ID: {item.foto.id}
+                              </div>
+                              <div style={{ marginTop: '0.5rem', fontSize: '0.7rem', color: '#6b7280' }}>
+                                URL: {`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`}
+                              </div>
                             </div>
                           }
                         />
@@ -633,37 +721,26 @@ const Fotos: React.FC = () => {
                   <FotoActions>
                     {item.foto?.id && (
                       <IconButton 
-                        onClick={async () => {
-                          try {
-                            // Buscar URL da imagem primeiro
-                            const response = await fetch(`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem-url`, {
-                              headers: {
-                                'Authorization': `Bearer ${localStorage.getItem('token')}`
-                              }
-                            });
-                            
-                            if (response.ok) {
-                              const data = await response.json();
-                              if (data.encontrada && data.url) {
-                                setImagemAmpliada(data.url);
-                                return;
-                              }
-                            }
-                            
-                            // Fallback: usar URL do estado ou rota direta
-                            if (imagemUrls[item.foto.id]) {
-                              setImagemAmpliada(imagemUrls[item.foto.id]);
-                            } else {
-                              setImagemAmpliada(`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`);
-                            }
-                          } catch (error) {
-                            console.error('Erro ao buscar URL da imagem:', error);
-                            // Fallback: usar URL do estado ou rota direta
-                            if (imagemUrls[item.foto.id]) {
-                              setImagemAmpliada(imagemUrls[item.foto.id]);
-                            } else {
-                              setImagemAmpliada(`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`);
-                            }
+                        onClick={() => {
+                          // SOMENTE usar imagem já carregada se ela estiver visível/aparecendo
+                          // Buscar a imagem no DOM pelo alt text
+                          const imgElement = document.querySelector(`img[alt="${item.nome}"]`) as HTMLImageElement;
+                          
+                          // Verificar se a imagem está realmente carregada e visível
+                          if (imgElement && 
+                              imgElement.src && 
+                              imgElement.complete && 
+                              imgElement.naturalWidth > 0 &&
+                              imgElement.offsetParent !== null) { // Verifica se está visível
+                            // Imagem já está carregada e visível, usar o src dela (SEM nova requisição)
+                            console.log('[Fotos] ✅ Imagem já carregada e visível, usando do DOM:', imgElement.src);
+                            setImagemAmpliada(imgElement.src);
+                          } else {
+                            // Imagem não está carregada ainda ou não está visível
+                            // Fazer requisição normal ao backend
+                            console.log('[Fotos] ⚠️ Imagem não está carregada ainda, fazendo requisição ao backend');
+                            const url = imagemUrls[item.foto.id] || `${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`;
+                            setImagemAmpliada(url);
                           }
                         }}
                         style={{ marginRight: '0.5rem' }}
@@ -752,20 +829,39 @@ const Fotos: React.FC = () => {
 
         {imagemAmpliada && (
           <Modal onClick={() => setImagemAmpliada(null)}>
-            <CloseButton onClick={() => setImagemAmpliada(null)}>
+            <CloseButton onClick={(e) => {
+              e.stopPropagation();
+              setImagemAmpliada(null);
+            }}>
               <X size={24} />
             </CloseButton>
-            <PreloadedImage
-              src={`${API_CONFIG.BASE_URL}${imagemAmpliada}`}
+            <img
+              src={imagemAmpliada}
               alt="Foto ampliada"
-              style={{
-                maxWidth: '90%',
-                maxHeight: '90vh',
-                objectFit: 'contain',
-                borderRadius: '0.5rem'
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setImagemAmpliada(null);
+                }
               }}
-              timeout={15000}
-              showLoading={true}
+              tabIndex={0}
+              role="img"
+              style={{
+                maxWidth: '95%',
+                maxHeight: '95vh',
+                objectFit: 'contain',
+                borderRadius: '0.5rem',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+                background: '#000',
+                padding: '1rem',
+                cursor: 'default'
+              }}
+              onError={(e) => {
+                console.error('[Fotos] Erro ao carregar imagem no modal:', imagemAmpliada);
+                // Se falhar, tentar recarregar
+                const img = e.target as HTMLImageElement;
+                img.src = imagemAmpliada + '?t=' + Date.now();
+              }}
             />
           </Modal>
         )}
