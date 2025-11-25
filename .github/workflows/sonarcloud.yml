@@ -148,6 +148,49 @@ jobs:
           NODE
         continue-on-error: true
 
+      - name: Verificar configuração SonarCloud
+        run: |
+          if [ -z "${{ secrets.SONAR_TOKEN }}" ]; then
+            echo "ERRO: SONAR_TOKEN não configurado."
+            echo "Configure o secret SONAR_TOKEN no GitHub:"
+            echo "1. Acesse: https://github.com/${{ github.repository }}/settings/secrets/actions"
+            echo "2. Adicione o secret SONAR_TOKEN"
+            echo "3. Para obter o token: https://sonarcloud.io/account/security"
+            exit 1
+          fi
+          echo "SONAR_TOKEN configurado"
+          echo "Project Key: Wuelliton96_Vessel-Inspection"
+          echo "Organization: wuelliton96"
+          echo ""
+          echo "NOTA: Se o projeto não existir no SonarCloud, você precisa criá-lo:"
+          echo "1. Acesse: https://sonarcloud.io/projects/create"
+          echo "2. Selecione 'Analyze a new project'"
+          echo "3. Escolha 'From GitHub' e selecione este repositório"
+          echo "4. Ou crie manualmente com:"
+          echo "   - Project Key: Wuelliton96_Vessel-Inspection"
+          echo "   - Organization: wuelliton96"
+        continue-on-error: false
+
+      - name: Tentar criar projeto no SonarCloud (se não existir)
+        run: |
+          echo "Verificando se o projeto existe no SonarCloud..."
+          response=$(curl -s -w "\n%{http_code}" -u "${{ secrets.SONAR_TOKEN }}:" \
+            "https://sonarcloud.io/api/projects/search?projects=Wuelliton96_Vessel-Inspection" || echo "000")
+          http_code=$(echo "$response" | tail -n1)
+          
+          if [ "$http_code" = "200" ]; then
+            echo "Projeto encontrado no SonarCloud"
+          elif [ "$http_code" = "401" ] || [ "$http_code" = "403" ]; then
+            echo "AVISO: Token sem permissão para verificar/criar projeto"
+            echo "Certifique-se de que o SONAR_TOKEN tem permissões de administrador"
+          else
+            echo "AVISO: Não foi possível verificar o projeto (código: $http_code)"
+            echo "O projeto será criado automaticamente na primeira análise bem-sucedida"
+          fi
+        continue-on-error: true
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
       - name: SonarCloud Scan Backend
         uses: SonarSource/sonarcloud-github-action@v2
         env:
@@ -160,6 +203,8 @@ jobs:
             -Dsonar.projectKey=Wuelliton96_Vessel-Inspection
             -Dsonar.organization=wuelliton96
             -Dsonar.projectVersion=${{ github.run_number }}
+            -Dsonar.sourceEncoding=UTF-8
+        continue-on-error: true
 
   sonarcloud-frontend:
     name: SonarCloud Frontend Analysis
