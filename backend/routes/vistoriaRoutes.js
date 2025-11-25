@@ -4,14 +4,16 @@ const router = express.Router();
 // Importamos os dois middlewares
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { Vistoria, Embarcacao, Local, StatusVistoria, Usuario, ChecklistTemplate, ChecklistTemplateItem, VistoriaChecklistItem } = require('../models');
+const logger = require('../utils/logger');
 
 // Rota: POST /api/vistorias
 router.post('/', [requireAuth, requireAdmin], async (req, res) => {
   try {
-    console.log('=== ROTA POST /api/vistorias ===');
-    console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
-    console.log('Nível de acesso:', req.user?.NivelAcesso?.nome);
-    console.log('Dados recebidos:', req.body);
+    logger.info('POST /api/vistorias', { 
+      userId: req.user?.id, 
+      userName: req.user?.nome,
+      nivelAcesso: req.user?.NivelAcesso?.nome 
+    });
     
     const {
       embarcacao_id,
@@ -55,18 +57,16 @@ router.post('/', [requireAuth, requireAdmin], async (req, res) => {
 
     // Se não foi fornecido embarcacao_id, criar nova embarcação
     if (!embarcacaoId) {
-      console.log('Criando nova embarcação...');
+      logger.debug('Criando nova embarcação');
       if (!embarcacao_nome || !embarcacao_nr_inscricao_barco) {
-        console.log('Validação falhou - campos obrigatórios ausentes');
-        console.log('=== FIM ROTA POST /api/vistorias (400) ===\n');
+        logger.warn('Validação falhou - campos obrigatórios ausentes para nova embarcação');
         return res.status(400).json({ error: "Nome e NF de Inscrição são obrigatórios para nova embarcação" });
       }
 
-      console.log('Dados da embarcação:', {
+      logger.debug('Dados da embarcação', {
         nome: embarcacao_nome,
         nr_inscricao_barco: embarcacao_nr_inscricao_barco,
-        proprietario_nome: req.body.embarcacao_proprietario_nome,
-        proprietario_email: req.body.embarcacao_proprietario_email
+        hasProprietario: !!req.body.embarcacao_proprietario_nome
       });
 
       // Validar tipo de embarcação com seguradora
@@ -85,13 +85,17 @@ router.post('/', [requireAuth, requireAdmin], async (req, res) => {
         
         if (!tipoPermitido) {
           const seguradora = await Seguradora.findByPk(seguradoraId);
-          console.log(`VALIDACAO FALHOU: Seguradora ${seguradora?.nome} nao permite tipo ${tipoEmbarcacao}`);
+          logger.warn('Validação falhou - tipo de embarcação não permitido', {
+            seguradoraId: seguradoraId,
+            seguradoraNome: seguradora?.nome,
+            tipoEmbarcacao
+          });
           return res.status(400).json({ 
             error: "Tipo de embarcação não permitido",
             message: `A seguradora ${seguradora?.nome} não aceita vistorias de ${tipoEmbarcacao}`
           });
         }
-        console.log('Validacao OK: Seguradora permite este tipo');
+        logger.debug('Validação OK - seguradora permite este tipo');
       }
 
       const [embarcacao] = await Embarcacao.findOrCreate({
@@ -110,19 +114,21 @@ router.post('/', [requireAuth, requireAdmin], async (req, res) => {
         }
       });
       embarcacaoId = embarcacao.id;
-      console.log('Embarcação criada/encontrada com ID:', embarcacaoId);
-      console.log('Tipo:', embarcacao.tipo_embarcacao, 'Seguradora:', embarcacao.seguradora_id);
+      logger.debug('Embarcação criada/encontrada', { 
+        embarcacaoId, 
+        tipo: embarcacao.tipo_embarcacao,
+        seguradoraId: embarcacao.seguradora_id 
+      });
     }
 
     // Se não foi fornecido local_id, buscar ou criar local
     if (!localId) {
       if (!local_tipo) {
-        console.log('Validação falhou - tipo do local é obrigatório');
-        console.log('=== FIM ROTA POST /api/vistorias (400) ===\n');
+        logger.warn('Validação falhou - tipo do local é obrigatório');
         return res.status(400).json({ error: "Tipo do local é obrigatório" });
       }
 
-      console.log('Buscando local existente...');
+      logger.debug('Buscando local existente');
       
       // Buscar local existente com os mesmos dados
       const whereClause = {
@@ -145,21 +151,9 @@ router.post('/', [requireAuth, requireAdmin], async (req, res) => {
 
       if (localExistente) {
         localId = localExistente.id;
-        console.log('Local existente encontrado! ID:', localId);
-        console.log('Local:', localExistente.nome_local || `${localExistente.logradouro}, ${localExistente.numero}`);
+        logger.debug('Local existente encontrado', { localId, nome: localExistente.nome_local });
       } else {
-        console.log('Local não encontrado, criando novo...');
-        console.log('Dados do local:', {
-          tipo: local_tipo,
-          nome_local: local_nome_local,
-          cep: local_cep,
-          logradouro: local_logradouro,
-          numero: local_numero,
-          complemento: req.body.local_complemento,
-          bairro: local_bairro,
-          cidade: local_cidade,
-          estado: local_estado
-        });
+        logger.debug('Local não encontrado, criando novo', { tipo: local_tipo });
 
         const novoLocal = await Local.create({
           tipo: local_tipo,
@@ -173,7 +167,7 @@ router.post('/', [requireAuth, requireAdmin], async (req, res) => {
           estado: local_estado || null
         });
         localId = novoLocal.id;
-        console.log('Novo local criado com ID:', localId);
+        logger.debug('Novo local criado', { localId });
       }
     }
 
@@ -184,7 +178,7 @@ router.post('/', [requireAuth, requireAdmin], async (req, res) => {
     }
 
     // Criar a vistoria
-    console.log('Criando vistoria com dados:', {
+    logger.debug('Criando vistoria', {
       embarcacao_id: embarcacaoId,
       local_id: localId,
       vistoriador_id: vistoriador_id,
@@ -212,13 +206,13 @@ router.post('/', [requireAuth, requireAdmin], async (req, res) => {
       corretora_email_laudo: corretora_email_laudo || null
     });
 
-    console.log('Vistoria criada com ID:', novaVistoria.id);
+    logger.info('Vistoria criada', { vistoriaId: novaVistoria.id });
 
     // Copiar checklist automaticamente se a embarcação tiver tipo definido
     try {
       const embarcacao = await Embarcacao.findByPk(embarcacaoId);
       if (embarcacao && embarcacao.tipo_embarcacao) {
-        console.log('Copiando checklist para tipo:', embarcacao.tipo_embarcacao);
+        logger.debug('Copiando checklist para tipo', { tipo: embarcacao.tipo_embarcacao });
         
         const template = await ChecklistTemplate.findOne({
           where: { tipo_embarcacao: embarcacao.tipo_embarcacao },
@@ -243,13 +237,19 @@ router.post('/', [requireAuth, requireAdmin], async (req, res) => {
               status: 'PENDENTE'
             });
           }
-          console.log(`Checklist copiado automaticamente: ${template.itens.length} itens`);
+          logger.info('Checklist copiado automaticamente', { 
+            vistoriaId: novaVistoria.id,
+            itensCount: template.itens.length 
+          });
         } else {
-          console.log('Nenhum template de checklist encontrado para:', embarcacao.tipo_embarcacao);
+          logger.debug('Nenhum template de checklist encontrado', { tipo: embarcacao.tipo_embarcacao });
         }
       }
     } catch (checklistError) {
-      console.error('Erro ao copiar checklist (não crítico):', checklistError);
+      logger.warn('Erro ao copiar checklist (não crítico)', { 
+        error: checklistError.message,
+        vistoriaId: novaVistoria.id 
+      });
       // Não falha a criação da vistoria se houver erro no checklist
     }
 
@@ -262,12 +262,10 @@ router.post('/', [requireAuth, requireAdmin], async (req, res) => {
       ]
     });
 
-    console.log('Vistoria completa retornada:', vistoriaCompleta.id);
-    console.log('=== FIM ROTA POST /api/vistorias ===\n');
     res.status(201).json(vistoriaCompleta);
 
   } catch (error) {
-    console.error("Erro ao criar vistoria:", error);
+    logger.error("Erro ao criar vistoria", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Erro interno do servidor." });
   }
 });
@@ -275,9 +273,10 @@ router.post('/', [requireAuth, requireAdmin], async (req, res) => {
 // Rota: GET /api/vistorias
 router.get('/', requireAuth, async (req, res) => {
   try {
-    console.log('=== ROTA GET /api/vistorias ===');
-    console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
-    console.log('Nível de acesso:', req.user?.NivelAcesso?.nome);
+    logger.debug('GET /api/vistorias', { 
+      userId: req.user?.id,
+      nivelAcesso: req.user?.NivelAcesso?.nome 
+    });
     
     const vistorias = await Vistoria.findAll({
       include: [
@@ -289,23 +288,11 @@ router.get('/', requireAuth, async (req, res) => {
       order: [['created_at', 'DESC']]
     });
     
-    console.log('Vistorias encontradas:', vistorias.length);
-    console.log('Primeira vistoria:', vistorias[0]?.id || 'Nenhuma');
-    
-    if (vistorias.length > 0) {
-      console.log('Estrutura da primeira vistoria:');
-      console.log('- ID:', vistorias[0].id);
-      console.log('- Embarcacao:', vistorias[0].Embarcacao?.nome || 'N/A');
-      console.log('- Local:', vistorias[0].Local?.nome_local || 'N/A');
-      console.log('- Vistoriador:', vistorias[0].vistoriador?.nome || 'N/A');
-      console.log('- Status:', vistorias[0].StatusVistoria?.nome || 'N/A');
-    }
-    
-    console.log('=== FIM ROTA GET /api/vistorias ===\n');
+    logger.debug('Vistorias encontradas', { count: vistorias.length });
     
     res.json(vistorias);
   } catch (error) {
-    console.error("Erro ao buscar vistorias:", error);
+    logger.error("Erro ao buscar vistorias", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Erro interno do servidor" });
   }
 });
@@ -327,7 +314,7 @@ router.get('/vistoriador', requireAuth, async (req, res) => {
     });
     res.json(vistorias);
   } catch (error) {
-    console.error("Erro ao buscar vistorias do vistoriador:", error);
+    logger.error("Erro ao buscar vistorias do vistoriador", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Erro interno do servidor" });
   }
 });
@@ -335,11 +322,11 @@ router.get('/vistoriador', requireAuth, async (req, res) => {
 // Rota: PUT /api/vistorias/:id - Atualizar vistoria
 router.put('/:id', requireAuth, async (req, res) => {
   try {
-    console.log('=== ROTA PUT /api/vistorias/:id ===');
-    console.log('ID da vistoria:', req.params.id);
-    console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
-    console.log('Nível de acesso:', req.user?.NivelAcesso?.nome);
-    console.log('Dados recebidos para atualização:', req.body);
+    logger.debug('PUT /api/vistorias/:id', { 
+      vistoriaId: req.params.id,
+      userId: req.user?.id,
+      nivelAcesso: req.user?.NivelAcesso?.nome 
+    });
     
     const { id } = req.params;
     const updateData = req.body;
@@ -353,8 +340,7 @@ router.put('/:id', requireAuth, async (req, res) => {
     });
 
     if (!vistoria) {
-      console.log('Vistoria não encontrada para ID:', id);
-      console.log('=== FIM ROTA PUT /api/vistorias/:id (404) ===\n');
+      logger.warn('Vistoria não encontrada', { vistoriaId: id });
       return res.status(404).json({ error: "Vistoria não encontrada" });
     }
 
@@ -364,12 +350,14 @@ router.put('/:id', requireAuth, async (req, res) => {
     const isOwner = vistoria.vistoriador_id === req.user.id;
 
     if (!isAdmin && !isOwner) {
-      console.log('Acesso negado - usuário não é admin nem dono da vistoria');
-      console.log('=== FIM ROTA PUT /api/vistorias/:id (403) ===\n');
+      logger.warn('Acesso negado - usuário não é admin nem dono da vistoria', { 
+        userId: req.user?.id,
+        vistoriaId: id 
+      });
       return res.status(403).json({ error: "Acesso negado" });
     }
 
-    console.log('Atualizando vistoria com dados:', updateData);
+    logger.debug('Atualizando vistoria', { vistoriaId: id });
     await vistoria.update(updateData);
     
     // Recarregar com associações
@@ -382,12 +370,10 @@ router.put('/:id', requireAuth, async (req, res) => {
       ]
     });
 
-    console.log('Vistoria atualizada com sucesso:', vistoria.id);
-    console.log('=== FIM ROTA PUT /api/vistorias/:id (200) ===\n');
+    logger.info('Vistoria atualizada com sucesso', { vistoriaId: vistoria.id });
     res.json(vistoria);
   } catch (error) {
-    console.error("Erro ao atualizar vistoria:", error);
-    console.log('=== FIM ROTA PUT /api/vistorias/:id (500) ===\n');
+    logger.error("Erro ao atualizar vistoria", { error: error.message, stack: error.stack, vistoriaId: req.params.id });
     res.status(500).json({ error: "Erro interno do servidor" });
   }
 });
@@ -395,10 +381,11 @@ router.put('/:id', requireAuth, async (req, res) => {
 // Rota: DELETE /api/vistorias/:id - Excluir vistoria (apenas se PENDENTE)
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
-    console.log('=== ROTA DELETE /api/vistorias/:id ===');
-    console.log('ID da vistoria:', req.params.id);
-    console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
-    console.log('Nível de acesso:', req.user?.NivelAcesso?.nome);
+    logger.debug('DELETE /api/vistorias/:id', { 
+      vistoriaId: req.params.id,
+      userId: req.user?.id,
+      nivelAcesso: req.user?.NivelAcesso?.nome 
+    });
     
     const { id } = req.params;
 
@@ -407,42 +394,45 @@ router.delete('/:id', requireAuth, async (req, res) => {
     });
     
     if (!vistoria) {
-      console.log('Vistoria não encontrada para ID:', id);
-      console.log('=== FIM ROTA DELETE /api/vistorias/:id (404) ===\n');
+      logger.warn('Vistoria não encontrada para exclusão', { vistoriaId: id });
       return res.status(404).json({ error: "Vistoria não encontrada" });
     }
 
-    console.log('Vistoria encontrada:', vistoria.id);
-    console.log('Status atual:', vistoria.StatusVistoria?.nome);
+    logger.debug('Vistoria encontrada', { 
+      vistoriaId: vistoria.id,
+      status: vistoria.StatusVistoria?.nome 
+    });
 
     // Apenas admin pode excluir vistorias
     const isAdmin = req.user.NivelAcesso?.id === 1;
-    console.log('isAdmin:', isAdmin);
     
     if (!isAdmin) {
-      console.log('Acesso negado - apenas administradores podem excluir vistorias');
-      console.log('=== FIM ROTA DELETE /api/vistorias/:id (403) ===\n');
+      logger.warn('Acesso negado - apenas administradores podem excluir vistorias', { 
+        userId: req.user?.id,
+        vistoriaId: id 
+      });
       return res.status(403).json({ error: "Apenas administradores podem excluir vistorias" });
     }
 
     // NOVA VALIDACAO: Apenas permitir deletar se status for PENDENTE
     if (vistoria.StatusVistoria?.nome !== 'PENDENTE') {
-      console.log(`Tentativa bloqueada - Status: ${vistoria.StatusVistoria?.nome}`);
-      console.log('=== FIM ROTA DELETE /api/vistorias/:id (403) ===\n');
+      logger.warn('Tentativa bloqueada - status não permite exclusão', { 
+        vistoriaId: id,
+        status: vistoria.StatusVistoria?.nome 
+      });
       return res.status(403).json({ 
         error: "Operação não permitida",
         message: `Apenas vistorias com status PENDENTE podem ser excluídas. Status atual: ${vistoria.StatusVistoria?.nome}` 
       });
     }
 
-    console.log('Excluindo vistoria:', vistoria.id);
+    logger.info('Excluindo vistoria', { vistoriaId: vistoria.id });
     await vistoria.destroy();
-    console.log('Vistoria excluída com sucesso');
-    console.log('=== FIM ROTA DELETE /api/vistorias/:id ===\n');
+    logger.info('Vistoria excluída com sucesso', { vistoriaId: vistoria.id });
     
     res.json({ message: "Vistoria excluída com sucesso" });
   } catch (error) {
-    console.error("Erro ao excluir vistoria:", error);
+    logger.error("Erro ao excluir vistoria", { error: error.message, stack: error.stack, vistoriaId: req.params.id });
     res.status(500).json({ error: "Erro interno do servidor" });
   }
 });
@@ -475,7 +465,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 
     res.json(vistoria);
   } catch (error) {
-    console.error("Erro ao buscar vistoria:", error);
+    logger.error("Erro ao buscar vistoria", { error: error.message, stack: error.stack, vistoriaId: req.params.id });
     res.status(500).json({ error: "Erro interno do servidor" });
   }
 });

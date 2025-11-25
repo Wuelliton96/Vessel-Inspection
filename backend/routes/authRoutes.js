@@ -7,7 +7,9 @@ const { requireAuth, requireAdmin, requireAuthAllowPasswordUpdate } = require('.
 const { loginValidation, registerValidation } = require('../middleware/validator');
 const { loginRateLimiter } = require('../middleware/rateLimiting');
 const { registrarAuditoria } = require('../middleware/auditoria');
-const { validarCPF, limparCPF } = require('../utils/validators');
+const { validarCPF, limparCPF, validatePassword } = require('../utils/validators');
+const { getJwtSecret, getJwtExpiration } = require('../config/jwt');
+const logger = require('../utils/logger');
 
 router.post('/register', registerValidation, async (req, res) => {
   try {
@@ -56,8 +58,9 @@ router.post('/register', registerValidation, async (req, res) => {
       nivelAcessoId: usuarioCompleto.NivelAcesso.id
     };
 
-    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET || 'sua-chave-secreta-jwt', {
-      expiresIn: '24h'
+    const jwtSecret = getJwtSecret();
+    const token = jwt.sign(tokenPayload, jwtSecret, {
+      expiresIn: getJwtExpiration()
     });
 
     res.status(201).json({
@@ -74,7 +77,7 @@ router.post('/register', registerValidation, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Erro no registro:', error);
+    logger.error('Erro no registro', { error: error.message, stack: error.stack });
     
     // Verificar se é erro de email duplicado do Sequelize
     if (error.name === 'SequelizeUniqueConstraintError') {
@@ -93,14 +96,16 @@ router.post('/register', registerValidation, async (req, res) => {
 
 router.post('/login', loginRateLimiter, loginValidation, async (req, res) => {
   try {
-    console.log('[AUTH] Requisição de login recebida');
-    console.log('[AUTH] Origin:', req.headers.origin);
-    console.log('[AUTH] Body:', { cpf: req.body.cpf ? '***' : 'vazio', senha: req.body.senha ? '***' : 'vazio' });
+    logger.info('[AUTH] Requisição de login recebida', { 
+      origin: req.headers.origin,
+      hasCpf: !!req.body.cpf,
+      hasSenha: !!req.body.senha
+    });
     
     const { cpf, senha } = req.body;
 
     if (!cpf || !senha) {
-      console.log('[AUTH] Campos obrigatórios faltando');
+      logger.warn('[AUTH] Campos obrigatórios faltando');
       return res.status(400).json({ 
         error: 'Campos obrigatórios',
         message: 'Por favor, preencha o CPF e a senha para continuar.',
@@ -118,7 +123,7 @@ router.post('/login', loginRateLimiter, loginValidation, async (req, res) => {
       });
     }
 
-    console.log('[AUTH] Buscando usuário no banco pelo CPF...');
+    logger.debug('[AUTH] Buscando usuário no banco pelo CPF');
     const usuario = await Usuario.findOne({
       where: { cpf: cpfLimpo },
       include: {
@@ -128,7 +133,7 @@ router.post('/login', loginRateLimiter, loginValidation, async (req, res) => {
     });
 
     if (!usuario) {
-      console.log('[AUTH] ERRO - Usuário não encontrado com CPF:', cpfLimpo);
+      logger.warn('[AUTH] Usuário não encontrado com CPF', { cpf: cpfLimpo });
       
       // Registrar tentativa de login falhada
       await registrarAuditoria({
@@ -146,14 +151,12 @@ router.post('/login', loginRateLimiter, loginValidation, async (req, res) => {
       });
     }
 
-    console.log('[AUTH] OK - Usuário encontrado:', usuario.nome, '(CPF:', cpfLimpo, ')');
-    console.log('[AUTH] Verificando senha...');
+    logger.debug('[AUTH] Usuário encontrado', { userId: usuario.id, nome: usuario.nome });
     
     const senhaValida = await bcrypt.compare(senha, usuario.senha_hash);
-    console.log('[AUTH] Senha válida?', senhaValida ? 'SIM' : 'NAO');
     
     if (!senhaValida) {
-      console.log('[AUTH] ERRO - Senha incorreta para CPF:', cpfLimpo);
+      logger.warn('[AUTH] Senha incorreta', { userId: usuario.id, cpf: cpfLimpo });
       
       // Registrar tentativa de login falhada
       await registrarAuditoria({
@@ -181,11 +184,12 @@ router.post('/login', loginRateLimiter, loginValidation, async (req, res) => {
       nivelAcessoId: usuario.NivelAcesso.id
     };
 
-    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET || 'sua-chave-secreta-jwt', {
-      expiresIn: '24h'
+    const jwtSecret = getJwtSecret();
+    const token = jwt.sign(tokenPayload, jwtSecret, {
+      expiresIn: getJwtExpiration()
     });
 
-    console.log('[AUTH] Login bem-sucedido para:', usuario.nome, '(CPF:', cpfLimpo, ')');
+    logger.info('[AUTH] Login bem-sucedido', { userId: usuario.id, nome: usuario.nome });
 
     // Registrar login bem-sucedido
     await registrarAuditoria({
@@ -212,7 +216,7 @@ router.post('/login', loginRateLimiter, loginValidation, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[AUTH] Erro no login:', error);
+    logger.error('[AUTH] Erro no login', { error: error.message, stack: error.stack });
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -232,7 +236,7 @@ router.get('/me', requireAuth, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Erro ao obter dados do usuário:', error);
+    logger.error('Erro ao obter dados do usuário', { error: error.message, stack: error.stack });
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -285,7 +289,7 @@ router.put('/user/:id/role', requireAuth, requireAdmin, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Erro ao atualizar nível de acesso:', error);
+    logger.error('Erro ao atualizar nível de acesso', { error: error.message, stack: error.stack });
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -313,7 +317,7 @@ router.get('/users', requireAuth, requireAdmin, async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('Erro ao listar usuários:', error);
+    logger.error('Erro ao listar usuários', { error: error.message, stack: error.stack });
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -360,7 +364,7 @@ router.put('/change-password', requireAuthAllowPasswordUpdate, async (req, res) 
       message: 'Senha atualizada com sucesso'
     });
   } catch (error) {
-    console.error('Erro ao atualizar senha:', error);
+    logger.error('Erro ao atualizar senha', { error: error.message, stack: error.stack });
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -385,7 +389,8 @@ router.put('/force-password-update', async (req, res) => {
     }
 
     // Verificar token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'sua-chave-secreta-jwt');
+    const jwtSecret = getJwtSecret();
+    const decoded = jwt.verify(token, jwtSecret);
     
     // Buscar usuário
     const usuario = await Usuario.findByPk(decoded.userId, {
@@ -442,7 +447,7 @@ router.put('/force-password-update', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Erro na atualização obrigatória de senha:', error);
+    logger.error('Erro na atualização obrigatória de senha', { error: error.message, stack: error.stack });
     
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({ error: 'Token inválido.' });
@@ -452,35 +457,6 @@ router.put('/force-password-update', async (req, res) => {
   }
 });
 
-// Função para validar critérios de senha
-const validatePassword = (senha) => {
-  const errors = [];
-  
-  if (senha.length < 8) {
-    errors.push('Senha deve ter pelo menos 8 caracteres');
-  }
-  
-  if (!/[A-Z]/.test(senha)) {
-    errors.push('Senha deve conter pelo menos uma letra maiúscula');
-  }
-  
-  if (!/[a-z]/.test(senha)) {
-    errors.push('Senha deve conter pelo menos uma letra minúscula');
-  }
-  
-  if (!/[0-9]/.test(senha)) {
-    errors.push('Senha deve conter pelo menos um número');
-  }
-  
-  if (!/[!@#$%^&*(),.?":{}|<>]/.test(senha)) {
-    errors.push('Senha deve conter pelo menos um caractere especial');
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors: errors
-  };
-};
 
 // Rota para administrador atualizar senha de outro usuário
 router.put('/user/:id/password', requireAuth, requireAdmin, async (req, res) => {
@@ -522,7 +498,7 @@ router.put('/user/:id/password', requireAuth, requireAdmin, async (req, res) => 
       message: 'Senha atualizada com sucesso. O usuário deve atualizar a senha no próximo login.'
     });
   } catch (error) {
-    console.error('Erro ao atualizar senha do usuário:', error);
+    logger.error('Erro ao atualizar senha do usuário', { error: error.message, stack: error.stack });
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -559,7 +535,7 @@ router.post('/user/:id/temp-password', requireAuth, requireAdmin, async (req, re
       senhaTemporaria: senhaTemporaria // Retornar para o admin saber qual senha definir
     });
   } catch (error) {
-    console.error('Erro ao definir senha temporária:', error);
+    logger.error('Erro ao definir senha temporária', { error: error.message, stack: error.stack });
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -575,7 +551,7 @@ router.get('/password-status', requireAuthAllowPasswordUpdate, async (req, res) 
         'Senha está atualizada'
     });
   } catch (error) {
-    console.error('Erro ao verificar status da senha:', error);
+    logger.error('Erro ao verificar status da senha', { error: error.message, stack: error.stack });
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
