@@ -182,6 +182,149 @@ class E2ETestBase {
     console.log(`  Foto ID: ${this.item.foto_id || 'null'}`);
     console.log(`  Concluído em: ${this.item.concluido_em || 'null'}`);
   }
+
+  /**
+   * Executa validação e retorna resultado formatado
+   */
+  validateAndLog(expectedStatus, expectedFotoId = null, successMessages = []) {
+    const validation = this.validateItemState(expectedStatus, expectedFotoId);
+    
+    if (validation.isValid) {
+      if (successMessages.length > 0) {
+        successMessages.forEach(msg => console.log(`  OK: ${msg}`));
+      }
+      return { isValid: true, errors: [] };
+    }
+    
+    validation.errors.forEach(error => {
+      console.log(`  ERRO: ${error}`);
+    });
+    return validation;
+  }
+
+  /**
+   * Executa teste completo de marcar como concluído e validar
+   */
+  async runCompleteMarkAsCompletedTest(fotoId = null) {
+    console.log('\n=== SIMULANDO ROTA PATCH /api/checklists/vistoria/item/:id/status ===\n');
+    this.logItemState('Estado ANTES');
+    await this.markItemAsCompleted(fotoId);
+    this.logItemState('Estado DEPOIS');
+    console.log('');
+    
+    console.log('=== VALIDAÇÕES ===');
+    const validation = this.validateAndLog(
+      'CONCLUIDO',
+      null,
+      [
+        'Status atualizado para CONCLUIDO',
+        'Foto ID é null',
+        'concluido_em foi definido'
+      ]
+    );
+    
+    return validation.isValid;
+  }
+
+  /**
+   * Executa teste completo de voltar para pendente e validar
+   */
+  async runCompleteMarkAsPendingTest() {
+    console.log('\n=== TESTANDO VOLTAR PARA PENDENTE ===');
+    await this.markItemAsPending();
+    
+    const validation = this.validateAndLog(
+      'PENDENTE',
+      null,
+      ['Item voltou para PENDENTE corretamente']
+    );
+    
+    return validation.isValid;
+  }
+
+  /**
+   * Verifica se item está nas listas corretas
+   */
+  async verifyItemInLists() {
+    const itensConcluidos = await this.getItemsByStatus('CONCLUIDO');
+    const itensPendentes = await this.getItemsByStatus('PENDENTE');
+
+    console.log('\n=== VERIFICAÇÃO DE LISTAS ===');
+    console.log(`  Itens concluídos na vistoria: ${itensConcluidos.length}`);
+    console.log(`  Itens pendentes na vistoria: ${itensPendentes.length}`);
+
+    const itemEstaConcluido = itensConcluidos.some(i => i.id === this.item.id);
+    const itemEstaPendente = itensPendentes.some(i => i.id === this.item.id);
+
+    if (itemEstaConcluido && !itemEstaPendente) {
+      console.log('  OK: Item aparece apenas na lista de concluídos');
+      return true;
+    }
+    
+    console.log('  ERRO: Item não está na lista correta');
+    console.log(`    Está em concluídos: ${itemEstaConcluido}`);
+    console.log(`    Está em pendentes: ${itemEstaPendente}`);
+    return false;
+  }
+
+  /**
+   * Executa teste completo e retorna resultado final
+   */
+  async runCompleteTest(options = {}) {
+    const {
+      testName = 'TESTE',
+      requireVistoriador = false,
+      itemOptions = {},
+      validateLists = false,
+      testPending = true
+    } = options;
+
+    let todasValido = true;
+
+    try {
+      console.log(`=== ${testName} ===\n`);
+
+      if (requireVistoriador) {
+        const vistoriador = await this.findVistoriador();
+        console.log(`Vistoriador: ${vistoriador.nome} (ID: ${vistoriador.id})\n`);
+      }
+
+      const item = await this.findPendingItem(itemOptions);
+      if (!item) {
+        console.log(`Nenhum item encontrado para teste`);
+        process.exit(0);
+      }
+
+      this.logItemInfo();
+      console.log('');
+
+      todasValido = await this.runCompleteMarkAsCompletedTest();
+
+      if (validateLists) {
+        const listsValid = await this.verifyItemInLists();
+        todasValido = todasValido && listsValid;
+      }
+
+      if (testPending) {
+        const pendingValid = await this.runCompleteMarkAsPendingTest();
+        todasValido = todasValido && pendingValid;
+      }
+
+      console.log('\n=== RESULTADO FINAL ===');
+      if (todasValido) {
+        console.log('OK: Todos os testes passaram!');
+      } else {
+        console.log('ERRO: Alguns testes falharam');
+      }
+
+      console.log('\n=== TESTE CONCLUÍDO ===\n');
+      return todasValido;
+    } catch (error) {
+      console.error('Erro no teste:', error);
+      console.error('Stack:', error.stack);
+      throw error;
+    }
+  }
 }
 
 module.exports = E2ETestBase;
