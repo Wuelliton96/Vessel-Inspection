@@ -50,7 +50,10 @@ jobs:
 
       - name: Instalar dependências
         working-directory: ./backend
-        run: npm install
+        env:
+          CI: true
+        run: |
+          npm ci --no-audit --no-fund --verbose
 
       - name: Restart PM2 
         working-directory: ./backend
