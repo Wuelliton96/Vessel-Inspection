@@ -27,9 +27,6 @@ jobs:
           cache: npm
           cache-dependency-path: ./backend/package-lock.json
 
-      - name: Instalar dependências
-        working-directory: ./backend
-        run: npm install
 
       - name: Criar .env no backend
         working-directory: ./backend
@@ -50,6 +47,10 @@ jobs:
       #    # IMPORTANTE: TEST_DATABASE_URL deve apontar para um banco SEPARADO de produção
       #    # Isso garante que testes nunca apaguem dados de produção
       #  run: npm test   # ou npm run test, se for o caso
+
+      - name: Instalar dependências
+        working-directory: ./backend
+        run: npm install
 
       - name: Restart PM2 
         working-directory: ./backend
