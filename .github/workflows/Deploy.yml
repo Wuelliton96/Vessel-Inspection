@@ -60,4 +60,4 @@ jobs:
         run: |
           pm2 describe BackendAPI > /dev/null \
             && pm2 restart BackendAPI --update-env \
-            || pm2 start index.js --name BackendAPI
+            || pm2 start server.js --name BackendAPI
