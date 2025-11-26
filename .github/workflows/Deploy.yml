@@ -55,9 +55,9 @@ jobs:
         run: |
           npm ci
 
-      - name: Gerenciar PM2 (restart ou criar)
+      - name: Gerenciar PM2 (delete e start novamente)
         working-directory: ./backend
         run: |
-          pm2 describe BackendAPI > /dev/null \
-            && pm2 restart BackendAPI --update-env \
-            || pm2 start server.js --name BackendAPI
+          pm2 delete all || true
+          pm2 start server.js --name BackendAPI
+
