@@ -1,13 +1,9 @@
 const request = require('supertest');
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const { sequelize, Usuario, NivelAcesso } = require('../../models');
+const { sequelize } = require('../../models');
 const authRoutes = require('../../routes/authRoutes');
-const jwt = require('jsonwebtoken');
+const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
 
-const app = express();
-app.use(express.json());
-app.use('/api/auth', authRoutes);
+const app = createTestApp({ path: '/api/auth', router: authRoutes });
 
 describe('Rotas de Autenticação', () => {
   let admin, vistoriador;
@@ -16,28 +12,9 @@ describe('Rotas de Autenticação', () => {
     // IMPORTANTE: force: true apaga e recria todas as tabelas
     // Isso é SEGURO porque NODE_ENV=test garante uso de banco de teste (TEST_DATABASE_URL)
     // NUNCA apagará dados de produção quando configurado corretamente
-    await sequelize.sync({ force: true });
-    
-    await NivelAcesso.create({ id: 1, nome: 'ADMINISTRADOR', descricao: 'Admin' });
-    await NivelAcesso.create({ id: 2, nome: 'VISTORIADOR', descricao: 'Vistoriador' });
-
-    const senhaHash = await bcrypt.hash('Teste@123', 10);
-    
-    admin = await Usuario.create({
-      cpf: '12345678901',
-      nome: 'Admin Test',
-      email: 'admin@auth.test',
-      senha_hash: senhaHash,
-      nivel_acesso_id: 1
-    });
-
-    vistoriador = await Usuario.create({
-      cpf: '12345678902',
-      nome: 'Vistoriador Test',
-      email: 'vist@auth.test',
-      senha_hash: senhaHash,
-      nivel_acesso_id: 2
-    });
+    const setup = await setupCompleteTestEnvironment('auth');
+    admin = setup.admin;
+    vistoriador = setup.vistoriador;
   });
 
   afterAll(async () => {

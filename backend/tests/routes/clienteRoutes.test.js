@@ -1,33 +1,16 @@
 const request = require('supertest');
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { sequelize, Cliente, Usuario, NivelAcesso } = require('../../models');
+const { sequelize, Cliente } = require('../../models');
 const clienteRoutes = require('../../routes/clienteRoutes');
+const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
 
-const app = express();
-app.use(express.json());
-app.use('/api/clientes', clienteRoutes);
+const app = createTestApp({ path: '/api/clientes', router: clienteRoutes });
 
 describe('Rotas de Clientes', () => {
   let vistoriadorToken;
 
   beforeAll(async () => {
-    await sequelize.sync({ force: true });
-    await NivelAcesso.create({ id: 2, nome: 'VISTORIADOR', descricao: 'Vistoriador' });
-    const senhaHash = await bcrypt.hash('Teste@123', 10);
-    const vistoriador = await Usuario.create({
-      cpf: '12345678905',
-      nome: 'Vistoriador', 
-      email: 'vist@cliente.test', 
-      senha_hash: senhaHash, 
-      nivel_acesso_id: 2
-    });
-    vistoriadorToken = jwt.sign({ 
-      userId: vistoriador.id, 
-      cpf: vistoriador.cpf,
-      nivelAcessoId: 2 
-    }, process.env.JWT_SECRET || 'sua-chave-secreta-jwt');
+    const setup = await setupCompleteTestEnvironment('cliente');
+    vistoriadorToken = setup.vistoriadorToken;
   });
 
   afterAll(async () => {

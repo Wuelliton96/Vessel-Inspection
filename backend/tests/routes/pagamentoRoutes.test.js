@@ -1,46 +1,19 @@
 const request = require('supertest');
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { sequelize, LotePagamento, VistoriaLotePagamento, Vistoria, Usuario, NivelAcesso, Embarcacao, Local, StatusVistoria } = require('../../models');
+const { sequelize, LotePagamento, VistoriaLotePagamento, Vistoria, Embarcacao, Local, StatusVistoria } = require('../../models');
 const pagamentoRoutes = require('../../routes/pagamentoRoutes');
+const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
 
-const app = express();
-app.use(express.json());
-app.use('/api/pagamentos', pagamentoRoutes);
+const app = createTestApp({ path: '/api/pagamentos', router: pagamentoRoutes });
 
 describe('Rotas de Pagamento', () => {
   let adminToken;
   let admin, vistoriador;
 
   beforeAll(async () => {
-    await sequelize.sync({ force: true });
-
-    await NivelAcesso.create({ id: 1, nome: 'ADMINISTRADOR', descricao: 'Admin' });
-    await NivelAcesso.create({ id: 2, nome: 'VISTORIADOR', descricao: 'Vistoriador' });
-
-    const senhaHash = await bcrypt.hash('Teste@123', 10);
-    
-    admin = await Usuario.create({
-      cpf: '12345678912',
-      nome: 'Admin',
-      email: 'admin@pagamento.test',
-      senha_hash: senhaHash,
-      nivel_acesso_id: 1
-    });
-
-    vistoriador = await Usuario.create({
-      cpf: '12345678913',
-      nome: 'Vistoriador',
-      email: 'vist@pagamento.test',
-      senha_hash: senhaHash,
-      nivel_acesso_id: 2
-    });
-
-    adminToken = jwt.sign(
-      { userId: admin.id, cpf: admin.cpf, nivelAcessoId: 1 },
-      process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-    );
+    const setup = await setupCompleteTestEnvironment('pagamento');
+    admin = setup.admin;
+    vistoriador = setup.vistoriador;
+    adminToken = setup.adminToken;
   });
 
   afterAll(async () => {

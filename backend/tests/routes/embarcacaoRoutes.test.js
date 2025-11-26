@@ -1,44 +1,20 @@
 const request = require('supertest');
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { sequelize, Embarcacao, Usuario, NivelAcesso, Seguradora, Cliente } = require('../../models');
+const { sequelize, Embarcacao, Seguradora, Cliente } = require('../../models');
 const embarcacaoRoutes = require('../../routes/embarcacaoRoutes');
+const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
 
-const app = express();
-app.use(express.json());
-app.use('/api/embarcacoes', embarcacaoRoutes);
+const app = createTestApp({ path: '/api/embarcacoes', router: embarcacaoRoutes });
 
 describe('Rotas de Embarcações', () => {
   let adminToken, vistoriadorToken;
   let admin, vistoriador;
 
   beforeAll(async () => {
-    await sequelize.sync({ force: true });
-
-    await NivelAcesso.create({ id: 1, nome: 'ADMINISTRADOR', descricao: 'Admin' });
-    await NivelAcesso.create({ id: 2, nome: 'VISTORIADOR', descricao: 'Vistoriador' });
-
-    const senhaHash = await bcrypt.hash('Teste@123', 10);
-    
-    admin = await Usuario.create({
-      cpf: '12345678903',
-      nome: 'Admin', 
-      email: 'admin@emb.test', 
-      senha_hash: senhaHash, 
-      nivel_acesso_id: 1
-    });
-
-    vistoriador = await Usuario.create({
-      cpf: '12345678904',
-      nome: 'Vistoriador', 
-      email: 'vist@emb.test', 
-      senha_hash: senhaHash, 
-      nivel_acesso_id: 2
-    });
-
-    adminToken = jwt.sign({ userId: admin.id, nivelAcessoId: 1 }, process.env.JWT_SECRET || 'test-secret');
-    vistoriadorToken = jwt.sign({ userId: vistoriador.id, nivelAcessoId: 2 }, process.env.JWT_SECRET || 'test-secret');
+    const setup = await setupCompleteTestEnvironment('embarcacao');
+    admin = setup.admin;
+    vistoriador = setup.vistoriador;
+    adminToken = setup.adminToken;
+    vistoriadorToken = setup.vistoriadorToken;
   });
 
   afterAll(async () => {

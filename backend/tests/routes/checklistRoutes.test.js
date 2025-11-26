@@ -1,13 +1,9 @@
 const request = require('supertest');
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { sequelize, ChecklistTemplate, ChecklistTemplateItem, VistoriaChecklistItem, Vistoria, Usuario, NivelAcesso, Embarcacao, Local, StatusVistoria } = require('../../models');
+const { sequelize, ChecklistTemplate, ChecklistTemplateItem, VistoriaChecklistItem, Vistoria, Embarcacao, Local, StatusVistoria } = require('../../models');
 const checklistRoutes = require('../../routes/checklistRoutes');
+const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
 
-const app = express();
-app.use(express.json());
-app.use('/api/checklists', checklistRoutes);
+const app = createTestApp({ path: '/api/checklists', router: checklistRoutes });
 
 describe('Rotas de Checklist', () => {
   let adminToken, vistoriadorToken;
@@ -15,38 +11,11 @@ describe('Rotas de Checklist', () => {
   let template, templateItem;
 
   beforeAll(async () => {
-    await sequelize.sync({ force: true });
-
-    await NivelAcesso.create({ id: 1, nome: 'ADMINISTRADOR', descricao: 'Admin' });
-    await NivelAcesso.create({ id: 2, nome: 'VISTORIADOR', descricao: 'Vistoriador' });
-
-    const senhaHash = await bcrypt.hash('Teste@123', 10);
-    
-    admin = await Usuario.create({
-      cpf: '12345678909',
-      nome: 'Admin',
-      email: 'admin@checklist.test',
-      senha_hash: senhaHash,
-      nivel_acesso_id: 1
-    });
-
-    vistoriador = await Usuario.create({
-      cpf: '12345678910',
-      nome: 'Vistoriador',
-      email: 'vist@checklist.test',
-      senha_hash: senhaHash,
-      nivel_acesso_id: 2
-    });
-
-    adminToken = jwt.sign(
-      { userId: admin.id, cpf: admin.cpf, nivelAcessoId: 1 },
-      process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-    );
-
-    vistoriadorToken = jwt.sign(
-      { userId: vistoriador.id, cpf: vistoriador.cpf, nivelAcessoId: 2 },
-      process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-    );
+    const setup = await setupCompleteTestEnvironment('checklist');
+    admin = setup.admin;
+    vistoriador = setup.vistoriador;
+    adminToken = setup.adminToken;
+    vistoriadorToken = setup.vistoriadorToken;
 
     template = await ChecklistTemplate.create({
       tipo_embarcacao: 'JET_SKI',

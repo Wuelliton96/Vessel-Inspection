@@ -1,13 +1,9 @@
 const request = require('supertest');
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { sequelize, Usuario, NivelAcesso, Vistoria, Embarcacao, Local, StatusVistoria } = require('../../models');
+const { sequelize, Vistoria, Embarcacao, Local, StatusVistoria } = require('../../models');
 const dashboardRoutes = require('../../routes/dashboardRoutes');
+const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
 
-const app = express();
-app.use(express.json());
-app.use('/api/dashboard', dashboardRoutes);
+const app = createTestApp({ path: '/api/dashboard', router: dashboardRoutes });
 
 describe('Rotas de Dashboard', () => {
   let adminToken;
@@ -17,25 +13,9 @@ describe('Rotas de Dashboard', () => {
     // IMPORTANTE: force: true apaga e recria todas as tabelas
     // Isso é SEGURO porque NODE_ENV=test garante uso de banco de teste (TEST_DATABASE_URL)
     // NUNCA apagará dados de produção quando configurado corretamente
-    await sequelize.sync({ force: true });
-
-    await NivelAcesso.create({ id: 1, nome: 'ADMINISTRADOR', descricao: 'Admin' });
-    await NivelAcesso.create({ id: 2, nome: 'VISTORIADOR', descricao: 'Vistoriador' });
-
-    const senhaHash = await bcrypt.hash('Teste@123', 10);
-    
-    admin = await Usuario.create({
-      cpf: '12345678911',
-      nome: 'Admin',
-      email: 'admin@dashboard.test',
-      senha_hash: senhaHash,
-      nivel_acesso_id: 1
-    });
-
-    adminToken = jwt.sign(
-      { userId: admin.id, cpf: admin.cpf, nivelAcessoId: 1 },
-      process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-    );
+    const setup = await setupCompleteTestEnvironment('dashboard');
+    admin = setup.admin;
+    adminToken = setup.adminToken;
   });
 
   afterAll(async () => {

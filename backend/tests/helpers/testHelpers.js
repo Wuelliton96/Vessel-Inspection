@@ -1,5 +1,7 @@
 // Helpers para testes
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { sequelize } = require('../../models');
 const { 
   Usuario, 
   NivelAcesso, 
@@ -335,6 +337,108 @@ const mockRequestData = {
   }
 };
 
+/**
+ * Setup básico do ambiente de teste (sequelize sync + níveis de acesso)
+ */
+const setupTestEnvironment = async () => {
+  await sequelize.sync({ force: true });
+  
+  const nivelAdmin = await NivelAcesso.create({ 
+    id: 1, 
+    nome: 'ADMINISTRADOR', 
+    descricao: 'Admin' 
+  });
+  
+  const nivelVistoriador = await NivelAcesso.create({ 
+    id: 2, 
+    nome: 'VISTORIADOR', 
+    descricao: 'Vistoriador' 
+  });
+  
+  return { nivelAdmin, nivelVistoriador };
+};
+
+/**
+ * Cria usuários de teste (admin e vistoriador)
+ */
+const createTestUsers = async (senhaHash, nivelAdmin, nivelVistoriador, suffix = '') => {
+  const timestamp = Date.now();
+  const randomSuffix = suffix || Math.floor(Math.random() * 1000);
+  
+  const admin = await Usuario.create({
+    cpf: `123456789${String(randomSuffix).padStart(2, '0')}`,
+    nome: 'Admin',
+    email: `admin${suffix}@test${timestamp}.com`,
+    senha_hash: senhaHash,
+    nivel_acesso_id: nivelAdmin.id
+  });
+  
+  const vistoriador = await Usuario.create({
+    cpf: `123456789${String(randomSuffix + 1).padStart(2, '0')}`,
+    nome: 'Vistoriador',
+    email: `vist${suffix}@test${timestamp}.com`,
+    senha_hash: senhaHash,
+    nivel_acesso_id: nivelVistoriador.id
+  });
+  
+  return { admin, vistoriador };
+};
+
+/**
+ * Gera tokens JWT para os usuários
+ */
+const generateTokens = (admin, vistoriador) => {
+  const adminToken = jwt.sign(
+    { userId: admin.id, cpf: admin.cpf, nivelAcessoId: 1 },
+    process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
+  );
+  
+  const vistoriadorToken = jwt.sign(
+    { userId: vistoriador.id, cpf: vistoriador.cpf, nivelAcessoId: 2 },
+    process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
+  );
+  
+  return { adminToken, vistoriadorToken };
+};
+
+/**
+ * Setup completo do ambiente de teste (recomendado para a maioria dos testes)
+ */
+const setupCompleteTestEnvironment = async (suffix = '') => {
+  const { nivelAdmin, nivelVistoriador } = await setupTestEnvironment();
+  const senhaHash = await bcrypt.hash('Teste@123', 10);
+  const { admin, vistoriador } = await createTestUsers(senhaHash, nivelAdmin, nivelVistoriador, suffix);
+  const { adminToken, vistoriadorToken } = generateTokens(admin, vistoriador);
+  
+  return {
+    nivelAdmin,
+    nivelVistoriador,
+    admin,
+    vistoriador,
+    adminToken,
+    vistoriadorToken
+  };
+};
+
+/**
+ * Cria uma instância do Express app configurada para testes
+ */
+const createTestApp = (routes) => {
+  const express = require('express');
+  const app = express();
+  app.use(express.json());
+  
+  if (Array.isArray(routes)) {
+    for (const route of routes) {
+      app.use(route.path, route.router);
+    }
+  } else if (routes.path && routes.router) {
+    app.use(routes.path, routes.router);
+  }
+  
+  return app;
+};
+
 module.exports = {
   createTestData,
   cleanupTestData,
@@ -342,5 +446,11 @@ module.exports = {
   createTestEmbarcacao,
   createTestLocal,
   createTestVistoria,
-  mockRequestData
+  mockRequestData,
+  // Novos helpers reutilizáveis
+  setupTestEnvironment,
+  createTestUsers,
+  generateTokens,
+  setupCompleteTestEnvironment,
+  createTestApp
 };

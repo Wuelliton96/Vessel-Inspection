@@ -1,33 +1,16 @@
 const request = require('supertest');
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { sequelize, Seguradora, Usuario, NivelAcesso } = require('../../models');
+const { sequelize, Seguradora } = require('../../models');
 const seguradoraRoutes = require('../../routes/seguradoraRoutes');
+const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
 
-const app = express();
-app.use(express.json());
-app.use('/api/seguradoras', seguradoraRoutes);
+const app = createTestApp({ path: '/api/seguradoras', router: seguradoraRoutes });
 
 describe('Rotas de Seguradoras', () => {
   let adminToken;
 
   beforeAll(async () => {
-    await sequelize.sync({ force: true });
-    await NivelAcesso.create({ id: 1, nome: 'ADMINISTRADOR', descricao: 'Admin' });
-    const senhaHash = await bcrypt.hash('Teste@123', 10);
-    const admin = await Usuario.create({
-      cpf: '12345678906',
-      nome: 'Admin', 
-      email: 'admin@seg.test', 
-      senha_hash: senhaHash, 
-      nivel_acesso_id: 1
-    });
-    adminToken = jwt.sign({ 
-      userId: admin.id, 
-      cpf: admin.cpf,
-      nivelAcessoId: 1 
-    }, process.env.JWT_SECRET || 'sua-chave-secreta-jwt');
+    const setup = await setupCompleteTestEnvironment('seguradora');
+    adminToken = setup.adminToken;
   });
 
   afterAll(async () => {

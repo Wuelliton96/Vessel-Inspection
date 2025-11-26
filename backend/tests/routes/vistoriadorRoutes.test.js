@@ -1,46 +1,19 @@
 const request = require('supertest');
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { sequelize, Vistoria, Embarcacao, Local, StatusVistoria, Usuario, NivelAcesso } = require('../../models');
+const { sequelize, Vistoria, Embarcacao, Local, StatusVistoria } = require('../../models');
 const vistoriadorRoutes = require('../../routes/vistoriadorRoutes');
+const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
 
-const app = express();
-app.use(express.json());
-app.use('/api/vistoriador', vistoriadorRoutes);
+const app = createTestApp({ path: '/api/vistoriador', router: vistoriadorRoutes });
 
 describe('Rotas de Vistoriador', () => {
   let vistoriadorToken;
   let admin, vistoriador;
 
   beforeAll(async () => {
-    await sequelize.sync({ force: true });
-
-    await NivelAcesso.create({ id: 1, nome: 'ADMINISTRADOR', descricao: 'Admin' });
-    await NivelAcesso.create({ id: 2, nome: 'VISTORIADOR', descricao: 'Vistoriador' });
-
-    const senhaHash = await bcrypt.hash('Teste@123', 10);
-    
-    admin = await Usuario.create({
-      cpf: '12345678914',
-      nome: 'Admin',
-      email: 'admin@vistoriador.test',
-      senha_hash: senhaHash,
-      nivel_acesso_id: 1
-    });
-
-    vistoriador = await Usuario.create({
-      cpf: '12345678915',
-      nome: 'Vistoriador',
-      email: 'vist@vistoriador.test',
-      senha_hash: senhaHash,
-      nivel_acesso_id: 2
-    });
-
-    vistoriadorToken = jwt.sign(
-      { userId: vistoriador.id, cpf: vistoriador.cpf, nivelAcessoId: 2 },
-      process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-    );
+    const setup = await setupCompleteTestEnvironment('vistoriador');
+    admin = setup.admin;
+    vistoriador = setup.vistoriador;
+    vistoriadorToken = setup.vistoriadorToken;
   });
 
   afterAll(async () => {
