@@ -53,7 +53,7 @@ jobs:
         env:
           CI: true
         run: |
-          npm ci --no-audit --no-fund --verbose
+          npm ci
 
       - name: Restart PM2 
         working-directory: ./backend

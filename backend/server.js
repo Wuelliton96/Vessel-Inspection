@@ -184,7 +184,7 @@ sequelize.authenticate()
   });
 
 app.get('/', (req, res) => {
-  res.send('API do SGVN está funcionando!!!');
+  res.send('API do SGVN está funcionando.');
 });
 
 app.get('/health', async (req, res) => {
