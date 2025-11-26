@@ -1,7 +1,7 @@
 const request = require('supertest');
-const { sequelize, Vistoria, Embarcacao, Local, StatusVistoria } = require('../../models');
+const { sequelize } = require('../../models');
 const vistoriadorRoutes = require('../../routes/vistoriadorRoutes');
-const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
+const { setupCompleteTestEnvironment, createTestApp, createTestVistoriaCompleta } = require('../helpers/testHelpers');
 
 const app = createTestApp({ path: '/api/vistoriador', router: vistoriadorRoutes });
 
@@ -22,16 +22,12 @@ describe('Rotas de Vistoriador', () => {
 
   describe('GET /api/vistoriador/vistorias', () => {
     it('deve listar vistorias do vistoriador', async () => {
-      const status = await StatusVistoria.create({ nome: 'EM_ANDAMENTO', descricao: 'Em andamento' });
-      const embarcacao = await Embarcacao.create({ nome: 'Barco Test', nr_inscricao_barco: 'TEST001' });
-      const local = await Local.create({ tipo: 'MARINA', nome_local: 'Marina Test' });
-      
-      await Vistoria.create({
-        embarcacao_id: embarcacao.id,
-        local_id: local.id,
-        vistoriador_id: vistoriador.id,
-        administrador_id: admin.id,
-        status_id: status.id
+      await createTestVistoriaCompleta({
+        vistoriador,
+        administrador: admin,
+        statusNome: 'EM_ANDAMENTO',
+        embarcacaoOverrides: { nome: 'Barco Test', nr_inscricao_barco: 'TEST001' },
+        localOverrides: { tipo: 'MARINA', nome_local: 'Marina Test' }
       });
 
       const response = await request(app)
@@ -50,16 +46,12 @@ describe('Rotas de Vistoriador', () => {
 
   describe('GET /api/vistoriador/vistorias/:id', () => {
     it('deve buscar vistoria específica do vistoriador', async () => {
-      const status = await StatusVistoria.create({ nome: 'EM_ANDAMENTO', descricao: 'Em andamento' });
-      const embarcacao = await Embarcacao.create({ nome: 'Barco Test', nr_inscricao_barco: 'TEST002' });
-      const local = await Local.create({ tipo: 'MARINA', nome_local: 'Marina Test' });
-      
-      const vistoria = await Vistoria.create({
-        embarcacao_id: embarcacao.id,
-        local_id: local.id,
-        vistoriador_id: vistoriador.id,
-        administrador_id: admin.id,
-        status_id: status.id
+      const { vistoria } = await createTestVistoriaCompleta({
+        vistoriador,
+        administrador: admin,
+        statusNome: 'EM_ANDAMENTO',
+        embarcacaoOverrides: { nome: 'Barco Test', nr_inscricao_barco: 'TEST002' },
+        localOverrides: { tipo: 'MARINA', nome_local: 'Marina Test' }
       });
 
       const response = await request(app)

@@ -1,7 +1,7 @@
 const request = require('supertest');
-const { sequelize, LotePagamento, VistoriaLotePagamento, Vistoria, Embarcacao, Local, StatusVistoria } = require('../../models');
+const { sequelize } = require('../../models');
 const pagamentoRoutes = require('../../routes/pagamentoRoutes');
-const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
+const { setupCompleteTestEnvironment, createTestApp, createTestVistoriaCompleta } = require('../helpers/testHelpers');
 
 const app = createTestApp({ path: '/api/pagamentos', router: pagamentoRoutes });
 
@@ -38,16 +38,12 @@ describe('Rotas de Pagamento', () => {
 
   describe('POST /api/pagamentos', () => {
     it('deve criar lote de pagamento (admin)', async () => {
-      const status = await StatusVistoria.create({ nome: 'CONCLUIDA', descricao: 'Concluída' });
-      const embarcacao = await Embarcacao.create({ nome: 'Barco Test', nr_inscricao_barco: 'TEST001' });
-      const local = await Local.create({ tipo: 'MARINA', nome_local: 'Marina Test' });
-      
-      const vistoria = await Vistoria.create({
-        embarcacao_id: embarcacao.id,
-        local_id: local.id,
-        vistoriador_id: vistoriador.id,
-        administrador_id: admin.id,
-        status_id: status.id
+      const { vistoria } = await createTestVistoriaCompleta({
+        vistoriador,
+        administrador: admin,
+        statusNome: 'CONCLUIDA',
+        embarcacaoOverrides: { nome: 'Barco Test', nr_inscricao_barco: 'TEST001' },
+        localOverrides: { tipo: 'MARINA', nome_local: 'Marina Test' }
       });
 
       const response = await request(app)

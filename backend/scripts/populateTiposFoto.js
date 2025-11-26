@@ -52,26 +52,36 @@ const tiposFotoPadrao = [
   }
 ];
 
+/**
+ * Cria ou atualiza um tipo de foto
+ */
+async function criarOuAtualizarTipoFoto(tipo) {
+  const [tipoCriado, criado] = await TipoFotoChecklist.findOrCreate({
+    where: { codigo: tipo.codigo },
+    defaults: tipo
+  });
+  
+  if (criado) {
+    console.log(`Tipo de foto criado: ${tipo.codigo} - ${tipo.nome_exibicao}`);
+  } else {
+    console.log(`Tipo de foto já existe: ${tipo.codigo} - ${tipo.nome_exibicao}`);
+  }
+  
+  return { tipoCriado, criado };
+}
+
 async function popularTiposFoto() {
   try {
     console.log('Iniciando população dos tipos de foto...');
     
     for (const tipo of tiposFotoPadrao) {
-      const [tipoCriado, criado] = await TipoFotoChecklist.findOrCreate({
-        where: { codigo: tipo.codigo },
-        defaults: tipo
-      });
-      
-      if (criado) {
-        console.log(`Tipo de foto criado: ${tipo.codigo} - ${tipo.nome_exibicao}`);
-      } else {
-        console.log(`Tipo de foto já existe: ${tipo.codigo} - ${tipo.nome_exibicao}`);
-      }
+      await criarOuAtualizarTipoFoto(tipo);
     }
     
     console.log('População dos tipos de foto concluída!');
   } catch (error) {
     console.error('Erro ao popular tipos de foto:', error);
+    throw error;
   }
 }
 

@@ -332,6 +332,42 @@ const createTestVistoria = async (overrides = {}) => {
 };
 
 /**
+ * Cria uma vistoria completa com todos os dados relacionados
+ * Útil para testes que precisam de uma vistoria completa
+ */
+const createTestVistoriaCompleta = async (options = {}) => {
+  const {
+    vistoriador,
+    administrador,
+    statusNome = 'EM_ANDAMENTO',
+    embarcacaoOverrides = {},
+    localOverrides = {},
+    vistoriaOverrides = {}
+  } = options;
+
+  if (!vistoriador || !administrador) {
+    throw new Error('vistoriador e administrador são obrigatórios');
+  }
+
+  // Criar status, embarcação e local
+  const status = await createTestStatusVistoria({ nome: statusNome });
+  const embarcacao = await createTestEmbarcacao(embarcacaoOverrides);
+  const local = await createTestLocal(localOverrides);
+
+  // Criar vistoria
+  const vistoria = await Vistoria.create({
+    embarcacao_id: embarcacao.id,
+    local_id: local.id,
+    vistoriador_id: vistoriador.id,
+    administrador_id: administrador.id,
+    status_id: status.id,
+    ...vistoriaOverrides
+  });
+
+  return { vistoria, status, embarcacao, local };
+};
+
+/**
  * Mock de dados para requisições
  */
 const mockRequestData = {
@@ -459,6 +495,7 @@ module.exports = {
   createTestEmbarcacao,
   createTestLocal,
   createTestVistoria,
+  createTestVistoriaCompleta,
   createTestStatusVistoria,
   mockRequestData,
   // Novos helpers reutilizáveis

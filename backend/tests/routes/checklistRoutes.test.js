@@ -1,7 +1,7 @@
 const request = require('supertest');
-const { sequelize, ChecklistTemplate, ChecklistTemplateItem, VistoriaChecklistItem, Vistoria, Embarcacao, Local, StatusVistoria } = require('../../models');
+const { sequelize, ChecklistTemplate, ChecklistTemplateItem } = require('../../models');
 const checklistRoutes = require('../../routes/checklistRoutes');
-const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
+const { setupCompleteTestEnvironment, createTestApp, createTestVistoriaCompleta } = require('../helpers/testHelpers');
 
 const app = createTestApp({ path: '/api/checklists', router: checklistRoutes });
 
@@ -76,16 +76,12 @@ describe('Rotas de Checklist', () => {
 
   describe('GET /api/checklists/vistoria/:vistoria_id', () => {
     it('deve buscar checklist de uma vistoria', async () => {
-      const status = await StatusVistoria.create({ nome: 'EM_ANDAMENTO', descricao: 'Em andamento' });
-      const embarcacao = await Embarcacao.create({ nome: 'Barco Test', nr_inscricao_barco: 'TEST001' });
-      const local = await Local.create({ tipo: 'MARINA', nome_local: 'Marina Test' });
-      
-      const vistoria = await Vistoria.create({
-        embarcacao_id: embarcacao.id,
-        local_id: local.id,
-        vistoriador_id: vistoriador.id,
-        administrador_id: admin.id,
-        status_id: status.id
+      const { vistoria } = await createTestVistoriaCompleta({
+        vistoriador,
+        administrador: admin,
+        statusNome: 'EM_ANDAMENTO',
+        embarcacaoOverrides: { nome: 'Barco Test', nr_inscricao_barco: 'TEST001' },
+        localOverrides: { tipo: 'MARINA', nome_local: 'Marina Test' }
       });
 
       const response = await request(app)
