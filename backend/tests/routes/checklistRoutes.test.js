@@ -1,7 +1,7 @@
 const request = require('supertest');
-const { sequelize, ChecklistTemplate, ChecklistTemplateItem } = require('../../models');
+const { sequelize } = require('../../models');
 const checklistRoutes = require('../../routes/checklistRoutes');
-const { setupCompleteTestEnvironment, createTestApp, createTestVistoriaCompleta } = require('../helpers/testHelpers');
+const { setupCompleteTestEnvironment, createTestApp, createTestVistoriaPadrao, createTestChecklistTemplate } = require('../helpers/testHelpers');
 
 const app = createTestApp({ path: '/api/checklists', router: checklistRoutes });
 
@@ -17,22 +17,9 @@ describe('Rotas de Checklist', () => {
     adminToken = setup.adminToken;
     vistoriadorToken = setup.vistoriadorToken;
 
-    template = await ChecklistTemplate.create({
-      tipo_embarcacao: 'JET_SKI',
-      nome: 'Checklist Jet Ski',
-      descricao: 'Checklist para vistoria de Jet Ski',
-      ativo: true
-    });
-
-    templateItem = await ChecklistTemplateItem.create({
-      checklist_template_id: template.id,
-      ordem: 1,
-      nome: 'Casco',
-      descricao: 'Verificar estado do casco',
-      obrigatorio: true,
-      permite_video: false,
-      ativo: true
-    });
+    const templateData = await createTestChecklistTemplate('JET_SKI');
+    template = templateData.template;
+    templateItem = templateData.templateItem;
   });
 
   afterAll(async () => {
@@ -76,13 +63,7 @@ describe('Rotas de Checklist', () => {
 
   describe('GET /api/checklists/vistoria/:vistoria_id', () => {
     it('deve buscar checklist de uma vistoria', async () => {
-      const { vistoria } = await createTestVistoriaCompleta({
-        vistoriador,
-        administrador: admin,
-        statusNome: 'EM_ANDAMENTO',
-        embarcacaoOverrides: { nome: 'Barco Test', nr_inscricao_barco: 'TEST001' },
-        localOverrides: { tipo: 'MARINA', nome_local: 'Marina Test' }
-      });
+      const { vistoria } = await createTestVistoriaPadrao(vistoriador, admin);
 
       const response = await request(app)
         .get(`/api/checklists/vistoria/${vistoria.id}`)

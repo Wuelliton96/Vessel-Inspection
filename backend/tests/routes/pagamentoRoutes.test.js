@@ -38,12 +38,9 @@ describe('Rotas de Pagamento', () => {
 
   describe('POST /api/pagamentos', () => {
     it('deve criar lote de pagamento (admin)', async () => {
-      const { vistoria } = await createTestVistoriaCompleta({
-        vistoriador,
-        administrador: admin,
+      const { vistoria } = await createTestVistoriaPadrao(vistoriador, admin, {
         statusNome: 'CONCLUIDA',
-        embarcacaoOverrides: { nome: 'Barco Test', nr_inscricao_barco: 'TEST001' },
-        localOverrides: { tipo: 'MARINA', nome_local: 'Marina Test' }
+        nrInscricao: 'TEST001'
       });
 
       const response = await request(app)

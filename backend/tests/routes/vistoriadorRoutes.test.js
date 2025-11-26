@@ -22,13 +22,7 @@ describe('Rotas de Vistoriador', () => {
 
   describe('GET /api/vistoriador/vistorias', () => {
     it('deve listar vistorias do vistoriador', async () => {
-      await createTestVistoriaCompleta({
-        vistoriador,
-        administrador: admin,
-        statusNome: 'EM_ANDAMENTO',
-        embarcacaoOverrides: { nome: 'Barco Test', nr_inscricao_barco: 'TEST001' },
-        localOverrides: { tipo: 'MARINA', nome_local: 'Marina Test' }
-      });
+      await createTestVistoriaPadrao(vistoriador, admin);
 
       const response = await request(app)
         .get('/api/vistoriador/vistorias')
@@ -46,12 +40,8 @@ describe('Rotas de Vistoriador', () => {
 
   describe('GET /api/vistoriador/vistorias/:id', () => {
     it('deve buscar vistoria específica do vistoriador', async () => {
-      const { vistoria } = await createTestVistoriaCompleta({
-        vistoriador,
-        administrador: admin,
-        statusNome: 'EM_ANDAMENTO',
-        embarcacaoOverrides: { nome: 'Barco Test', nr_inscricao_barco: 'TEST002' },
-        localOverrides: { tipo: 'MARINA', nome_local: 'Marina Test' }
+      const { vistoria } = await createTestVistoriaPadrao(vistoriador, admin, {
+        nrInscricao: 'TEST002'
       });
 
       const response = await request(app)

@@ -3,7 +3,8 @@
  */
 
 require('dotenv').config();
-const { ChecklistTemplate, ChecklistTemplateItem, sequelize } = require('../models');
+const { sequelize } = require('../models');
+const { criarTemplateCompleto, exibirResumoTemplates } = require('./helpers/templateHelper');
 
 async function criarTemplate() {
   try {
@@ -11,30 +12,9 @@ async function criarTemplate() {
     console.log('='.repeat(60));
 
     const tipoEmbarcacao = 'EMBARCACAO_COMERCIAL';
+    const nome = 'Checklist Padrao - Embarcacao Comercial';
+    const descricao = 'Checklist padrao para vistorias de Embarcacoes Comerciais';
 
-    // Verificar se já existe
-    let template = await ChecklistTemplate.findOne({
-      where: { tipo_embarcacao: tipoEmbarcacao }
-    });
-
-    if (template) {
-      console.log(`\n[INFO] Template ja existe (ID: ${template.id})`);
-      console.log('[INFO] Removendo itens antigos...');
-      await ChecklistTemplateItem.destroy({
-        where: { checklist_template_id: template.id }
-      });
-    } else {
-      console.log('\n[INFO] Criando novo template...');
-      template = await ChecklistTemplate.create({
-        tipo_embarcacao: tipoEmbarcacao,
-        nome: 'Checklist Padrao - Embarcacao Comercial',
-        descricao: 'Checklist padrao para vistorias de Embarcacoes Comerciais',
-        ativo: true
-      });
-      console.log(`[OK] Template criado (ID: ${template.id})`);
-    }
-
-    // Itens do checklist
     const itens = [
       { ordem: 1, nome: 'Casco - Vista Geral', descricao: 'Foto geral do casco', obrigatorio: true },
       { ordem: 2, nome: 'Proa', descricao: 'Parte frontal', obrigatorio: true },
@@ -56,33 +36,12 @@ async function criarTemplate() {
       { ordem: 18, nome: 'Area de Carga/Passageiros', descricao: 'Area comercial', obrigatorio: false }
     ];
 
-    console.log('\n[INFO] Criando itens do checklist...');
-    
-    for (const itemData of itens) {
-      await ChecklistTemplateItem.create({
-        checklist_template_id: template.id,
-        ...itemData
-      });
-    }
-
-    console.log(`[OK] ${itens.length} itens criados`);
+    await criarTemplateCompleto(tipoEmbarcacao, nome, descricao, itens);
 
     console.log('\n' + '='.repeat(60));
     console.log('[SUCESSO] Template EMBARCACAO_COMERCIAL criado!\n');
 
-    // Mostrar resumo final
-    const todosTemplates = await ChecklistTemplate.findAll({
-      include: [{
-        model: ChecklistTemplateItem,
-        as: 'itens'
-      }]
-    });
-
-    console.log('[RESUMO GERAL]');
-    todosTemplates.forEach(t => {
-      console.log(`  ${t.tipo_embarcacao}: ${t.itens.length} itens`);
-    });
-    console.log('');
+    await exibirResumoTemplates();
 
   } catch (error) {
     console.error('\n[ERRO]:', error.message);

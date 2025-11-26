@@ -4,7 +4,8 @@
  */
 
 require('dotenv').config();
-const { ChecklistTemplate, ChecklistTemplateItem, sequelize } = require('../models');
+const { sequelize } = require('../models');
+const { criarTemplateCompleto, exibirResumoTemplates } = require('./helpers/templateHelper');
 
 // Templates padrão para cada tipo
 const TEMPLATES = {
@@ -76,66 +77,18 @@ async function criarTemplates() {
     console.log('='.repeat(60));
 
     for (const [tipoEmbarcacao, templateData] of Object.entries(TEMPLATES)) {
-      console.log(`\n[${tipoEmbarcacao}] Processando...`);
-
-      // Verificar se template já existe
-      let template = await ChecklistTemplate.findOne({
-        where: { tipo_embarcacao: tipoEmbarcacao }
-      });
-
-      if (template) {
-        console.log(`  [INFO] Template ja existe (ID: ${template.id})`);
-        
-        // Atualizar nome e descrição
-        await template.update({
-          nome: templateData.nome,
-          descricao: templateData.descricao,
-          ativo: true
-        });
-        console.log(`  [OK] Template atualizado`);
-      } else {
-        // Criar novo template
-        template = await ChecklistTemplate.create({
-          tipo_embarcacao: tipoEmbarcacao,
-          nome: templateData.nome,
-          descricao: templateData.descricao,
-          ativo: true
-        });
-        console.log(`  [OK] Template criado (ID: ${template.id})`);
-      }
-
-      // Remover itens antigos
-      await ChecklistTemplateItem.destroy({
-        where: { checklist_template_id: template.id }
-      });
-      console.log(`  [INFO] Itens antigos removidos`);
-
-      // Criar novos itens
-      for (const itemData of templateData.itens) {
-        await ChecklistTemplateItem.create({
-          checklist_template_id: template.id,
-          ...itemData
-        });
-      }
-      console.log(`  [OK] ${templateData.itens.length} itens criados`);
+      await criarTemplateCompleto(
+        tipoEmbarcacao,
+        templateData.nome,
+        templateData.descricao,
+        templateData.itens
+      );
     }
 
     console.log('\n' + '='.repeat(60));
     console.log('[SUCESSO] Templates criados com sucesso!\n');
 
-    // Mostrar resumo
-    console.log('[RESUMO]');
-    const templates = await ChecklistTemplate.findAll({
-      include: [{
-        model: ChecklistTemplateItem,
-        as: 'itens'
-      }]
-    });
-
-    for (const template of templates) {
-      console.log(`  ${template.tipo_embarcacao}: ${template.itens.length} itens`);
-    }
-    console.log('');
+    await exibirResumoTemplates();
 
   } catch (error) {
     console.error('\n[ERRO] Erro ao criar templates:');

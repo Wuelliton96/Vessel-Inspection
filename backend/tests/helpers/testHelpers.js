@@ -488,6 +488,56 @@ const createTestApp = (routes) => {
   return app;
 };
 
+/**
+ * Helper para criar vistoria completa com dados padrão simplificados
+ */
+const createTestVistoriaPadrao = async (vistoriador, administrador, options = {}) => {
+  return await createTestVistoriaCompleta({
+    vistoriador,
+    administrador,
+    statusNome: options.statusNome || 'EM_ANDAMENTO',
+    embarcacaoOverrides: {
+      nome: 'Barco Test',
+      nr_inscricao_barco: options.nrInscricao || `TEST${Date.now()}`,
+      ...options.embarcacaoOverrides
+    },
+    localOverrides: {
+      tipo: 'MARINA',
+      nome_local: 'Marina Test',
+      ...options.localOverrides
+    },
+    ...options.vistoriaOverrides
+  });
+};
+
+/**
+ * Helper para criar template de checklist padrão para testes
+ */
+const createTestChecklistTemplate = async (tipoEmbarcacao = 'JET_SKI', overrides = {}) => {
+  const ChecklistTemplate = require('../../models').ChecklistTemplate;
+  const ChecklistTemplateItem = require('../../models').ChecklistTemplateItem;
+  
+  const template = await ChecklistTemplate.create({
+    tipo_embarcacao: tipoEmbarcacao,
+    nome: `Checklist ${tipoEmbarcacao}`,
+    descricao: `Checklist para vistoria de ${tipoEmbarcacao}`,
+    ativo: true,
+    ...overrides
+  });
+
+  const templateItem = await ChecklistTemplateItem.create({
+    checklist_template_id: template.id,
+    ordem: 1,
+    nome: 'Casco',
+    descricao: 'Verificar estado do casco',
+    obrigatorio: true,
+    permite_video: false,
+    ativo: true
+  });
+
+  return { template, templateItem };
+};
+
 module.exports = {
   createTestData,
   cleanupTestData,
@@ -496,6 +546,8 @@ module.exports = {
   createTestLocal,
   createTestVistoria,
   createTestVistoriaCompleta,
+  createTestVistoriaPadrao,
+  createTestChecklistTemplate,
   createTestStatusVistoria,
   mockRequestData,
   // Novos helpers reutilizáveis
