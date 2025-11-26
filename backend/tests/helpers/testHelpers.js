@@ -538,6 +538,23 @@ const createTestChecklistTemplate = async (tipoEmbarcacao = 'JET_SKI', overrides
   return { template, templateItem };
 };
 
+/**
+ * Helper para criar token JWT para testes
+ */
+const createTestToken = (usuario, nivelAcesso = 'ADMINISTRADOR', nivelAcessoId = 1) => {
+  return jwt.sign(
+    { 
+      userId: usuario.id, 
+      cpf: usuario.cpf,
+      email: usuario.email,
+      nome: usuario.nome,
+      nivelAcesso: nivelAcesso,
+      nivelAcessoId: nivelAcessoId
+    },
+    process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
+  );
+};
+
 module.exports = {
   createTestData,
   cleanupTestData,
@@ -549,6 +566,7 @@ module.exports = {
   createTestVistoriaPadrao,
   createTestChecklistTemplate,
   createTestStatusVistoria,
+  createTestToken,
   mockRequestData,
   // Novos helpers reutilizáveis
   setupTestEnvironment,

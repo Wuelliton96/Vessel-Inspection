@@ -1,7 +1,8 @@
 const request = require('supertest');
-const { sequelize } = require('../../models');
+const { sequelize, Usuario } = require('../../models');
+const bcrypt = require('bcryptjs');
 const authRoutes = require('../../routes/authRoutes');
-const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
+const { setupCompleteTestEnvironment, createTestApp, createTestToken } = require('../helpers/testHelpers');
 
 const app = createTestApp({ path: '/api/auth', router: authRoutes });
 
@@ -164,17 +165,7 @@ describe('Rotas de Autenticação', () => {
 
   describe('GET /api/auth/me', () => {
     it('deve retornar dados do usuário autenticado', async () => {
-      const token = jwt.sign(
-        { 
-          userId: admin.id, 
-          cpf: admin.cpf,
-          email: admin.email,
-          nome: admin.nome,
-          nivelAcesso: 'ADMINISTRADOR',
-          nivelAcessoId: 1
-        },
-        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-      );
+      const token = createTestToken(admin);
 
       const response = await request(app)
         .get('/api/auth/me')
@@ -203,17 +194,7 @@ describe('Rotas de Autenticação', () => {
 
   describe('PUT /api/auth/change-password', () => {
     it('deve atualizar senha quando senha atual é correta', async () => {
-      const token = jwt.sign(
-        { 
-          userId: admin.id, 
-          cpf: admin.cpf,
-          email: admin.email,
-          nome: admin.nome,
-          nivelAcesso: 'ADMINISTRADOR',
-          nivelAcessoId: 1
-        },
-        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-      );
+      const token = createTestToken(admin);
 
       const response = await request(app)
         .put('/api/auth/change-password')
@@ -228,17 +209,7 @@ describe('Rotas de Autenticação', () => {
     });
 
     it('deve retornar 400 quando senha atual está incorreta', async () => {
-      const token = jwt.sign(
-        { 
-          userId: admin.id, 
-          cpf: admin.cpf,
-          email: admin.email,
-          nome: admin.nome,
-          nivelAcesso: 'ADMINISTRADOR',
-          nivelAcessoId: 1
-        },
-        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-      );
+      const token = createTestToken(admin);
 
       const response = await request(app)
         .put('/api/auth/change-password')
@@ -253,17 +224,7 @@ describe('Rotas de Autenticação', () => {
     });
 
     it('deve retornar 400 quando nova senha não atende aos critérios', async () => {
-      const token = jwt.sign(
-        { 
-          userId: admin.id, 
-          cpf: admin.cpf,
-          email: admin.email,
-          nome: admin.nome,
-          nivelAcesso: 'ADMINISTRADOR',
-          nivelAcessoId: 1
-        },
-        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-      );
+      const token = createTestToken(admin);
 
       const response = await request(app)
         .put('/api/auth/change-password')
@@ -290,17 +251,7 @@ describe('Rotas de Autenticação', () => {
         deve_atualizar_senha: true
       });
 
-      const token = jwt.sign(
-        { 
-          userId: usuarioTemp.id, 
-          cpf: usuarioTemp.cpf,
-          email: usuarioTemp.email,
-          nome: usuarioTemp.nome,
-          nivelAcesso: 'VISTORIADOR',
-          nivelAcessoId: 2
-        },
-        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-      );
+      const token = createTestToken(usuarioTemp, 'VISTORIADOR', 2);
 
       const response = await request(app)
         .put('/api/auth/force-password-update')
@@ -337,17 +288,7 @@ describe('Rotas de Autenticação', () => {
 
   describe('PUT /api/auth/user/:id/role', () => {
     it('deve atualizar nível de acesso do usuário (admin)', async () => {
-      const token = jwt.sign(
-        { 
-          userId: admin.id, 
-          cpf: admin.cpf,
-          email: admin.email,
-          nome: admin.nome,
-          nivelAcesso: 'ADMINISTRADOR',
-          nivelAcessoId: 1
-        },
-        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-      );
+      const token = createTestToken(admin);
 
       const response = await request(app)
         .put(`/api/auth/user/${vistoriador.id}/role`)
@@ -359,17 +300,7 @@ describe('Rotas de Autenticação', () => {
     });
 
     it('deve retornar 400 quando nível de acesso não existe', async () => {
-      const token = jwt.sign(
-        { 
-          userId: admin.id, 
-          cpf: admin.cpf,
-          email: admin.email,
-          nome: admin.nome,
-          nivelAcesso: 'ADMINISTRADOR',
-          nivelAcessoId: 1
-        },
-        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-      );
+      const token = createTestToken(admin);
 
       const response = await request(app)
         .put(`/api/auth/user/${vistoriador.id}/role`)
@@ -382,17 +313,7 @@ describe('Rotas de Autenticação', () => {
 
   describe('GET /api/auth/users', () => {
     it('deve listar todos os usuários (admin)', async () => {
-      const token = jwt.sign(
-        { 
-          userId: admin.id, 
-          cpf: admin.cpf,
-          email: admin.email,
-          nome: admin.nome,
-          nivelAcesso: 'ADMINISTRADOR',
-          nivelAcessoId: 1
-        },
-        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-      );
+      const token = createTestToken(admin);
 
       const response = await request(app)
         .get('/api/auth/users')
