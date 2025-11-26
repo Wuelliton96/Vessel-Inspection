@@ -4,6 +4,7 @@ const router = express.Router();
 // Importamos os dois middlewares
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { Vistoria, Embarcacao, Local, StatusVistoria, Usuario, ChecklistTemplate, ChecklistTemplateItem, VistoriaChecklistItem } = require('../models');
+const { getVistoriaIncludes } = require('../utils/routeHelpers');
 
 // Rota: POST /api/vistorias
 router.post('/', [requireAuth, requireAdmin], async (req, res) => {
@@ -120,6 +121,23 @@ router.post('/', [requireAuth, requireAdmin], async (req, res) => {
         console.log('Validação falhou - tipo do local é obrigatório');
         console.log('=== FIM ROTA POST /api/vistorias (400) ===\n');
         return res.status(400).json({ error: "Tipo do local é obrigatório" });
+      }
+      
+      // Validação: se for MARINA, nome_local é obrigatório
+      if (local_tipo === 'MARINA' && !local_nome_local) {
+        console.log('Validação falhou - nome da marina é obrigatório');
+        console.log('=== FIM ROTA POST /api/vistorias (400) ===\n');
+        return res.status(400).json({ error: "Nome da marina é obrigatório quando o tipo é MARINA" });
+      }
+      
+      // Validação: CEP deve ter 8 dígitos se fornecido
+      if (local_cep) {
+        const cepLimpo = local_cep.replace(/\D/g, '');
+        if (cepLimpo.length !== 8) {
+          console.log('Validação falhou - CEP deve ter 8 dígitos');
+          console.log('=== FIM ROTA POST /api/vistorias (400) ===\n');
+          return res.status(400).json({ error: "CEP deve ter 8 dígitos" });
+        }
       }
 
       console.log('Buscando local existente...');
@@ -255,11 +273,7 @@ router.post('/', [requireAuth, requireAdmin], async (req, res) => {
 
     // Retornar a vistoria com associações
     const vistoriaCompleta = await Vistoria.findByPk(novaVistoria.id, {
-      include: [
-        { model: Embarcacao, as: 'Embarcacao' },
-        { model: Local, as: 'Local' },
-        { model: StatusVistoria, as: 'StatusVistoria' }
-      ]
+      include: getVistoriaIncludes()
     });
 
     console.log('Vistoria completa retornada:', vistoriaCompleta.id);
@@ -280,12 +294,7 @@ router.get('/', requireAuth, async (req, res) => {
     console.log('Nível de acesso:', req.user?.NivelAcesso?.nome);
     
     const vistorias = await Vistoria.findAll({
-      include: [
-        { model: Embarcacao, as: 'Embarcacao' },
-        { model: Local, as: 'Local' },
-        { model: StatusVistoria, as: 'StatusVistoria' },
-        { model: Usuario, as: 'vistoriador', attributes: ['id', 'nome', 'email'] }
-      ],
+      include: getVistoriaIncludes(),
       order: [['created_at', 'DESC']]
     });
     
@@ -317,12 +326,7 @@ router.get('/vistoriador', requireAuth, async (req, res) => {
       where: {
         vistoriador_id: req.user.id
       },
-      include: [
-        { model: Embarcacao, as: 'Embarcacao' },
-        { model: Local, as: 'Local' },
-        { model: StatusVistoria, as: 'StatusVistoria' },
-        { model: Usuario, as: 'vistoriador', attributes: ['id', 'nome', 'email'] }
-      ],
+      include: getVistoriaIncludes(),
       order: [['created_at', 'DESC']]
     });
     res.json(vistorias);
@@ -453,12 +457,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
 
     const vistoria = await Vistoria.findByPk(id, {
-      include: [
-        { model: Embarcacao, as: 'Embarcacao' },
-        { model: Local, as: 'Local' },
-        { model: StatusVistoria, as: 'StatusVistoria' },
-        { model: Usuario, as: 'vistoriador', attributes: ['id', 'nome', 'email', 'cpf'] }
-      ]
+      include: getVistoriaIncludes()
     });
 
     if (!vistoria) {
@@ -472,6 +471,10 @@ router.get('/:id', requireAuth, async (req, res) => {
     if (!isAdmin && !isOwner) {
       return res.status(403).json({ error: "Acesso negado" });
     }
+
+    // Log para debug
+    console.log('[GET /api/vistorias/:id] Vistoriador:', vistoria.vistoriador);
+    console.log('[GET /api/vistorias/:id] Nome do Vistoriador:', vistoria.vistoriador?.nome || 'NÃO ENCONTRADO');
 
     res.json(vistoria);
   } catch (error) {

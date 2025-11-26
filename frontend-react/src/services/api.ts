@@ -673,6 +673,23 @@ export const laudoService = {
   }
 };
 
+export const configuracaoLaudoService = {
+  get: async () => {
+    const response = await api.get('/api/configuracoes-laudo');
+    return response.data;
+  },
+
+  update: async (data: {
+    nome_empresa?: string;
+    logo_empresa_url?: string;
+    nota_rodape?: string;
+    empresa_prestadora?: string;
+  }) => {
+    const response = await api.put('/api/configuracoes-laudo', data);
+    return response.data;
+  }
+};
+
 export const auditoriaService = {
   listar: async (params?: {
     page?: number;

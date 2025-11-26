@@ -129,6 +129,338 @@ const formatarValor = (valor) => {
 };
 
 /**
+ * Função auxiliar para adicionar fotos ao PDF
+ * Reutilizável tanto para PDF com template quanto sem template
+ */
+async function adicionarFotosAoPDF(pdfDoc, fotos, vistoria) {
+  if (!fotos || fotos.length === 0) {
+    console.log('[PDF] Nenhuma foto para adicionar ao PDF');
+    return;
+  }
+
+  console.log(`[PDF] Adicionando ${fotos.length} fotos ao PDF...`);
+  console.log(`[PDF] Fotos recebidas:`, fotos.map(f => ({ 
+    id: f.id, 
+    url: f.url_arquivo, 
+    tipo: f.TipoFotoChecklist?.nome_exibicao || 'Sem tipo',
+    vistoria_id: f.vistoria_id 
+  })));
+  console.log(`[PDF] Vistoria ID: ${vistoria?.id}`);
+  console.log(`[PDF] UPLOAD_STRATEGY: ${UPLOAD_STRATEGY}`);
+  
+  try {
+    const pages = pdfDoc.getPages();
+    let currentPage = pages[pages.length - 1]; // Última página existente
+    const { width, height } = currentPage.getSize();
+    
+    // Verificar se há espaço na última página para título
+    let yPos = 50; // Posição inicial para fotos
+    
+    // Adicionar título "REGISTRO FOTOGRÁFICO" se houver espaço
+    if (yPos + 30 < height - 200) {
+      currentPage.drawText('REGISTRO FOTOGRÁFICO', {
+        x: 50,
+        y: yPos,
+        size: 14,
+        color: rgb(0, 0, 0),
+      });
+      yPos += 30;
+    } else {
+      // Criar nova página para fotos
+      currentPage = pdfDoc.addPage([width, height]);
+      yPos = height - 50;
+      currentPage.drawText('REGISTRO FOTOGRÁFICO', {
+        x: 50,
+        y: yPos,
+        size: 14,
+        color: rgb(0, 0, 0),
+      });
+      yPos -= 30;
+    }
+    
+    const fotoWidth = 200;
+    const fotoHeight = 150;
+    const maxFotosPorPagina = 4;
+    let fotosPorPagina = 0;
+    let totalFotosAdicionadas = 0; // Contador total de fotos adicionadas com sucesso
+    
+    for (let i = 0; i < fotos.length; i++) {
+      const foto = fotos[i];
+      
+      try {
+        // Verificar se precisa de nova página
+        if (fotosPorPagina >= maxFotosPorPagina) {
+          currentPage = pdfDoc.addPage([width, height]);
+          yPos = height - 50;
+          fotosPorPagina = 0;
+        }
+        
+        // Obter bytes da imagem (suporta S3 e local)
+        let imageBytes;
+        
+        if (!foto.url_arquivo) {
+          console.log(`[PDF] Foto ${i + 1} sem url_arquivo, pulando...`);
+          continue;
+        }
+        
+        try {
+          if (UPLOAD_STRATEGY === 'S3' || UPLOAD_STRATEGY === 's3' || foto.url_arquivo?.startsWith('vistorias/')) {
+            // Se for S3, acessar diretamente o S3 usando AWS SDK
+            console.log(`[PDF] Baixando imagem do S3 diretamente...`);
+            console.log(`[PDF] Foto URL: ${foto.url_arquivo}`);
+            console.log(`[PDF] Vistoria ID: ${vistoria?.id}`);
+            
+            let s3Client, bucket;
+            try {
+              const awsConfig = require('../config/aws');
+              s3Client = awsConfig.s3Client;
+              bucket = awsConfig.bucket;
+              
+              if (!s3Client) {
+                throw new Error('S3Client não configurado. Verifique AWS_ACCESS_KEY_ID e AWS_SECRET_ACCESS_KEY.');
+              }
+              if (!bucket) {
+                throw new Error('Bucket S3 não configurado. Verifique AWS_S3_BUCKET.');
+              }
+              
+              console.log(`[PDF] Configuração AWS OK - Bucket: ${bucket}`);
+            } catch (awsConfigError) {
+              console.log(`[PDF] Erro ao carregar configuração AWS:`, awsConfigError.message);
+              throw new Error(`Erro na configuração AWS S3: ${awsConfigError.message}`);
+            }
+            
+            const { GetObjectCommand } = require('@aws-sdk/client-s3');
+            
+            // Determinar a key do S3
+            let s3Key = foto.url_arquivo;
+            
+            // Se url_arquivo já contém o caminho completo do S3 (começa com "vistorias/"), usar como está
+            // Caso contrário, construir o caminho
+            if (!s3Key.startsWith('vistorias/')) {
+              // Construir key no formato: vistorias/id-{vistoria_id}/{filename}
+              const filename = path.basename(s3Key);
+              s3Key = `vistorias/id-${vistoria?.id}/${filename}`;
+              console.log(`[PDF] Construindo S3 Key: ${s3Key}`);
+            } else {
+              console.log(`[PDF] Usando S3 Key diretamente: ${s3Key}`);
+            }
+            
+            try {
+              const command = new GetObjectCommand({
+                Bucket: bucket,
+                Key: s3Key
+              });
+              
+              const response = await s3Client.send(command);
+              
+              // Ler o stream em um buffer
+              const chunks = [];
+              for await (const chunk of response.Body) {
+                chunks.push(chunk);
+              }
+              
+              if (chunks.length === 0) {
+                throw new Error('Imagem vazia recebida do S3');
+              }
+              
+              imageBytes = Buffer.concat(chunks);
+              console.log(`[PDF] ✅ Imagem baixada do S3: ${imageBytes.length} bytes`);
+            } catch (s3Error) {
+              console.log(`[PDF] ⚠️  Erro ao baixar do S3 via SDK:`, s3Error.message);
+              console.log(`[PDF] Tentando fallback: URL pública do S3...`);
+              
+              // Fallback: tentar URL pública do S3
+              const { region } = require('../config/aws');
+              const publicUrl = `https://${bucket}.s3.${region}.amazonaws.com/${s3Key}`;
+              console.log(`[PDF] URL pública: ${publicUrl}`);
+              
+              const https = require('https');
+              const http = require('http');
+              const urlModule = require('url');
+              
+              imageBytes = await new Promise((resolve, reject) => {
+                const parsedUrl = urlModule.parse(publicUrl);
+                const client = parsedUrl.protocol === 'https:' ? https : http;
+                
+                const req = client.get(publicUrl, (res) => {
+                  if (res.statusCode !== 200) {
+                    return reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`));
+                  }
+                  
+                  const chunks = [];
+                  res.on('data', (chunk) => chunks.push(chunk));
+                  res.on('end', () => {
+                    if (chunks.length === 0) {
+                      return reject(new Error('Imagem vazia recebida da URL pública'));
+                    }
+                    const buffer = Buffer.concat(chunks);
+                    console.log(`[PDF] ✅ Imagem baixada via URL pública: ${buffer.length} bytes`);
+                    resolve(buffer);
+                  });
+                  res.on('error', reject);
+                });
+                
+                req.on('error', reject);
+                req.setTimeout(30000, () => {
+                  req.destroy();
+                  reject(new Error('Timeout ao baixar imagem da URL pública'));
+                });
+              }).catch((urlError) => {
+                console.log(`[PDF] ❌ Erro ao baixar via URL pública:`, urlError.message);
+                throw new Error(`Não foi possível baixar a imagem do S3: ${s3Error.message}. Fallback também falhou: ${urlError.message}`);
+              });
+            }
+          } else {
+            // Se for local, usar caminho do arquivo
+            const relativePath = getFullPath(foto.url_arquivo, vistoria?.id);
+            // getFullPath retorna caminho relativo, precisamos converter para absoluto
+            const imagePath = relativePath.startsWith('/') 
+              ? path.join(__dirname, '..', relativePath)
+              : path.join(__dirname, '..', 'uploads', 'fotos', `vistoria-${vistoria?.id}`, foto.url_arquivo);
+            
+            console.log(`[PDF] Carregando imagem local: ${imagePath}`);
+            
+            if (!fs.existsSync(imagePath)) {
+              console.log(`[PDF] Arquivo de foto não encontrado: ${imagePath}`);
+              // Tentar caminho alternativo
+              const altPath = path.join(__dirname, '..', 'uploads', foto.url_arquivo);
+              if (fs.existsSync(altPath)) {
+                imageBytes = fs.readFileSync(altPath);
+              } else {
+                continue;
+              }
+            } else {
+              imageBytes = fs.readFileSync(imagePath);
+            }
+          }
+        } catch (imageLoadError) {
+          console.log(`[PDF] Erro ao carregar imagem ${i + 1}:`, imageLoadError.message);
+          continue;
+        }
+        
+        let image;
+        
+        // Detectar tipo de imagem baseado na URL ou tentar ambos
+        const urlLower = foto.url_arquivo.toLowerCase();
+        try {
+          if (urlLower.endsWith('.png')) {
+            image = await pdfDoc.embedPng(imageBytes);
+          } else if (urlLower.endsWith('.jpg') || urlLower.endsWith('.jpeg')) {
+            image = await pdfDoc.embedJpg(imageBytes);
+          } else {
+            // Tentar como JPEG primeiro (mais comum)
+            try {
+              image = await pdfDoc.embedJpg(imageBytes);
+            } catch (jpegError) {
+              // Se falhar, tentar PNG
+              try {
+                image = await pdfDoc.embedPng(imageBytes);
+              } catch (pngError) {
+                console.log(`[PDF] Erro ao carregar imagem ${i + 1} (tentou JPEG e PNG):`, pngError.message);
+                continue;
+              }
+            }
+          }
+        } catch (embedError) {
+          console.log(`[PDF] Erro ao incorporar imagem ${i + 1}:`, embedError.message);
+          continue;
+        }
+        
+        // Calcular posição
+        const xPos = 50 + (fotosPorPagina % 2) * 250;
+        const yPosFoto = yPos - Math.floor(fotosPorPagina / 2) * 200;
+        
+        // Adicionar imagem
+        currentPage.drawImage(image, {
+          x: xPos,
+          y: yPosFoto - fotoHeight,
+          width: fotoWidth,
+          height: fotoHeight,
+        });
+        
+        // Adicionar legenda (nome do tipo de foto) - mais visível
+        const legenda = foto.TipoFotoChecklist?.nome_exibicao || `Foto ${i + 1}`;
+        // Desenhar fundo branco para legenda (opcional, para melhor legibilidade)
+        currentPage.drawRectangle({
+          x: xPos - 2,
+          y: yPosFoto - fotoHeight - 20,
+          width: fotoWidth + 4,
+          height: 12,
+          color: rgb(1, 1, 1), // Branco
+        });
+        currentPage.drawText(legenda, {
+          x: xPos,
+          y: yPosFoto - fotoHeight - 15,
+          size: 10,
+          color: rgb(0, 0, 0),
+        });
+        
+        let yOffset = 30; // Espaçamento inicial para observação/descrição
+        
+        // Adicionar descrição do tipo de foto se houver
+        if (foto.TipoFotoChecklist?.descricao) {
+          const descricao = foto.TipoFotoChecklist.descricao;
+          // Quebrar texto em linhas se necessário (máximo 40 caracteres por linha)
+          const maxChars = 40;
+          const linhas = [];
+          for (let j = 0; j < descricao.length; j += maxChars) {
+            linhas.push(descricao.substring(j, j + maxChars));
+          }
+          
+          linhas.forEach((linha, idx) => {
+            if (yPosFoto - fotoHeight - yOffset - (idx * 12) > 50) {
+              currentPage.drawText(linha, {
+                x: xPos,
+                y: yPosFoto - fotoHeight - yOffset - (idx * 12),
+                size: 7,
+                color: rgb(0.3, 0.3, 0.3),
+              });
+            }
+          });
+          
+          yOffset += linhas.length * 12 + 5;
+        }
+        
+        // Adicionar observação da foto se houver (do banco de dados)
+        if (foto.observacao) {
+          const observacao = foto.observacao.trim();
+          // Quebrar texto em linhas se necessário (máximo 40 caracteres por linha)
+          const maxChars = 40;
+          const linhas = [];
+          for (let j = 0; j < observacao.length; j += maxChars) {
+            linhas.push(observacao.substring(j, j + maxChars));
+          }
+          
+          linhas.forEach((linha, idx) => {
+            if (yPosFoto - fotoHeight - yOffset - (idx * 12) > 50) {
+              currentPage.drawText(linha, {
+                x: xPos,
+                y: yPosFoto - fotoHeight - yOffset - (idx * 12),
+                size: 7,
+                color: rgb(0.5, 0.5, 0.5),
+              });
+            }
+          });
+        }
+        
+        fotosPorPagina++;
+        totalFotosAdicionadas++;
+        console.log(`[PDF] ✅ Foto ${i + 1}/${fotos.length} adicionada com sucesso: "${legenda}"`);
+      } catch (fotoError) {
+        console.log(`[PDF] ❌ Erro ao processar foto ${i + 1}:`, fotoError.message);
+        console.log(`[PDF] Stack trace:`, fotoError.stack);
+        continue;
+      }
+    }
+    
+    console.log(`[PDF] ✅ Total de ${totalFotosAdicionadas} fotos adicionadas ao PDF (de ${fotos.length} disponíveis)`);
+  } catch (fotosError) {
+    console.log('[PDF] Erro ao processar fotos:', fotosError.message);
+    // Continuar mesmo se não conseguir adicionar fotos
+  }
+}
+
+/**
  * Preenche campos do PDF usando pdf-lib
  * Nota: pdf-lib não suporta preenchimento de formulários PDF diretamente.
  * Para isso, precisaríamos usar pdf-fill-form ou similar.
@@ -136,10 +468,20 @@ const formatarValor = (valor) => {
  */
 const gerarLaudoPDF = async (laudo, vistoria, fotos = []) => {
   try {
+    console.log('[PDF] ============================================');
     console.log('[PDF] Iniciando geração do PDF com template...');
-    console.log('[PDF] Laudo ID:', laudo.id);
+    console.log('[PDF] Laudo ID:', laudo?.id);
+    console.log('[PDF] Vistoria ID:', vistoria?.id);
     console.log('[PDF] Tipo de embarcação:', vistoria?.Embarcacao?.tipo_embarcacao);
     console.log('[PDF] Número de fotos:', fotos?.length || 0);
+    
+    // Validações iniciais
+    if (!laudo) {
+      throw new Error('Laudo não fornecido');
+    }
+    if (!vistoria) {
+      throw new Error('Vistoria não fornecida');
+    }
     
     // Determinar qual template usar baseado no tipo de embarcação da vistoria
     const tipoEmbarcacao = vistoria?.Embarcacao?.tipo_embarcacao;
@@ -153,28 +495,10 @@ const gerarLaudoPDF = async (laudo, vistoria, fotos = []) => {
     console.log('[PDF] Template selecionado:', templatePath);
     console.log('[PDF] Tipo de embarcação usado para seleção:', tipoEmbarcacao || 'NÃO DEFINIDO (usando padrão)');
     
-    // Verificar se o template existe
-    if (!fs.existsSync(templatePath)) {
-      throw new Error(`Template PDF não encontrado: ${templatePath}`);
-    }
-    
-    // Carregar template PDF
-    const templateBytes = fs.readFileSync(templatePath);
-    const pdfDoc = await PDFDocument.load(templateBytes);
-    
-    // Habilitar fontkit para melhor suporte a fontes (opcional)
-    try {
-      const fontkit = require('@pdf-lib/fontkit');
-      pdfDoc.registerFontkit(fontkit);
-    } catch (e) {
-      console.log('[PDF] Fontkit não disponível, usando fontes padrão');
-    }
-    
-    // Obter dados da embarcação e vistoria
+    // Preparar dados ANTES de verificar template (para usar em caso de fallback)
     const embarcacao = vistoria?.Embarcacao || {};
     const local = vistoria?.Local || {};
     
-    // Preparar dados para preenchimento
     const dados = {
       // Dados gerais
       numero_laudo: laudo.numero_laudo || '',
@@ -187,6 +511,9 @@ const gerarLaudoPDF = async (laudo, vistoria, fotos = []) => {
       local_vistoria: laudo.local_vistoria || local.logradouro || '',
       empresa_prestadora: laudo.empresa_prestadora || '',
       responsavel_inspecao: laudo.responsavel_inspecao || '',
+      nome_empresa: laudo.nome_empresa || '',
+      logo_empresa_url: laudo.logo_empresa_url || '',
+      nota_rodape: laudo.nota_rodape || '',
       
       // Dados da embarcação
       inscricao_capitania: laudo.inscricao_capitania || embarcacao.nr_inscricao_barco || '',
@@ -295,6 +622,47 @@ const gerarLaudoPDF = async (laudo, vistoria, fotos = []) => {
       data_inspecao: dados.data_inspecao
     });
     
+    // Verificar se o template existe
+    let templatePathFinal = templatePath;
+    if (!fs.existsSync(templatePathFinal)) {
+      console.log(`[PDF] AVISO: Template não encontrado em: ${templatePathFinal}`);
+      console.log(`[PDF] Tentando encontrar templates alternativos...`);
+      
+      // Tentar encontrar qualquer template PDF na pasta
+      const basePath = path.join(__dirname, '..', '..', 'PDF');
+      if (fs.existsSync(basePath)) {
+        const arquivos = fs.readdirSync(basePath);
+        const templatesPDF = arquivos.filter(f => f.toLowerCase().endsWith('.pdf'));
+        
+        if (templatesPDF.length > 0) {
+          templatePathFinal = path.join(basePath, templatesPDF[0]);
+          console.log(`[PDF] Usando template alternativo: ${templatePathFinal}`);
+        } else {
+          console.log(`[PDF] ⚠️  Nenhum template PDF encontrado. Criando PDF sem template...`);
+          // Criar PDF vazio se não houver template
+          const pdfDoc = await PDFDocument.create();
+          return await processarPDFSemTemplate(pdfDoc, laudo, vistoria, fotos, dados);
+        }
+      } else {
+        console.log(`[PDF] ⚠️  Pasta PDF não existe. Criando PDF sem template...`);
+        // Criar PDF vazio se não houver pasta
+        const pdfDoc = await PDFDocument.create();
+        return await processarPDFSemTemplate(pdfDoc, laudo, vistoria, fotos, dados);
+      }
+    }
+    
+    // Carregar template PDF
+    const templateBytes = fs.readFileSync(templatePathFinal);
+    const pdfDoc = await PDFDocument.load(templateBytes);
+    
+    // Habilitar fontkit para melhor suporte a fontes (opcional)
+    try {
+      const fontkit = require('@pdf-lib/fontkit');
+      pdfDoc.registerFontkit(fontkit);
+    } catch (e) {
+      console.log('[PDF] Fontkit não disponível, usando fontes padrão');
+    }
+    
     // Tentar preencher campos de formulário do PDF (se existirem)
     let camposPreenchidos = 0;
     try {
@@ -385,6 +753,8 @@ const gerarLaudoPDF = async (laudo, vistoria, fotos = []) => {
         { campo: 'tipo_embarcacao', valor: dados.tipo_embarcacao },
         { campo: 'ano_fabricacao', valor: dados.ano_fabricacao ? String(dados.ano_fabricacao) : '' },
         { campo: 'valor_risco', valor: dados.valor_risco ? `R$ ${dados.valor_risco}` : '' },
+        { campo: 'nome_empresa', valor: dados.nome_empresa },
+        { campo: 'empresa_prestadora', valor: dados.empresa_prestadora },
       ];
       
       let camposAdicionados = 0;
@@ -425,233 +795,8 @@ const gerarLaudoPDF = async (laudo, vistoria, fotos = []) => {
       // Continuar mesmo se não conseguir adicionar texto
     }
     
-    // Adicionar fotos ao PDF
-    if (fotos && fotos.length > 0) {
-      console.log(`[PDF] Adicionando ${fotos.length} fotos ao PDF...`);
-      
-      try {
-        const pages = pdfDoc.getPages();
-        let currentPage = pages[pages.length - 1]; // Última página existente
-        const { width, height } = currentPage.getSize();
-        
-        // Verificar se há espaço na última página para título
-        let yPos = 50; // Posição inicial para fotos
-        
-        // Adicionar título "REGISTRO FOTOGRÁFICO" se houver espaço
-        if (yPos + 30 < height - 200) {
-          currentPage.drawText('REGISTRO FOTOGRÁFICO', {
-            x: 50,
-            y: yPos,
-            size: 14,
-            color: rgb(0, 0, 0),
-          });
-          yPos += 30;
-        } else {
-          // Criar nova página para fotos
-          currentPage = pdfDoc.addPage([width, height]);
-          yPos = height - 50;
-          currentPage.drawText('REGISTRO FOTOGRÁFICO', {
-            x: 50,
-            y: yPos,
-            size: 14,
-            color: rgb(0, 0, 0),
-          });
-          yPos -= 30;
-        }
-        
-        const fotoWidth = 200;
-        const fotoHeight = 150;
-        const maxFotosPorPagina = 4;
-        let fotosPorPagina = 0;
-        
-        for (let i = 0; i < fotos.length; i++) {
-          const foto = fotos[i];
-          
-          try {
-            // Verificar se precisa de nova página
-            if (fotosPorPagina >= maxFotosPorPagina) {
-              currentPage = pdfDoc.addPage([width, height]);
-              yPos = height - 50;
-              fotosPorPagina = 0;
-            }
-            
-            // Obter bytes da imagem (suporta S3 e local)
-            let imageBytes;
-            
-            if (!foto.url_arquivo) {
-              console.log(`[PDF] Foto ${i + 1} sem url_arquivo, pulando...`);
-              continue;
-            }
-            
-            try {
-              if (UPLOAD_STRATEGY === 'S3' || UPLOAD_STRATEGY === 's3') {
-                // Se for S3, buscar URL e fazer download
-                const imageUrl = getFullPath(foto.url_arquivo, vistoria?.id);
-                console.log(`[PDF] Baixando imagem do S3: ${imageUrl}`);
-                
-                // Usar https nativo do Node.js para fazer download
-                const https = require('https');
-                const http = require('http');
-                const urlModule = require('url');
-                
-                imageBytes = await new Promise((resolve, reject) => {
-                  const parsedUrl = urlModule.parse(imageUrl);
-                  const client = parsedUrl.protocol === 'https:' ? https : http;
-                  
-                  client.get(imageUrl, (res) => {
-                    if (res.statusCode !== 200) {
-                      return reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`));
-                    }
-                    
-                    const chunks = [];
-                    res.on('data', (chunk) => chunks.push(chunk));
-                    res.on('end', () => resolve(Buffer.concat(chunks)));
-                    res.on('error', reject);
-                  }).on('error', reject);
-                });
-              } else {
-                // Se for local, usar caminho do arquivo
-                const relativePath = getFullPath(foto.url_arquivo, vistoria?.id);
-                // getFullPath retorna caminho relativo, precisamos converter para absoluto
-                const imagePath = relativePath.startsWith('/') 
-                  ? path.join(__dirname, '..', relativePath)
-                  : path.join(__dirname, '..', 'uploads', 'fotos', `vistoria-${vistoria?.id}`, foto.url_arquivo);
-                
-                console.log(`[PDF] Carregando imagem local: ${imagePath}`);
-                
-                if (!fs.existsSync(imagePath)) {
-                  console.log(`[PDF] Arquivo de foto não encontrado: ${imagePath}`);
-                  // Tentar caminho alternativo
-                  const altPath = path.join(__dirname, '..', 'uploads', foto.url_arquivo);
-                  if (fs.existsSync(altPath)) {
-                    imageBytes = fs.readFileSync(altPath);
-                  } else {
-                    continue;
-                  }
-                } else {
-                  imageBytes = fs.readFileSync(imagePath);
-                }
-              }
-            } catch (imageLoadError) {
-              console.log(`[PDF] Erro ao carregar imagem ${i + 1}:`, imageLoadError.message);
-              continue;
-            }
-            
-            let image;
-            
-            // Detectar tipo de imagem baseado na URL ou tentar ambos
-            const urlLower = foto.url_arquivo.toLowerCase();
-            try {
-              if (urlLower.endsWith('.png')) {
-                image = await pdfDoc.embedPng(imageBytes);
-              } else if (urlLower.endsWith('.jpg') || urlLower.endsWith('.jpeg')) {
-                image = await pdfDoc.embedJpg(imageBytes);
-              } else {
-                // Tentar como JPEG primeiro (mais comum)
-                try {
-                  image = await pdfDoc.embedJpg(imageBytes);
-                } catch (jpegError) {
-                  // Se falhar, tentar PNG
-                  try {
-                    image = await pdfDoc.embedPng(imageBytes);
-                  } catch (pngError) {
-                    console.log(`[PDF] Erro ao carregar imagem ${i + 1} (tentou JPEG e PNG):`, pngError.message);
-                    continue;
-                  }
-                }
-              }
-            } catch (embedError) {
-              console.log(`[PDF] Erro ao incorporar imagem ${i + 1}:`, embedError.message);
-              continue;
-            }
-            
-            // Calcular posição
-            const xPos = 50 + (fotosPorPagina % 2) * 250;
-            const yPosFoto = yPos - Math.floor(fotosPorPagina / 2) * 200;
-            
-            // Adicionar imagem
-            currentPage.drawImage(image, {
-              x: xPos,
-              y: yPosFoto - fotoHeight,
-              width: fotoWidth,
-              height: fotoHeight,
-            });
-            
-            // Adicionar legenda (nome do tipo de foto)
-            const legenda = foto.TipoFotoChecklist?.nome_exibicao || `Foto ${i + 1}`;
-            currentPage.drawText(legenda, {
-              x: xPos,
-              y: yPosFoto - fotoHeight - 15,
-              size: 9,
-              color: rgb(0, 0, 0),
-            });
-            
-            let yOffset = 30; // Espaçamento inicial para observação/descrição
-            
-            // Adicionar descrição do tipo de foto se houver
-            if (foto.TipoFotoChecklist?.descricao) {
-              const descricao = foto.TipoFotoChecklist.descricao;
-              // Quebrar texto em linhas se necessário (máximo 40 caracteres por linha)
-              const maxChars = 40;
-              const linhas = [];
-              for (let i = 0; i < descricao.length; i += maxChars) {
-                linhas.push(descricao.substring(i, i + maxChars));
-              }
-              
-              linhas.forEach((linha, idx) => {
-                if (yPosFoto - fotoHeight - yOffset - (idx * 12) > 50) {
-                  currentPage.drawText(linha, {
-                    x: xPos,
-                    y: yPosFoto - fotoHeight - yOffset - (idx * 12),
-                    size: 7,
-                    color: rgb(0.3, 0.3, 0.3),
-                  });
-                }
-              });
-              
-              yOffset += linhas.length * 12 + 5;
-            }
-            
-            // Adicionar observação da foto se houver (do banco de dados)
-            if (foto.observacao) {
-              const observacao = foto.observacao.trim();
-              // Quebrar texto em linhas se necessário (máximo 40 caracteres por linha)
-              const maxChars = 40;
-              const linhas = [];
-              for (let i = 0; i < observacao.length; i += maxChars) {
-                linhas.push(observacao.substring(i, i + maxChars));
-              }
-              
-              linhas.forEach((linha, idx) => {
-                if (yPosFoto - fotoHeight - yOffset - (idx * 12) > 50) {
-                  currentPage.drawText(linha, {
-                    x: xPos,
-                    y: yPosFoto - fotoHeight - yOffset - (idx * 12),
-                    size: 7,
-                    color: rgb(0.5, 0.5, 0.5),
-                  });
-                }
-              });
-            }
-            
-            fotosPorPagina++;
-            
-            console.log(`[PDF] Foto ${i + 1} adicionada: ${legenda}`);
-            
-          } catch (fotoError) {
-            console.log(`[PDF] Erro ao adicionar foto ${i + 1}:`, fotoError.message);
-            // Continuar com próxima foto
-          }
-        }
-        
-        console.log(`[PDF] Total de ${fotos.length} fotos processadas`);
-      } catch (fotosError) {
-        console.log('[PDF] Erro ao processar fotos:', fotosError.message);
-        // Continuar mesmo se não conseguir adicionar fotos
-      }
-    } else {
-      console.log('[PDF] Nenhuma foto para adicionar ao PDF');
-    }
+    // Adicionar fotos ao PDF usando função auxiliar
+    await adicionarFotosAoPDF(pdfDoc, fotos, vistoria);
     
     // Salvar PDF
     const dirPath = garantirDiretorioLaudos();
@@ -675,10 +820,89 @@ const gerarLaudoPDF = async (laudo, vistoria, fotos = []) => {
     };
     
   } catch (error) {
-    console.error('[PDF] Erro ao gerar PDF:', error);
+    console.error('[PDF] ============================================');
+    console.error('[PDF] ERRO CRÍTICO ao gerar PDF:');
+    console.error('[PDF] Mensagem:', error.message);
+    console.error('[PDF] Stack:', error.stack);
+    console.error('[PDF] Laudo ID:', laudo?.id);
+    console.error('[PDF] Vistoria ID:', vistoria?.id);
+    console.error('[PDF] ============================================');
     throw error;
   }
 };
+
+/**
+ * Processa PDF sem template (cria PDF do zero)
+ */
+async function processarPDFSemTemplate(pdfDoc, laudo, vistoria, fotos, dados) {
+  try {
+    console.log('[PDF] Criando PDF sem template...');
+    
+    // Adicionar primeira página
+    const page = pdfDoc.addPage([595, 842]); // A4
+    
+    // Adicionar título
+    page.drawText('LAUDO DE VISTORIA', {
+      x: 50,
+      y: 800,
+      size: 20,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Adicionar dados principais
+    let yPos = 750;
+    const campos = [
+      { label: 'Número do Laudo:', valor: dados.numero_laudo },
+      { label: 'Nome da Embarcação:', valor: dados.nome_embarcacao },
+      { label: 'Proprietário:', valor: dados.proprietario },
+      { label: 'CPF/CNPJ:', valor: dados.cpf_cnpj },
+      { label: 'Data de Inspeção:', valor: dados.data_inspecao },
+      { label: 'Inscrição:', valor: dados.inscricao_capitania },
+      { label: 'Tipo:', valor: dados.tipo_embarcacao },
+      { label: 'Ano:', valor: dados.ano_fabricacao ? String(dados.ano_fabricacao) : '' },
+      { label: 'Valor em Risco:', valor: dados.valor_risco ? `R$ ${dados.valor_risco}` : '' },
+    ];
+    
+    campos.forEach(({ label, valor }) => {
+      if (valor) {
+        page.drawText(`${label} ${valor}`, {
+          x: 50,
+          y: yPos,
+          size: 12,
+          color: rgb(0, 0, 0),
+        });
+        yPos -= 25;
+      }
+    });
+    
+    // Processar fotos usando função auxiliar
+    await adicionarFotosAoPDF(pdfDoc, fotos, vistoria);
+    
+    // Salvar PDF
+    const dirPath = garantirDiretorioLaudos();
+    const fileName = `laudo-${laudo.id}.pdf`;
+    const filePath = path.join(dirPath, fileName);
+    
+    const pdfBytes = await pdfDoc.save();
+    fs.writeFileSync(filePath, pdfBytes);
+    
+    console.log('[PDF] PDF sem template salvo:', filePath);
+    
+    const agora = new Date();
+    const ano = agora.getFullYear();
+    const mes = String(agora.getMonth() + 1).padStart(2, '0');
+    const urlRelativa = `/uploads/laudos/${ano}/${mes}/${fileName}`;
+    
+    return {
+      filePath,
+      urlRelativa,
+      fileName
+    };
+  } catch (error) {
+    console.error('[PDF] Erro ao processar PDF sem template:', error);
+    throw error;
+  }
+}
 
 const deletarLaudoPDF = (urlPdf) => {
   try {

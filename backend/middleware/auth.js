@@ -53,7 +53,9 @@ const requireAdmin = async (req, res, next) => {
     next();
   } catch (error) {
     console.error("Erro no middleware de admin:", error);
-    res.status(500).json({ error: "Erro interno do servidor." });
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Erro interno do servidor." });
+    }
   }
 };
 
@@ -71,7 +73,9 @@ const requireVistoriador = async (req, res, next) => {
     next();
   } catch (error) {
     console.error("Erro no middleware de vistoriador:", error);
-    res.status(500).json({ error: "Erro interno do servidor." });
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Erro interno do servidor." });
+    }
   }
 };
 

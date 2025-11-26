@@ -619,6 +619,7 @@ const NovaVistoria: React.FC = () => {
       if (endereco && !endereco.erro) {
         setWizardData({
           ...wizardData,
+          local_cep: cepLimpo, // Garantir que o CEP seja preservado
           local_logradouro: endereco.logradouro || '',
           local_bairro: endereco.bairro || '',
           local_cidade: endereco.localidade || '',
@@ -626,10 +627,20 @@ const NovaVistoria: React.FC = () => {
         });
       } else {
         setError('CEP não encontrado. Por favor, preencha os dados manualmente.');
+        // Manter o CEP mesmo se não encontrar endereço
+        setWizardData({
+          ...wizardData,
+          local_cep: cepLimpo
+        });
       }
     } catch (err: any) {
       console.error('Erro ao buscar CEP:', err);
       setError('Erro ao buscar CEP. Por favor, preencha os dados manualmente.');
+      // Manter o CEP mesmo se houver erro
+      setWizardData({
+        ...wizardData,
+        local_cep: cepLimpo
+      });
     } finally {
       setLoadingCEP(false);
     }
@@ -789,7 +800,13 @@ const NovaVistoria: React.FC = () => {
           setError('Nome do local é obrigatório para MARINA');
           return;
         }
-        if (!wizardData.local_cep || !wizardData.local_logradouro || !wizardData.local_cidade || !wizardData.local_estado) {
+        // Validar CEP: deve ter 8 dígitos
+        const cepLimpo = (wizardData.local_cep || '').replace(/\D/g, '');
+        if (!cepLimpo || cepLimpo.length !== 8) {
+          setError('CEP é obrigatório e deve ter 8 dígitos');
+          return;
+        }
+        if (!wizardData.local_logradouro || !wizardData.local_cidade || !wizardData.local_estado) {
           setError('Preencha o endereço completo do local');
           return;
         }
@@ -2054,6 +2071,25 @@ const NovaVistoria: React.FC = () => {
           {/* Formulário de endereço (só aparece se não tiver local selecionado) */}
           {!wizardData.local_id && modoLocal === 'criar' && (
             <>
+              {/* Campo Nome da Marina (apenas para tipo MARINA) */}
+              {wizardData.local_tipo === 'MARINA' && (
+                <FormGroup>
+                  <Label>Nome da Marina *</Label>
+                  <Input
+                    type="text"
+                    value={wizardData.local_nome_local || ''}
+                    onChange={(e) => setWizardData({ ...wizardData, local_nome_local: e.target.value })}
+                    placeholder="Ex: Marina do Sol"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '2px solid #e5e7eb',
+                      borderRadius: '8px',
+                      fontSize: '0.9rem'
+                    }}
+                  />
+                </FormGroup>
+              )}
       <Grid cols={2}>
         <FormGroup>
           <Label>CEP *</Label>

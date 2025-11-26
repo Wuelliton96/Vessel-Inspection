@@ -22,8 +22,11 @@ export function preloadImage(url: string, timeout: number = 10000): Promise<Imag
       return;
     }
 
+    // Normalizar URL (remover barras duplas)
+    const normalizedUrl = url.replace(/([^:]\/)\/+/g, '$1');
+
     // Se a URL é da nossa API, precisamos usar fetch com autenticação
-    const isApiUrl = url.includes('/api/fotos/') || url.includes('/uploads/');
+    const isApiUrl = normalizedUrl.includes('/api/fotos/') || normalizedUrl.includes('/uploads/');
     
     if (isApiUrl) {
       // Usar IIFE para executar async/await dentro do Promise executor
@@ -41,7 +44,7 @@ export function preloadImage(url: string, timeout: number = 10000): Promise<Imag
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-          const response = await fetch(url, {
+          const response = await fetch(normalizedUrl, {
             method: 'GET',
             headers,
             signal: controller.signal,
@@ -55,8 +58,8 @@ export function preloadImage(url: string, timeout: number = 10000): Promise<Imag
           // Verificar se é um redirect (302, 301, etc)
           if (response.status >= 300 && response.status < 400) {
             // Se for redirect, tentar usar a URL final
-            const finalUrl = response.url || url;
-            console.log(`[preloadImage] Redirect detectado: ${url} -> ${finalUrl}`);
+            const finalUrl = response.url || normalizedUrl;
+            console.log(`[preloadImage] Redirect detectado: ${normalizedUrl} -> ${finalUrl}`);
             // Tentar carregar a URL final diretamente (pode ser S3 presigned URL)
             const img = new Image();
             let resolved = false;
@@ -64,7 +67,7 @@ export function preloadImage(url: string, timeout: number = 10000): Promise<Imag
               if (!resolved) {
                 resolved = true;
                 // Se timeout, retornar URL original para tentar diretamente
-                resolve({ success: true, url });
+                resolve({ success: true, url: normalizedUrl });
               }
             }, 5000);
             
@@ -81,7 +84,7 @@ export function preloadImage(url: string, timeout: number = 10000): Promise<Imag
                 clearTimeout(timeoutId);
                 console.warn(`[preloadImage] Erro ao carregar URL após redirect, tentando original: ${finalUrl}`);
                 // Retornar URL original para tentar diretamente
-                resolve({ success: true, url });
+                resolve({ success: true, url: normalizedUrl });
               }
             };
             img.src = finalUrl;
@@ -89,7 +92,7 @@ export function preloadImage(url: string, timeout: number = 10000): Promise<Imag
           }
 
           if (!response.ok) {
-            console.error(`[preloadImage] Erro HTTP ${response.status} ao carregar: ${url}`);
+            console.error(`[preloadImage] Erro HTTP ${response.status} ao carregar: ${normalizedUrl}`);
             // Se falhar, tentar usar a URL diretamente na tag img (pode funcionar mesmo com erro HTTP)
             const img = new Image();
             img.onload = () => {
@@ -98,7 +101,7 @@ export function preloadImage(url: string, timeout: number = 10000): Promise<Imag
             img.onerror = () => {
               resolve({ success: false, url, error: `Erro HTTP ${response.status}` });
             };
-            img.src = url;
+            img.src = normalizedUrl;
             return;
           }
 
@@ -119,16 +122,16 @@ export function preloadImage(url: string, timeout: number = 10000): Promise<Imag
           };
           img.onerror = () => {
             URL.revokeObjectURL(blobUrl);
-            console.warn(`[preloadImage] Erro ao validar blob, tentando URL original: ${url}`);
+            console.warn(`[preloadImage] Erro ao validar blob, tentando URL original: ${normalizedUrl}`);
             // Se blob falhar, tentar URL original diretamente
             const img2 = new Image();
             img2.onload = () => {
-              resolve({ success: true, url });
+              resolve({ success: true, url: normalizedUrl });
             };
             img2.onerror = () => {
-              resolve({ success: false, url, error: 'Erro ao validar imagem' });
+              resolve({ success: false, url: normalizedUrl, error: 'Erro ao validar imagem' });
             };
-            img2.src = url;
+            img2.src = normalizedUrl;
           };
           img.src = blobUrl;
         } catch (error: any) {

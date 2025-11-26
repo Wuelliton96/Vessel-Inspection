@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { Laudo, Vistoria, Embarcacao, StatusVistoria, Foto, TipoFotoChecklist, Seguradora, Cliente, Local } = require('../models');
+const { Laudo, Vistoria, Embarcacao, StatusVistoria, Foto, TipoFotoChecklist, Seguradora, Cliente, Local, ConfiguracaoLaudo } = require('../models');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { gerarNumeroLaudo, gerarLaudoPDF, deletarLaudoPDF } = require('../services/laudoService');
+const { handleRouteError, notFoundResponse, logRouteStart, logRouteEnd, getLaudoIncludes, getVistoriaIncludes } = require('../utils/routeHelpers');
+const { preencherDadosLaudo, preencherDadosLaudoExistente } = require('../utils/preencherLaudo');
 const path = require('path');
 const fs = require('fs');
 
@@ -10,6 +12,7 @@ router.use(requireAuth);
 
 router.get('/', async (req, res) => {
   try {
+    logRouteStart('GET', '/api/laudos', req);
     const laudos = await Laudo.findAll({
       include: [
         {
@@ -33,109 +36,121 @@ router.get('/', async (req, res) => {
       order: [['created_at', 'DESC']]
     });
     
+    logRouteEnd('GET', '/api/laudos', 200);
     res.json(laudos || []);
   } catch (error) {
-    console.error('Erro ao listar laudos:', error);
-    res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
+    handleRouteError(error, res, 'Erro ao listar laudos');
   }
 });
 
 router.get('/:id', async (req, res) => {
   try {
-    const laudo = await Laudo.findByPk(req.params.id, {
-      include: [
-        {
-          model: Vistoria,
-          as: 'Vistoria',
-          include: [
-            { 
-              model: Embarcacao, 
-              as: 'Embarcacao',
-              include: [
-                { model: Cliente, as: 'Cliente' }
-              ]
-            },
-            { model: StatusVistoria, as: 'StatusVistoria' },
-            { model: Local, as: 'Local' }
-          ]
-        }
-      ]
-    });
+    logRouteStart('GET', `/api/laudos/${req.params.id}`, req);
     
-    if (!laudo) {
-      return res.status(404).json({ error: 'Laudo não encontrado' });
+    const laudoId = Number.parseInt(req.params.id, 10);
+    if (Number.isNaN(laudoId) || laudoId <= 0) {
+      if (!res.headersSent) {
+        return res.status(400).json({ error: 'ID do laudo inválido' });
+      }
+      return;
     }
     
-    res.json(laudo);
+    let laudo;
+    try {
+      laudo = await Laudo.findByPk(laudoId, {
+        include: getLaudoIncludes()
+      });
+    } catch (includeError) {
+      console.error('Erro ao buscar laudo com includes:', includeError);
+      // Tentar buscar sem includes se houver erro
+      laudo = await Laudo.findByPk(laudoId);
+    }
+    
+    if (!laudo) {
+      logRouteEnd('GET', `/api/laudos/${req.params.id}`, 404);
+      if (!res.headersSent) {
+        return notFoundResponse(res, 'Laudo');
+      }
+      return;
+    }
+    
+    logRouteEnd('GET', `/api/laudos/${req.params.id}`, 200);
+    if (!res.headersSent) {
+      res.json(laudo);
+    }
   } catch (error) {
-    console.error('Erro ao buscar laudo:', error);
+    console.error('Erro detalhado ao buscar laudo:', error);
     console.error('Stack trace:', error.stack);
-    res.status(500).json({ 
-      error: 'Erro interno do servidor',
-      details: error.message 
-    });
+    if (!res.headersSent) {
+      handleRouteError(error, res, 'Erro ao buscar laudo');
+    }
   }
 });
 
 router.get('/vistoria/:vistoriaId', async (req, res) => {
   try {
-    const laudo = await Laudo.findOne({
-      where: { vistoria_id: req.params.vistoriaId },
-      include: [
-        {
-          model: Vistoria,
-          as: 'Vistoria',
-          include: [
-            { 
-              model: Embarcacao, 
-              as: 'Embarcacao',
-              include: [
-                { model: Cliente, as: 'Cliente' }
-              ]
-            },
-            { model: StatusVistoria, as: 'StatusVistoria' },
-            { model: Local, as: 'Local' }
-          ]
-        }
-      ]
-    });
+    logRouteStart('GET', `/api/laudos/vistoria/${req.params.vistoriaId}`, req);
     
-    if (!laudo) {
-      return res.status(404).json({ error: 'Laudo não encontrado para esta vistoria' });
+    const vistoriaId = Number.parseInt(req.params.vistoriaId, 10);
+    if (Number.isNaN(vistoriaId) || vistoriaId <= 0) {
+      if (!res.headersSent) {
+        return res.status(400).json({ error: 'ID da vistoria inválido' });
+      }
+      return;
     }
     
-    res.json(laudo);
+    let laudo;
+    try {
+      laudo = await Laudo.findOne({
+        where: { vistoria_id: vistoriaId },
+        include: getLaudoIncludes()
+      });
+    } catch (includeError) {
+      console.error('Erro ao buscar laudo com includes:', includeError);
+      // Tentar buscar sem includes se houver erro
+      laudo = await Laudo.findOne({
+        where: { vistoria_id: vistoriaId }
+      });
+    }
+    
+    if (!laudo) {
+      logRouteEnd('GET', `/api/laudos/vistoria/${req.params.vistoriaId}`, 404);
+      if (!res.headersSent) {
+        return notFoundResponse(res, 'Laudo');
+      }
+      return;
+    }
+    
+    logRouteEnd('GET', `/api/laudos/vistoria/${req.params.vistoriaId}`, 200);
+    if (!res.headersSent) {
+      res.json(laudo);
+    }
   } catch (error) {
-    console.error('Erro ao buscar laudo da vistoria:', error);
+    console.error('Erro detalhado ao buscar laudo por vistoria:', error);
     console.error('Stack trace:', error.stack);
-    res.status(500).json({ 
-      error: 'Erro interno do servidor',
-      details: error.message 
-    });
+    if (!res.headersSent) {
+      handleRouteError(error, res, 'Erro ao buscar laudo da vistoria');
+    }
   }
 });
 
 router.post('/vistoria/:vistoriaId', requireAdmin, async (req, res) => {
   try {
+    logRouteStart('POST', `/api/laudos/vistoria/${req.params.vistoriaId}`, req);
     const vistoriaId = req.params.vistoriaId;
     
     const vistoria = await Vistoria.findByPk(vistoriaId, {
-      include: [
-        { 
-          model: Embarcacao, 
-          as: 'Embarcacao',
-          include: [
-            { model: Cliente, as: 'Cliente' }
-          ]
-        },
-        { model: StatusVistoria, as: 'StatusVistoria' },
-        { model: Local, as: 'Local' }
-      ]
+      include: getVistoriaIncludes()
     });
     
     if (!vistoria) {
-      return res.status(404).json({ error: 'Vistoria não encontrada' });
+      logRouteEnd('POST', `/api/laudos/vistoria/${req.params.vistoriaId}`, 404);
+      return notFoundResponse(res, 'Vistoria');
     }
+    
+    // Log para debug
+    console.log('[POST /api/laudos/vistoria/:vistoriaId] Vistoriador:', vistoria.vistoriador);
+    console.log('[POST /api/laudos/vistoria/:vistoriaId] Nome do Vistoriador:', vistoria.vistoriador?.nome || 'NÃO ENCONTRADO');
 
     const statusConcluida = await StatusVistoria.findOne({ where: { nome: 'CONCLUIDA' } });
     if (!statusConcluida || vistoria.status_id !== statusConcluida.id) {
@@ -147,100 +162,85 @@ router.post('/vistoria/:vistoriaId', requireAdmin, async (req, res) => {
 
     const laudoExistente = await Laudo.findOne({ where: { vistoria_id: vistoriaId } });
     
-    const dadosLaudo = {
-      ...req.body,
-      vistoria_id: vistoriaId
-    };
+    // Garantir que o responsavel_inspecao seja sempre o nome do vistoriador se não foi fornecido
+    const nomeVistoriador = vistoria.vistoriador?.nome || '';
+    if (!req.body.responsavel_inspecao && nomeVistoriador) {
+      req.body.responsavel_inspecao = nomeVistoriador;
+    }
 
     let laudo;
     if (laudoExistente) {
+      // Atualizar laudo existente: preencher apenas campos vazios ou não fornecidos
+      const dadosPreenchidos = preencherDadosLaudoExistente(laudoExistente, vistoria, req.body);
+      
+      // Buscar configurações padrão
+      let configPadrao = await ConfiguracaoLaudo.findOne({ where: { padrao: true } });
+      
+      const dadosLaudo = { 
+        ...dadosPreenchidos, 
+        ...req.body, // req.body tem prioridade
+        // Usar configurações padrão se não foram fornecidas e o campo está vazio no laudo existente
+        nome_empresa: req.body.nome_empresa || laudoExistente.nome_empresa || configPadrao?.nome_empresa || '',
+        logo_empresa_url: req.body.logo_empresa_url || laudoExistente.logo_empresa_url || configPadrao?.logo_empresa_url || '',
+        nota_rodape: req.body.nota_rodape || laudoExistente.nota_rodape || configPadrao?.nota_rodape || '',
+        empresa_prestadora: req.body.empresa_prestadora || laudoExistente.empresa_prestadora || configPadrao?.empresa_prestadora || 'Vessel Inspection',
+        // Garantir que o responsavel_inspecao seja sempre o nome do vistoriador se não foi fornecido explicitamente
+        responsavel_inspecao: req.body.responsavel_inspecao || dadosPreenchidos.responsavel_inspecao || nomeVistoriador || ''
+      };
       await laudoExistente.update(dadosLaudo);
       laudo = laudoExistente;
     } else {
-      const numeroLaudo = gerarNumeroLaudo();
-      dadosLaudo.numero_laudo = numeroLaudo;
+      // Criar novo laudo: preencher todos os campos possíveis
+      const numeroLaudo = await gerarNumeroLaudo();
+      const dadosPreenchidos = preencherDadosLaudo(vistoria, req.body);
       
-      // Preencher dados iniciais do laudo com base na vistoria e embarcação
-      dadosLaudo.nome_moto_aquatica = dadosLaudo.nome_moto_aquatica || vistoria.Embarcacao?.nome;
-      dadosLaudo.proprietario = dadosLaudo.proprietario || vistoria.Embarcacao?.proprietario_nome || vistoria.Embarcacao?.Cliente?.nome;
-      dadosLaudo.cpf_cnpj = dadosLaudo.cpf_cnpj || vistoria.Embarcacao?.proprietario_cpf || vistoria.Embarcacao?.Cliente?.cpf || vistoria.Embarcacao?.Cliente?.cnpj;
-      dadosLaudo.data_inspecao = dadosLaudo.data_inspecao || vistoria.data_conclusao || vistoria.data_inicio;
-      dadosLaudo.valor_risco = dadosLaudo.valor_risco || vistoria.valor_embarcacao || vistoria.Embarcacao?.valor_embarcacao;
+      // Buscar configurações padrão
+      let configPadrao = await ConfiguracaoLaudo.findOne({ where: { padrao: true } });
       
-      // Construir endereço completo do local de vistoria
-      const localVistoria = vistoria.Local ? 
-        `${vistoria.Local.logradouro || ''}, ${vistoria.Local.numero || ''} - ${vistoria.Local.bairro || ''}, ${vistoria.Local.cidade || ''}/${vistoria.Local.estado || ''}`.trim().replace(/^,\s*-\s*,?\s*\/?,?/, '') : 
-        '';
-      
-      dadosLaudo.local_vistoria = dadosLaudo.local_vistoria || localVistoria;
-      dadosLaudo.local_guarda = dadosLaudo.local_guarda || localVistoria; // Local da guarda = Local de vistoria
-      dadosLaudo.inscricao_capitania = dadosLaudo.inscricao_capitania || vistoria.Embarcacao?.nr_inscricao_barco;
-      dadosLaudo.tipo_embarcacao = dadosLaudo.tipo_embarcacao || vistoria.Embarcacao?.tipo_embarcacao;
-      dadosLaudo.ano_fabricacao = dadosLaudo.ano_fabricacao || vistoria.Embarcacao?.ano_fabricacao;
+      const dadosLaudo = {
+        ...dadosPreenchidos,
+        ...req.body, // req.body tem prioridade sobre dados preenchidos
+        // Usar configurações padrão se não foram fornecidas
+        nome_empresa: req.body.nome_empresa || dadosPreenchidos.nome_empresa || configPadrao?.nome_empresa || '',
+        logo_empresa_url: req.body.logo_empresa_url || dadosPreenchidos.logo_empresa_url || configPadrao?.logo_empresa_url || '',
+        nota_rodape: req.body.nota_rodape || dadosPreenchidos.nota_rodape || configPadrao?.nota_rodape || '',
+        empresa_prestadora: req.body.empresa_prestadora || dadosPreenchidos.empresa_prestadora || configPadrao?.empresa_prestadora || 'Vessel Inspection',
+        // Garantir que o responsavel_inspecao seja sempre o nome do vistoriador se não foi fornecido explicitamente
+        responsavel_inspecao: req.body.responsavel_inspecao || dadosPreenchidos.responsavel_inspecao || nomeVistoriador || '',
+        numero_laudo: numeroLaudo,
+        vistoria_id: vistoriaId
+      };
       
       laudo = await Laudo.create(dadosLaudo);
     }
 
     const laudoCompleto = await Laudo.findByPk(laudo.id, {
-      include: [
-        {
-          model: Vistoria,
-          as: 'Vistoria',
-          include: [
-            { 
-              model: Embarcacao, 
-              as: 'Embarcacao',
-              include: [
-                { model: Cliente, as: 'Cliente' }
-              ]
-            },
-            { model: StatusVistoria, as: 'StatusVistoria' },
-            { model: Local, as: 'Local' }
-          ]
-        }
-      ]
+      include: getLaudoIncludes()
     });
     
+    logRouteEnd('POST', `/api/laudos/vistoria/${vistoriaId}`, 200);
     res.json(laudoCompleto);
   } catch (error) {
-    console.error('Erro ao criar/atualizar laudo:', error);
-    console.error('Stack trace:', error.stack);
-    
     if (error.name === 'SequelizeUniqueConstraintError') {
-      return res.status(400).json({ error: 'Já existe um laudo para esta vistoria' });
+      if (!res.headersSent) {
+        return res.status(400).json({ error: 'Já existe um laudo para esta vistoria' });
+      }
+      return;
     }
-    
-    res.status(500).json({ 
-      error: 'Erro interno do servidor',
-      details: error.message 
-    });
+    handleRouteError(error, res, 'Erro ao criar/atualizar laudo');
   }
 });
 
 router.get('/:id/preview', requireAuth, async (req, res) => {
   try {
+    logRouteStart('GET', `/api/laudos/${req.params.id}/preview`, req);
     const laudo = await Laudo.findByPk(req.params.id, {
-      include: [
-        {
-          model: Vistoria,
-          as: 'Vistoria',
-          include: [
-            { 
-              model: Embarcacao, 
-              as: 'Embarcacao',
-              include: [
-                { model: Cliente, as: 'Cliente' }
-              ]
-            },
-            { model: StatusVistoria, as: 'StatusVistoria' },
-            { model: Local, as: 'Local' }
-          ]
-        }
-      ]
+      include: getLaudoIncludes()
     });
     
     if (!laudo) {
-      return res.status(404).json({ error: 'Laudo não encontrado' });
+      logRouteEnd('GET', `/api/laudos/${req.params.id}/preview`, 404);
+      return notFoundResponse(res, 'Laudo');
     }
 
     const fotos = await Foto.findAll({
@@ -310,13 +310,10 @@ router.get('/:id/preview', requireAuth, async (req, res) => {
       totalFotos: fotos.length
     };
 
+    logRouteEnd('GET', `/api/laudos/${req.params.id}/preview`, 200);
     res.json(dadosPreview);
   } catch (error) {
-    console.error('Erro ao gerar preview do laudo:', error);
-    res.status(500).json({ 
-      error: 'Erro ao gerar preview do laudo',
-      details: error.message 
-    });
+    handleRouteError(error, res, 'Erro ao gerar preview do laudo');
   }
 });
 
@@ -351,7 +348,13 @@ router.post('/:id/gerar-pdf', requireAdmin, async (req, res) => {
       deletarLaudoPDF(laudo.url_pdf);
     }
 
+    console.log(`[POST /api/laudos/:id/gerar-pdf] Iniciando geração do PDF...`);
+    console.log(`[POST /api/laudos/:id/gerar-pdf] Laudo encontrado: ID=${laudo.id}, Vistoria ID=${laudo.vistoria_id}`);
+    console.log(`[POST /api/laudos/:id/gerar-pdf] Fotos encontradas: ${fotos.length}`);
+    
     const { urlRelativa } = await gerarLaudoPDF(laudo, laudo.Vistoria, fotos);
+    
+    console.log(`[POST /api/laudos/:id/gerar-pdf] PDF gerado com sucesso: ${urlRelativa}`);
 
     await laudo.update({
       url_pdf: urlRelativa,
@@ -359,17 +362,10 @@ router.post('/:id/gerar-pdf', requireAdmin, async (req, res) => {
     });
 
     const laudoAtualizado = await Laudo.findByPk(laudo.id, {
-      include: [
-        {
-          model: Vistoria,
-          as: 'Vistoria',
-          include: [
-            { model: Embarcacao, as: 'Embarcacao' }
-          ]
-        }
-      ]
+      include: getLaudoIncludes()
     });
 
+    logRouteEnd('POST', `/api/laudos/${req.params.id}/gerar-pdf`, 200);
     res.json({
       success: true,
       message: 'Laudo gerado com sucesso',
@@ -377,113 +373,84 @@ router.post('/:id/gerar-pdf', requireAdmin, async (req, res) => {
       downloadUrl: `/api/laudos/${laudo.id}/download`
     });
   } catch (error) {
-    console.error('Erro ao gerar PDF do laudo:', error);
-    console.error('Stack trace:', error.stack);
-    res.status(500).json({ 
-      error: 'Erro ao gerar PDF do laudo',
-      details: error.message 
-    });
+    console.error(`[POST /api/laudos/:id/gerar-pdf] ERRO:`, error.message);
+    console.error(`[POST /api/laudos/:id/gerar-pdf] Stack:`, error.stack);
+    handleRouteError(error, res, 'Erro ao gerar PDF do laudo');
   }
 });
 
-router.get('/:id/download-pdf', requireAuth, async (req, res) => {
+// Função auxiliar para download de PDF (reduz duplicação)
+async function downloadLaudoPDF(req, res, routePath) {
   try {
+    logRouteStart('GET', routePath, req);
     const laudo = await Laudo.findByPk(req.params.id);
     
     if (!laudo) {
-      return res.status(404).json({ error: 'Laudo não encontrado' });
+      logRouteEnd('GET', routePath, 404);
+      return notFoundResponse(res, 'Laudo');
     }
     
     if (!laudo.url_pdf) {
-      return res.status(404).json({ error: 'PDF do laudo ainda não foi gerado' });
+      logRouteEnd('GET', routePath, 404);
+      if (!res.headersSent) {
+        return res.status(404).json({ error: 'PDF do laudo ainda não foi gerado' });
+      }
+      return;
     }
 
     const filePath = path.join(__dirname, '..', laudo.url_pdf);
     
     if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'Arquivo PDF não encontrado no servidor' });
+      logRouteEnd('GET', routePath, 404);
+      if (!res.headersSent) {
+        return res.status(404).json({ error: 'Arquivo PDF não encontrado no servidor' });
+      }
+      return;
     }
 
+    logRouteEnd('GET', routePath, 200);
     res.download(filePath, `laudo-${laudo.numero_laudo}.pdf`);
   } catch (error) {
-    console.error('Erro ao fazer download do laudo:', error);
-    res.status(500).json({ error: 'Erro ao fazer download do laudo' });
+    handleRouteError(error, res, 'Erro ao fazer download do laudo');
   }
-});
+}
+
+router.get('/:id/download-pdf', requireAuth, (req, res) => downloadLaudoPDF(req, res, `/api/laudos/${req.params.id}/download-pdf`));
 
 // Manter rota antiga para compatibilidade
-router.get('/:id/download', requireAuth, async (req, res) => {
-  try {
-    const laudo = await Laudo.findByPk(req.params.id);
-    
-    if (!laudo) {
-      return res.status(404).json({ error: 'Laudo não encontrado' });
-    }
-    
-    if (!laudo.url_pdf) {
-      return res.status(404).json({ error: 'PDF do laudo ainda não foi gerado' });
-    }
-
-    const filePath = path.join(__dirname, '..', laudo.url_pdf);
-    
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'Arquivo PDF não encontrado no servidor' });
-    }
-
-    res.download(filePath, `laudo-${laudo.numero_laudo}.pdf`);
-  } catch (error) {
-    console.error('Erro ao fazer download do laudo:', error);
-    res.status(500).json({ error: 'Erro ao fazer download do laudo' });
-  }
-});
+router.get('/:id/download', requireAuth, (req, res) => downloadLaudoPDF(req, res, `/api/laudos/${req.params.id}/download`));
 
 router.put('/:id', requireAdmin, async (req, res) => {
   try {
+    logRouteStart('PUT', `/api/laudos/${req.params.id}`, req);
     const laudo = await Laudo.findByPk(req.params.id);
     
     if (!laudo) {
-      return res.status(404).json({ error: 'Laudo não encontrado' });
+      logRouteEnd('PUT', `/api/laudos/${req.params.id}`, 404);
+      return notFoundResponse(res, 'Laudo');
     }
 
     await laudo.update(req.body);
 
     const laudoAtualizado = await Laudo.findByPk(laudo.id, {
-      include: [
-        {
-          model: Vistoria,
-          as: 'Vistoria',
-          include: [
-            { 
-              model: Embarcacao, 
-              as: 'Embarcacao',
-              include: [
-                { model: Cliente, as: 'Cliente' }
-              ]
-            },
-            { model: StatusVistoria, as: 'StatusVistoria' },
-            { model: Local, as: 'Local' }
-          ]
-        }
-      ]
+      include: getLaudoIncludes()
     });
 
+    logRouteEnd('PUT', `/api/laudos/${req.params.id}`, 200);
     res.json(laudoAtualizado);
   } catch (error) {
-    console.error('Erro ao atualizar laudo:', error);
-    console.error('Stack trace:', error.stack);
-    res.status(500).json({ 
-      error: 'Erro interno do servidor',
-      details: error.message 
-    });
+    handleRouteError(error, res, 'Erro ao atualizar laudo');
   }
 });
 
 router.delete('/:id', requireAdmin, async (req, res) => {
   try {
+    logRouteStart('DELETE', `/api/laudos/${req.params.id}`, req);
     const laudo = await Laudo.findByPk(req.params.id);
     
     if (!laudo) {
-      return res.status(404).json({ error: 'Laudo não encontrado' });
+      logRouteEnd('DELETE', `/api/laudos/${req.params.id}`, 404);
+      return notFoundResponse(res, 'Laudo');
     }
 
     if (laudo.url_pdf) {
@@ -492,10 +459,10 @@ router.delete('/:id', requireAdmin, async (req, res) => {
 
     await laudo.destroy();
 
+    logRouteEnd('DELETE', `/api/laudos/${req.params.id}`, 200);
     res.json({ message: 'Laudo excluído com sucesso' });
   } catch (error) {
-    console.error('Erro ao excluir laudo:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    handleRouteError(error, res, 'Erro ao excluir laudo');
   }
 });
 

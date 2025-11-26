@@ -7,7 +7,7 @@ const getApiBaseUrl = () => {
   
   // Se estiver em producao, usar a URL de producao
   if (process.env.NODE_ENV === 'production') {
-    return 'https://sua-api.elasticbeanstalk.com';
+    return process.env.REACT_APP_API_URL || 'https://api.vessel-inspection.com.br';
   }
   
   // Em desenvolvimento, usar localhost

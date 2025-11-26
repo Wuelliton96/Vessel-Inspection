@@ -180,6 +180,7 @@ export interface Vistoria {
   Local?: Local;
   StatusVistoria?: StatusVistoria;
   Fotos?: Foto[];
+  Vistoriador?: Usuario; // Para compatibilidade com backend
 }
 
 export interface StatusVistoria {

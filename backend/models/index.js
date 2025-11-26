@@ -23,6 +23,7 @@ const ChecklistTemplate = require('./ChecklistTemplate');
 const ChecklistTemplateItem = require('./ChecklistTemplateItem');
 const VistoriaChecklistItem = require('./VistoriaChecklistItem');
 const AuditoriaLog = require('./AuditoriaLog');
+const ConfiguracaoLaudo = require('./ConfiguracaoLaudo');
 
 Usuario.belongsTo(NivelAcesso, { foreignKey: 'nivel_acesso_id' });
 NivelAcesso.hasMany(Usuario, { foreignKey: 'nivel_acesso_id' });
@@ -75,6 +76,10 @@ VistoriaChecklistItem.belongsTo(ChecklistTemplateItem, { as: 'templateItem', for
 AuditoriaLog.belongsTo(Usuario, { as: 'usuario', foreignKey: 'usuario_id' });
 Usuario.hasMany(AuditoriaLog, { as: 'auditorias', foreignKey: 'usuario_id' });
 
+// Relacionamentos de ConfiguracaoLaudo
+ConfiguracaoLaudo.belongsTo(Usuario, { as: 'usuario', foreignKey: 'usuario_id' });
+Usuario.hasMany(ConfiguracaoLaudo, { as: 'configuracoesLaudo', foreignKey: 'usuario_id' });
+
 const shouldSync = process.env.NODE_ENV !== 'test' && (process.env.DB_SYNC || 'off') !== 'off';
 if (shouldSync) {
   const mode = process.env.DB_SYNC || 'alter';
@@ -109,4 +114,5 @@ module.exports = {
   ChecklistTemplateItem,
   VistoriaChecklistItem,
   AuditoriaLog,
+  ConfiguracaoLaudo,
 };

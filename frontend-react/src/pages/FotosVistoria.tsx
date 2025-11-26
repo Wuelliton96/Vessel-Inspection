@@ -8,6 +8,7 @@ import { API_CONFIG } from '../config/api';
 import { mascaraCPF } from '../utils/validators';
 import PreloadedImage from '../components/PreloadedImage';
 import { imageCacheManager } from '../utils/imageCache';
+import { buildImageUrl, buildImageUrlEndpoint } from '../utils/urlHelper';
 
 const Container = styled.div`
   padding: 2rem;
@@ -324,7 +325,7 @@ const FotosVistoria: React.FC = () => {
             if (!item.foto?.id) return;
             
             try {
-              const response = await fetch(`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem-url`, {
+              const response = await fetch(buildImageUrlEndpoint(API_CONFIG.BASE_URL, item.foto.id), {
                 headers: {
                   'Authorization': `Bearer ${token}`
                 }
@@ -337,18 +338,18 @@ const FotosVistoria: React.FC = () => {
                 } else {
                   errosCountRef.count++;
                   // Fallback: usar rota direta
-                  urls[item.foto.id] = `${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`;
+                  urls[item.foto.id] = buildImageUrl(API_CONFIG.BASE_URL, item.foto.id);
                 }
               } else {
                 errosCountRef.count++;
                 // Fallback: usar rota direta
-                urls[item.foto.id] = `${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`;
+                urls[item.foto.id] = buildImageUrl(API_CONFIG.BASE_URL, item.foto.id);
               }
             } catch (error) {
               console.error(`Erro ao buscar URL da foto ${item.foto.id}:`, error);
               errosCountRef.count++;
               // Fallback: usar rota direta
-              urls[item.foto.id] = `${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`;
+              urls[item.foto.id] = buildImageUrl(API_CONFIG.BASE_URL, item.foto.id);
             }
           })
         );
@@ -387,7 +388,7 @@ const FotosVistoria: React.FC = () => {
     
     try {
       // Buscar URL da imagem primeiro
-      const response = await fetch(`${API_CONFIG.BASE_URL}/api/fotos/${fotoId}/imagem-url`, {
+      const response = await fetch(buildImageUrlEndpoint(API_CONFIG.BASE_URL, fotoId), {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -406,14 +407,14 @@ const FotosVistoria: React.FC = () => {
       
       // Fallback: usar rota antiga
       const link = document.createElement('a');
-      link.href = `${API_CONFIG.BASE_URL}/api/fotos/${fotoId}/imagem`;
+      link.href = buildImageUrl(API_CONFIG.BASE_URL, fotoId);
       link.download = `${nomeItem}.jpg`;
       link.click();
     } catch (error) {
       console.error('Erro ao fazer download:', error);
       // Fallback: usar rota antiga
       const link = document.createElement('a');
-      link.href = `${API_CONFIG.BASE_URL}/api/fotos/${fotoId}/imagem`;
+      link.href = buildImageUrl(API_CONFIG.BASE_URL, fotoId);
       link.download = `${nomeItem}.jpg`;
       link.click();
     }
@@ -557,9 +558,9 @@ const FotosVistoria: React.FC = () => {
                 <FotoImageContainer>
                   {item.foto?.id ? (
                     <PreloadedImage
-                      src={imagemUrls[item.foto.id] || `${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`}
+                      src={imagemUrls[item.foto.id] || buildImageUrl(API_CONFIG.BASE_URL, item.foto.id)}
                       alt={item.nome}
-                      fallbackSrc={imagemUrls[item.foto.id] ? `${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem` : undefined}
+                      fallbackSrc={imagemUrls[item.foto.id] ? buildImageUrl(API_CONFIG.BASE_URL, item.foto.id) : undefined}
                       style={{
                         width: '100%',
                         height: '100%',
@@ -621,7 +622,7 @@ const FotosVistoria: React.FC = () => {
                           // Imagem não está carregada ainda ou não está visível
                           // Fazer requisição normal ao backend
                           console.log('[FotosVistoria] ⚠️ Imagem não está carregada ainda, fazendo requisição ao backend');
-                          const url = imagemUrls[item.foto.id] || `${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`;
+                          const url = imagemUrls[item.foto.id] || buildImageUrl(API_CONFIG.BASE_URL, item.foto.id);
                           setImagemAmpliada(url);
                         }
                       }}

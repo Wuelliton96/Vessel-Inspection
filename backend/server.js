@@ -29,6 +29,7 @@ const seguradoraRoutes = require('./routes/seguradoraRoutes');
 const clienteRoutes = require('./routes/clienteRoutes');
 const checklistRoutes = require('./routes/checklistRoutes');
 const laudoRoutes = require('./routes/laudoRoutes');
+const configuracaoLaudoRoutes = require('./routes/configuracaoLaudoRoutes');
 const cepRoutes = require('./routes/cepRoutes');
 const auditoriaRoutes = require('./routes/auditoriaRoutes');
 
@@ -226,6 +227,7 @@ app.use('/api/seguradoras', seguradoraRoutes);
 app.use('/api/clientes', clienteRoutes);
 app.use('/api/checklists', checklistRoutes);
 app.use('/api/laudos', laudoRoutes);
+app.use('/api/configuracoes-laudo', configuracaoLaudoRoutes);
 app.use('/api/cep', cepRoutes);
 app.use('/api/auditoria', auditoriaRoutes);
 

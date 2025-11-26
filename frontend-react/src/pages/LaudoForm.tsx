@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { FileText, Save, FileCheck, ArrowLeft, Loader, Eye, X } from 'lucide-react';
-import { laudoService, vistoriaService } from '../services/api';
+import { laudoService, vistoriaService, configuracaoLaudoService } from '../services/api';
 import { Laudo } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 const Container = styled.div`
   padding: 2rem;
@@ -38,6 +39,57 @@ const PreviewModal = styled.div`
   justify-content: center;
   z-index: 1000;
   padding: 2rem;
+`;
+
+const ProcessingModal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 2rem;
+`;
+
+const ProcessingContent = styled.div`
+  background: white;
+  border-radius: 12px;
+  padding: 3rem;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+`;
+
+const ProcessingTitle = styled.h2`
+  font-size: 1.5rem;
+  color: #1f2937;
+  margin-bottom: 1rem;
+`;
+
+const ProcessingMessage = styled.p`
+  color: #6b7280;
+  margin-bottom: 2rem;
+  font-size: 1rem;
+`;
+
+const Spinner = styled.div`
+  border: 4px solid #f3f4f6;
+  border-top: 4px solid #3b82f6;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1.5rem;
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
 `;
 
 const PreviewContent = styled.div`
@@ -354,6 +406,8 @@ const QuestionText = styled.p`
 const LaudoForm: React.FC = () => {
   const { id, vistoriaId } = useParams<{ id?: string; vistoriaId?: string }>();
   const navigate = useNavigate();
+  const { usuario } = useAuth();
+  const isAdmin = usuario?.nivelAcessoId === 1 || (usuario as any)?.nivel_acesso_id === 1;
   const [activeTab, setActiveTab] = useState('dados-gerais');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -361,6 +415,8 @@ const LaudoForm: React.FC = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [previewData, setPreviewData] = useState<any>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [showProcessingModal, setShowProcessingModal] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState('Processando PDF...');
   
   const [formData, setFormData] = useState<Partial<Laudo>>({
     versao: 'BS 2021-01',
@@ -368,6 +424,11 @@ const LaudoForm: React.FC = () => {
     checklist_hidraulica: {},
     checklist_geral: {}
   });
+
+  // Carregar configurações padrão quando o componente montar
+  useEffect(() => {
+    carregarConfiguracoesPadrao();
+  }, []);
 
   useEffect(() => {
     if (id) {
@@ -378,23 +439,68 @@ const LaudoForm: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, vistoriaId]);
 
+  // Carregar configurações padrão
+  const carregarConfiguracoesPadrao = async () => {
+    try {
+      const config = await configuracaoLaudoService.get();
+      console.log('[LaudoForm] Configurações padrão carregadas:', config);
+      
+      // Preencher campos com configurações padrão se não tiverem valores
+      setFormData(prev => ({
+        ...prev,
+        nome_empresa: prev.nome_empresa || config.nome_empresa || '',
+        logo_empresa_url: prev.logo_empresa_url || config.logo_empresa_url || '',
+        nota_rodape: prev.nota_rodape || config.nota_rodape || '',
+        empresa_prestadora: prev.empresa_prestadora || config.empresa_prestadora || 'Vessel Inspection'
+      }));
+    } catch (error: any) {
+      console.error('[LaudoForm] Erro ao carregar configurações padrão:', error);
+      // Não exibir erro para o usuário, apenas usar valores padrão
+    }
+  };
+
   const carregarLaudo = async () => {
     try {
       setLoading(true);
+      console.log('[LaudoForm] Carregando laudo ID:', id);
+      
+      if (!id || isNaN(Number(id))) {
+        throw new Error('ID do laudo inválido');
+      }
+      
       const data = await laudoService.buscarPorId(Number(id));
+      console.log('[LaudoForm] Laudo carregado:', data);
+      
       if (data) {
+        // O backend já preenche automaticamente campos vazios, mas garantimos aqui também
         // Se local_guarda não estiver preenchido, usar local_vistoria
         if (!data.local_guarda && data.local_vistoria) {
           data.local_guarda = data.local_vistoria;
         }
         setFormData(data);
       } else {
+        console.warn('[LaudoForm] Laudo não encontrado');
         alert('Laudo não encontrado');
         navigate('/laudos');
       }
     } catch (err: any) {
-      console.error('Erro ao carregar laudo:', err);
-      const errorMessage = err.response?.data?.error || err.message || 'Erro ao carregar laudo';
+      console.error('[LaudoForm] Erro ao carregar laudo:', err);
+      console.error('[LaudoForm] Erro completo:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        statusText: err.response?.statusText
+      });
+      
+      let errorMessage = 'Erro ao carregar laudo';
+      if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
       alert(errorMessage);
       navigate('/laudos');
     } finally {
@@ -421,10 +527,62 @@ const LaudoForm: React.FC = () => {
     // Se não existir laudo, carregar dados da vistoria para preencher o formulário
     try {
       const vistoria = await vistoriaService.getById(Number(vistoriaId));
+      console.log('[LaudoForm] Vistoria carregada:', vistoria);
+      console.log('[LaudoForm] Embarcacao:', vistoria.Embarcacao);
+      console.log('[LaudoForm] Cliente:', vistoria.Embarcacao?.Cliente);
+      console.log('[LaudoForm] Local:', vistoria.Local);
+      console.log('[LaudoForm] Vistoriador:', vistoria.vistoriador || vistoria.Vistoriador);
+      console.log('[LaudoForm] Vistoria carregada:', vistoria);
+      console.log('[LaudoForm] Embarcacao:', vistoria.Embarcacao);
+      console.log('[LaudoForm] Cliente:', vistoria.Embarcacao?.Cliente);
+      console.log('[LaudoForm] Local:', vistoria.Local);
+      console.log('[LaudoForm] Vistoriador (vistoriador):', vistoria.vistoriador);
+      console.log('[LaudoForm] Vistoriador (Vistoriador):', vistoria.Vistoriador);
+      console.log('[LaudoForm] Nome do Vistoriador:', vistoria.vistoriador?.nome || vistoria.Vistoriador?.nome || 'NÃO ENCONTRADO');
+      
       // Construir endereço completo do local de vistoria
-      const localVistoria = vistoria.Local ? 
-        `${vistoria.Local.logradouro || ''}, ${vistoria.Local.numero || ''} - ${vistoria.Local.bairro || ''}, ${vistoria.Local.cidade || ''}/${vistoria.Local.estado || ''}`.trim().replace(/^,\s*-\s*,?\s*\/?,?/, '') : 
-        '';
+      const construirEnderecoLocal = (local: any) => {
+        if (!local) return '';
+        const partes = [];
+        if (local.logradouro) partes.push(local.logradouro);
+        if (local.numero) partes.push(local.numero);
+        if (local.complemento) partes.push(local.complemento);
+        if (local.bairro) partes.push(local.bairro);
+        if (local.cidade) partes.push(local.cidade);
+        if (local.estado) partes.push(local.estado);
+        if (local.cep) partes.push(`CEP: ${local.cep}`);
+        return partes.join(', ').replace(/^,\s*/, '').replace(/,\s*,/g, ',');
+      };
+      
+      // Construir endereço do proprietário/cliente
+      const construirEnderecoProprietario = () => {
+        const cliente = vistoria.Embarcacao?.Cliente;
+        console.log('[LaudoForm] Construindo endereço do cliente:', cliente);
+        if (!cliente) {
+          console.log('[LaudoForm] Cliente não encontrado');
+          return '';
+        }
+        
+        const partes = [];
+        if (cliente.logradouro) partes.push(cliente.logradouro);
+        if (cliente.numero) partes.push(cliente.numero);
+        if (cliente.complemento) partes.push(cliente.complemento);
+        if (cliente.bairro) partes.push(cliente.bairro);
+        if (cliente.cidade) partes.push(cliente.cidade);
+        if (cliente.estado) partes.push(cliente.estado);
+        if (cliente.cep) partes.push(`CEP: ${cliente.cep}`);
+        const enderecoCompleto = partes.join(', ').replace(/^,\s*/, '').replace(/,\s*,/g, ',');
+        console.log('[LaudoForm] Endereço completo construído:', enderecoCompleto);
+        return enderecoCompleto;
+      };
+      
+      const localVistoria = construirEnderecoLocal(vistoria.Local);
+      const enderecoProprietario = construirEnderecoProprietario();
+      
+      console.log('[LaudoForm] Preenchendo formulário com:');
+      console.log('  - Local Vistoria:', localVistoria);
+      console.log('  - Endereço Proprietário:', enderecoProprietario);
+      console.log('  - Responsável Inspeção:', vistoria.vistoriador?.nome || vistoria.Vistoriador?.nome || '');
       
       setFormData(prev => ({
         ...prev,
@@ -432,13 +590,25 @@ const LaudoForm: React.FC = () => {
         nome_moto_aquatica: vistoria.Embarcacao?.nome || '',
         proprietario: vistoria.Embarcacao?.proprietario_nome || vistoria.Embarcacao?.Cliente?.nome || '',
         cpf_cnpj: vistoria.Embarcacao?.proprietario_cpf || vistoria.Embarcacao?.Cliente?.cpf || vistoria.Embarcacao?.Cliente?.cnpj || '',
+        endereco_proprietario: enderecoProprietario, // Endereço completo do cliente
         data_inspecao: vistoria.data_conclusao || vistoria.data_inicio || new Date().toISOString().split('T')[0],
-        valor_risco: vistoria.valor_embarcacao || 0,
-        local_vistoria: localVistoria,
-        local_guarda: localVistoria // Local da guarda = Local de vistoria
+        valor_risco: vistoria.valor_embarcacao || vistoria.Embarcacao?.valor_embarcacao || 0,
+        local_vistoria: localVistoria || '', // Local da vistoria do banco
+        local_guarda: localVistoria || '', // Local da guarda = Local de vistoria
+        inscricao_capitania: vistoria.Embarcacao?.nr_inscricao_barco || '',
+        tipo_embarcacao: vistoria.Embarcacao?.tipo_embarcacao || '',
+        ano_fabricacao: vistoria.Embarcacao?.ano_fabricacao || undefined,
+        empresa_prestadora: 'Vessel Inspection',
+        responsavel_inspecao: vistoria.vistoriador?.nome || vistoria.Vistoriador?.nome || (vistoria.vistoriador_id ? 'Carregando...' : ''), // Nome do vistoriador que fez a vistoria
+        versao: 'BS 2021-01'
       }));
     } catch (vistoriaErr: any) {
-      console.error('Erro ao carregar dados da vistoria:', vistoriaErr);
+      console.error('[LaudoForm] Erro ao carregar dados da vistoria:', vistoriaErr);
+      console.error('[LaudoForm] Erro completo:', {
+        message: vistoriaErr.message,
+        response: vistoriaErr.response?.data,
+        status: vistoriaErr.response?.status
+      });
       alert(vistoriaErr.response?.data?.error || 'Erro ao carregar dados da vistoria');
     }
   };
@@ -521,28 +691,56 @@ const LaudoForm: React.FC = () => {
         return;
       }
 
+      // Mostrar modal de processamento e bloquear interface
+      setShowProcessingModal(true);
+      setProcessingMessage('Iniciando geração do PDF...');
       setGenerating(true);
       
-      await laudoService.gerarPDF(formData.id);
+      // Desabilitar scroll e interações
+      document.body.style.overflow = 'hidden';
       
-      alert('PDF gerado com sucesso!');
-      
-      const blob = await laudoService.download(formData.id);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `laudo-${formData.numero_laudo}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      carregarLaudo();
-      setShowPreview(false);
+      try {
+        setProcessingMessage('Buscando informações do laudo e fotos...');
+        await new Promise(resolve => setTimeout(resolve, 500)); // Pequeno delay para mostrar mensagem
+        
+        setProcessingMessage('Gerando PDF com imagens...');
+        await laudoService.gerarPDF(formData.id);
+        
+        setProcessingMessage('Finalizando PDF...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        setProcessingMessage('Baixando PDF...');
+        const blob = await laudoService.download(formData.id);
+        
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `laudo-${formData.numero_laudo}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        setProcessingMessage('PDF gerado com sucesso!');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        carregarLaudo();
+        setShowPreview(false);
+      } catch (err: any) {
+        console.error('Erro ao gerar PDF:', err);
+        setProcessingMessage('Erro ao gerar PDF. Tente novamente.');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        alert(err.response?.data?.error || 'Erro ao gerar PDF');
+      } finally {
+        setGenerating(false);
+        setShowProcessingModal(false);
+        document.body.style.overflow = 'unset';
+      }
     } catch (err: any) {
       console.error('Erro ao gerar PDF:', err);
+      setShowProcessingModal(false);
+      document.body.style.overflow = 'unset';
       alert(err.response?.data?.error || 'Erro ao gerar PDF');
-    } finally {
       setGenerating(false);
     }
   };
@@ -1455,6 +1653,34 @@ const LaudoForm: React.FC = () => {
                   placeholder="Ex: Relatório exclusivo para [Seguradora], não tem validade para outra finalidade..."
                 />
               </FormGroup>
+              
+              {isAdmin && (
+                <FormGroup fullWidth style={{ marginTop: '1rem' }}>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={async () => {
+                      try {
+                        await configuracaoLaudoService.update({
+                          nome_empresa: formData.nome_empresa,
+                          logo_empresa_url: formData.logo_empresa_url,
+                          nota_rodape: formData.nota_rodape,
+                          empresa_prestadora: formData.empresa_prestadora
+                        });
+                        alert('Configurações salvas como padrão com sucesso!');
+                      } catch (error: any) {
+                        console.error('Erro ao salvar configurações:', error);
+                        alert(error.response?.data?.error || 'Erro ao salvar configurações');
+                      }
+                    }}
+                  >
+                    Salvar como Padrão
+                  </Button>
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                    As configurações salvas aqui serão usadas como padrão para todos os novos laudos.
+                  </p>
+                </FormGroup>
+              )}
             </FormSection>
           </>
         )}
@@ -1577,6 +1803,20 @@ const LaudoForm: React.FC = () => {
             </PreviewFooter>
           </PreviewContent>
         </PreviewModal>
+      )}
+
+      {/* Modal de Processamento do PDF */}
+      {showProcessingModal && (
+        <ProcessingModal>
+          <ProcessingContent>
+            <Spinner />
+            <ProcessingTitle>Gerando PDF</ProcessingTitle>
+            <ProcessingMessage>{processingMessage}</ProcessingMessage>
+            <p style={{ color: '#9ca3af', fontSize: '0.875rem', marginTop: '1rem' }}>
+              Por favor, aguarde. Não feche esta janela.
+            </p>
+          </ProcessingContent>
+        </ProcessingModal>
       )}
     </Container>
   );
