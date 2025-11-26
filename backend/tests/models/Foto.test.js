@@ -1,36 +1,25 @@
-const bcrypt = require('bcryptjs');
-const { Foto, Vistoria, TipoFotoChecklist, Usuario, Embarcacao, Local, StatusVistoria, NivelAcesso } = require('../../models');
+const { Foto, Vistoria, TipoFotoChecklist, StatusVistoria } = require('../../models');
+const { setupCompleteTestEnvironment, createTestEmbarcacao, createTestLocal, createTestStatusVistoria } = require('../helpers/testHelpers');
 
 describe('Modelo Foto', () => {
   let vistoria, tipoFoto;
 
   beforeEach(async () => {
     // Setup necessário para criar uma vistoria
-    const nivelAcesso = await NivelAcesso.create({
-      nome: 'VISTORIADOR',
-      descricao: 'Nível para vistoriadores'
-    });
+    const setup = await setupCompleteTestEnvironment('foto');
+    const usuario = setup.vistoriador;
 
-    const senhaHash = await bcrypt.hash('Teste@123', 10);
-    const usuario = await Usuario.create({
-      cpf: '12345678913',
-      nome: 'Usuário Teste',
-      email: 'teste@teste.com',
-      senha_hash: senhaHash,
-      nivel_acesso_id: nivelAcesso.id
-    });
-
-    const embarcacao = await Embarcacao.create({
+    const embarcacao = await createTestEmbarcacao({
       nome: 'Barco Teste',
       nr_inscricao_barco: 'TEST001'
     });
 
-    const local = await Local.create({
+    const local = await createTestLocal({
       tipo: 'MARINA',
       nome_local: 'Marina Teste'
     });
 
-    const status = await StatusVistoria.create({
+    const status = await createTestStatusVistoria({
       nome: 'PENDENTE',
       descricao: 'Vistoria pendente'
     });

@@ -1,12 +1,9 @@
 const request = require('supertest');
-const express = require('express');
-const { sequelize, Laudo, Vistoria, Usuario, Embarcacao, Local, StatusVistoria, NivelAcesso } = require('../../models');
+const { sequelize, Laudo, Vistoria, Embarcacao, Local, StatusVistoria } = require('../../models');
 const laudoRoutes = require('../../routes/laudoRoutes');
-const jwt = require('jsonwebtoken');
+const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
 
-const app = express();
-app.use(express.json());
-app.use('/api/laudos', laudoRoutes);
+const app = createTestApp({ path: '/api/laudos', router: laudoRoutes });
 
 describe('Rotas de Laudos', () => {
   let adminToken;
@@ -19,41 +16,11 @@ describe('Rotas de Laudos', () => {
   beforeAll(async () => {
     await sequelize.sync({ force: true });
 
-    const nivelAdmin = await NivelAcesso.create({
-      id: 1,
-      nome: 'ADMINISTRADOR',
-      descricao: 'Admin'
-    });
-
-    const nivelVist = await NivelAcesso.create({
-      id: 2,
-      nome: 'VISTORIADOR',
-      descricao: 'Vistoriador'
-    });
-
-    admin = await Usuario.create({
-      nome: 'Admin Teste',
-      email: 'admin@laudotest.com',
-      senha_hash: 'hash',
-      nivel_acesso_id: 1
-    });
-
-    vistoriador = await Usuario.create({
-      nome: 'Vistoriador Teste',
-      email: 'vist@laudotest.com',
-      senha_hash: 'hash',
-      nivel_acesso_id: 2
-    });
-
-    adminToken = jwt.sign(
-      { userId: admin.id, email: admin.email, nivelAcessoId: 1 },
-      process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-    );
-
-    vistoriadorToken = jwt.sign(
-      { userId: vistoriador.id, email: vistoriador.email, nivelAcessoId: 2 },
-      process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-    );
+    const setup = await setupCompleteTestEnvironment('laudo');
+    admin = setup.admin;
+    vistoriador = setup.vistoriador;
+    adminToken = setup.adminToken;
+    vistoriadorToken = setup.vistoriadorToken;
 
     const embarcacao = await Embarcacao.create({
       nome: 'Embarcação Teste',

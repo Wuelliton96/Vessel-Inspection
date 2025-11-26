@@ -1,54 +1,18 @@
 const request = require('supertest');
-const express = require('express');
-const bcrypt = require('bcryptjs');
 const vistoriaRoutes = require('../../routes/vistoriaRoutes');
-const { 
-  Usuario, 
-  NivelAcesso, 
-  Embarcacao, 
-  Local, 
-  StatusVistoria, 
-  Vistoria 
-} = require('../../models');
+const { StatusVistoria } = require('../../models');
+const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
 
 describe('Rotas de Vistoria', () => {
   let app;
-  let nivelAdmin, nivelVistoriador, usuarioAdmin, usuarioVistoriador;
+  let usuarioAdmin, usuarioVistoriador;
 
   beforeEach(async () => {
-    app = express();
-    app.use(express.json());
-    app.use('/api/vistorias', vistoriaRoutes);
-
-    // Criar níveis de acesso
-    nivelAdmin = await NivelAcesso.create({
-      nome: 'ADMINISTRADOR',
-      descricao: 'Administrador do sistema'
-    });
-
-    nivelVistoriador = await NivelAcesso.create({
-      nome: 'VISTORIADOR',
-      descricao: 'Vistoriador'
-    });
-
-    // Criar usuários
-    const senhaHash = await bcrypt.hash('Teste@123', 10);
+    const setup = await setupCompleteTestEnvironment('vistoria');
+    usuarioAdmin = setup.admin;
+    usuarioVistoriador = setup.vistoriador;
     
-    usuarioAdmin = await Usuario.create({
-      cpf: '12345678901',
-      nome: 'Admin Teste',
-      email: 'admin@teste.com',
-      senha_hash: senhaHash,
-      nivel_acesso_id: nivelAdmin.id
-    });
-
-    usuarioVistoriador = await Usuario.create({
-      cpf: '12345678902',
-      nome: 'Vistoriador Teste',
-      email: 'vistoriador@teste.com',
-      senha_hash: senhaHash,
-      nivel_acesso_id: nivelVistoriador.id
-    });
+    app = createTestApp({ path: '/api/vistorias', router: vistoriaRoutes });
 
     // Criar status padrão
     await StatusVistoria.create({

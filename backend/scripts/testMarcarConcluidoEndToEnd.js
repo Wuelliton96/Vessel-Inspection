@@ -2,128 +2,67 @@
  * Teste end-to-end completo para validar marcação de item como concluído
  */
 
-const { VistoriaChecklistItem, Vistoria, Usuario, NivelAcesso } = require('../models');
-const jwt = require('jsonwebtoken');
+const E2ETestBase = require('../tests/helpers/e2eTestBase');
 
 async function testMarcarConcluidoEndToEnd() {
   try {
     console.log('=== TESTE END-TO-END: MARCAR ITEM COMO CONCLUIDO ===\n');
 
+    const testBase = new E2ETestBase();
+
     // Buscar um vistoriador
-    const nivelVistoriador = await NivelAcesso.findOne({ where: { nome: 'VISTORIADOR' } });
-    if (!nivelVistoriador) {
-      console.log('Nível VISTORIADOR não encontrado');
-      process.exit(1);
-    }
-
-    const vistoriador = await Usuario.findOne({
-      where: { nivel_acesso_id: nivelVistoriador.id },
-      include: [{ model: NivelAcesso, as: 'NivelAcesso' }]
-    });
-
-    if (!vistoriador) {
-      console.log('Nenhum vistoriador encontrado');
-      process.exit(1);
-    }
-
+    const vistoriador = await testBase.findVistoriador();
     console.log(`Vistoriador: ${vistoriador.nome} (ID: ${vistoriador.id})\n`);
 
     // Buscar item pendente de qualquer vistoria
-    const item = await VistoriaChecklistItem.findOne({
-      where: { status: 'PENDENTE' },
-      include: [
-        {
-          model: Vistoria,
-          as: 'vistoria',
-          attributes: ['id', 'vistoriador_id']
-        }
-      ]
-    });
+    const item = await testBase.findPendingItem();
 
     if (!item) {
       console.log('Nenhum item PENDENTE encontrado para teste');
       process.exit(0);
     }
 
-    if (!item) {
-      console.log('Nenhum item PENDENTE encontrado para teste');
-      process.exit(0);
-    }
-
-    const vistoria = item.vistoria;
-
-    console.log('Item encontrado:');
-    console.log(`  ID: ${item.id}`);
-    console.log(`  Nome: ${item.nome}`);
-    console.log(`  Status: ${item.status}`);
-    console.log(`  Obrigatório: ${item.obrigatorio}`);
-    console.log(`  Vistoria ID: ${item.vistoria_id}`);
-    console.log(`  Vistoriador da vistoria: ${vistoria?.vistoriador_id || 'N/A'}\n`);
+    testBase.logItemInfo();
+    console.log('');
 
     // Simular requisição da rota
     console.log('=== SIMULANDO ROTA PATCH /api/checklists/vistoria/item/:id/status ===\n');
 
-    const statusAntes = item.status;
-    const fotoIdAntes = item.foto_id;
-    const concluidoEmAntes = item.concluido_em;
-
-    console.log('Estado ANTES:');
-    console.log(`  Status: ${statusAntes}`);
-    console.log(`  Foto ID: ${fotoIdAntes || 'null'}`);
-    console.log(`  Concluído em: ${concluidoEmAntes || 'null'}\n`);
+    testBase.logItemState('Estado ANTES');
 
     // Atualizar como a rota faria
-    const updateData = {
-      status: 'CONCLUIDO',
-      concluido_em: new Date(),
-      foto_id: null
-    };
+    await testBase.markItemAsCompleted(null);
 
-    await item.update(updateData);
-    await item.reload();
-
-    console.log('Estado DEPOIS:');
-    console.log(`  Status: ${item.status}`);
-    console.log(`  Foto ID: ${item.foto_id || 'null'}`);
-    console.log(`  Concluído em: ${item.concluido_em || 'null'}\n`);
+    testBase.logItemState('Estado DEPOIS');
+    console.log('');
 
     // Validações
-    let todasValido = true;
+    console.log('=== VALIDAÇÕES ===');
+    const validation = testBase.validateItemState('CONCLUIDO', null);
+    let todasValido = validation.isValid;
 
-    if (item.status !== 'CONCLUIDO') {
-      console.log('ERRO: Status não foi atualizado para CONCLUIDO');
-      todasValido = false;
-    } else {
+    if (validation.isValid) {
       console.log('OK: Status atualizado para CONCLUIDO');
-    }
-
-    if (item.foto_id !== null) {
-      console.log('ERRO: Foto ID deveria ser null (concluído sem foto)');
-      todasValido = false;
-    } else {
-      console.log('OK: Foto ID está null (concluído sem foto)');
-    }
-
-    if (!item.concluido_em) {
-      console.log('ERRO: concluido_em não foi definido');
-      todasValido = false;
-    } else {
+      console.log('OK: Foto ID é null');
       console.log('OK: concluido_em foi definido');
+    } else {
+      validation.errors.forEach(error => {
+        console.log(`ERRO: ${error}`);
+      });
     }
 
     // Testar voltar para PENDENTE
-    console.log('\n=== TESTANDO VOLTAR PARA PENDENTE ===\n');
-    await item.update({
-      status: 'PENDENTE',
-      concluido_em: null,
-      foto_id: null
-    });
-    await item.reload();
+    console.log('\n=== TESTANDO VOLTAR PARA PENDENTE ===');
+    await testBase.markItemAsPending();
 
-    if (item.status === 'PENDENTE' && !item.concluido_em) {
+    const validationPending = testBase.validateItemState('PENDENTE', null);
+    if (validationPending.isValid) {
       console.log('OK: Item voltou para PENDENTE corretamente');
     } else {
       console.log('ERRO: Item não voltou para PENDENTE corretamente');
+      validationPending.errors.forEach(error => {
+        console.log(`ERRO: ${error}`);
+      });
       todasValido = false;
     }
 

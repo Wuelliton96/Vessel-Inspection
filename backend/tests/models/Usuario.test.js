@@ -1,15 +1,14 @@
 const bcrypt = require('bcryptjs');
 const { Usuario, NivelAcesso } = require('../../models');
+const { setupTestEnvironment } = require('../helpers/testHelpers');
 
 describe('Modelo Usuario', () => {
   let nivelAcesso;
 
   beforeEach(async () => {
     // Criar um nível de acesso para os testes
-    nivelAcesso = await NivelAcesso.create({
-      nome: 'VISTORIADOR',
-      descricao: 'Nível de acesso para vistoriadores'
-    });
+    const { nivelVistoriador } = await setupTestEnvironment();
+    nivelAcesso = nivelVistoriador;
   });
 
   describe('Criação de usuário', () => {

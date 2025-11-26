@@ -302,6 +302,19 @@ const createTestLocal = async (overrides = {}) => {
 };
 
 /**
+ * Cria um status de vistoria de teste
+ */
+const createTestStatusVistoria = async (overrides = {}) => {
+  const defaultData = {
+    nome: 'PENDENTE',
+    descricao: 'Vistoria pendente'
+  };
+
+  const statusData = { ...defaultData, ...overrides };
+  return await StatusVistoria.create(statusData);
+};
+
+/**
  * Cria uma vistoria de teste com dados específicos
  */
 const createTestVistoria = async (overrides = {}) => {
@@ -446,6 +459,7 @@ module.exports = {
   createTestEmbarcacao,
   createTestLocal,
   createTestVistoria,
+  createTestStatusVistoria,
   mockRequestData,
   // Novos helpers reutilizáveis
   setupTestEnvironment,
