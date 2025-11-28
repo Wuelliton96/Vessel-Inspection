@@ -1,5 +1,5 @@
-# .github/workflows/codacy-coverage.yml
-name: Tests + Coverage (Codacy)
+# .github/workflows/ci-cd.yml
+name: Tests + Coverage (Codacy + SonarCloud)
 
 on:
   push:
@@ -56,3 +56,36 @@ jobs:
             -l Javascript \
             -r backend/coverage/lcov.info \
             -r frontend-react/coverage/lcov.info
+
+      # Setup Java para SonarCloud Scanner
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # SonarCloud Scan com cobertura
+      - name: SonarCloud Scan
+        if: always()
+        uses: SonarSource/sonarcloud-github-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          projectBaseDir: .
+          args: >
+            -Dsonar.projectVersion=${{ github.run_number }}
+            -Dsonar.projectKey=Wuelliton96_Vessel-Inspection
+            -Dsonar.organization=wuelliton96
+            -Dsonar.projectName=Vessel-Inspection
+            -Dsonar.sources=backend,frontend-react/src
+            -Dsonar.tests=backend/tests,frontend-react/src
+            -Dsonar.test.inclusions=backend/tests/**/*.test.js,backend/tests/**/*.spec.js,frontend-react/src/**/*.test.ts,frontend-react/src/**/*.test.tsx,frontend-react/src/**/*.spec.ts,frontend-react/src/**/*.spec.tsx
+            -Dsonar.javascript.lcov.reportPaths=backend/coverage/lcov.info,frontend-react/coverage/lcov.info
+            -Dsonar.typescript.lcov.reportPaths=frontend-react/coverage/lcov.info
+            -Dsonar.typescript.tsconfigPaths=frontend-react/tsconfig.json
+            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/coverage/**,**/*.d.ts,**/logs/**,**/uploads/**,**/migrations/**,**/scripts/**,**/__mocks__/**,backend/server.js,frontend-react/src/reportWebVitals.ts,frontend-react/src/setupTests.ts,frontend-react/src/index.tsx,frontend-react/src/react-app-env.d.ts,backend/jest.config.js,frontend-react/jest.config.js
+            -Dsonar.test.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/coverage/**,**/__mocks__/**
+            -Dsonar.coverage.exclusions=**/node_modules/**,**/tests/**,**/__mocks__/**,**/__tests__/**,**/coverage/**,**/logs/**,**/uploads/**,**/migrations/**,**/scripts/**,**/*.test.js,**/*.test.ts,**/*.test.tsx,**/*.spec.js,**/*.spec.ts,**/*.spec.tsx,backend/server.js,frontend-react/src/reportWebVitals.ts,frontend-react/src/setupTests.ts,frontend-react/src/index.tsx,frontend-react/src/react-app-env.d.ts,backend/jest.config.js,frontend-react/jest.config.js
+            -Dsonar.cpd.exclusions=**/*.test.js,**/*.test.ts,**/*.test.tsx,**/__tests__/**,**/scripts/**,**/migrations/**
+            -Dsonar.sourceEncoding=UTF-8
