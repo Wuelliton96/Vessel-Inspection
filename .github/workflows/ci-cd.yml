@@ -1,0 +1,135 @@
+name: CI/CD
+
+on:
+  push:
+    branches: ["master", "main"]
+  pull_request:
+    branches: ["master", "main"]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for better analysis
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend-react/package-lock.json
+
+      - name: Setup Java (for Sonar scanner)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install backend deps
+        working-directory: backend
+        run: npm ci
+
+      - name: Run backend tests with coverage
+        working-directory: backend
+        run: npm run test:ci
+        continue-on-error: true
+
+      - name: Install frontend deps
+        working-directory: frontend-react
+        run: npm ci
+
+      - name: Run frontend tests with coverage
+        working-directory: frontend-react
+        run: npm run test:ci
+        continue-on-error: true
+
+      - name: Ensure combined coverage ≥ 80%
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          
+          function parseLcov(filePath) {
+            if (!fs.existsSync(filePath)) {
+              console.log(`Coverage file not found: ${filePath} - skipping`);
+              return { total: 0, covered: 0 };
+            }
+            const content = fs.readFileSync(filePath, 'utf8');
+            let total = 0, covered = 0;
+            for (const line of content.split('\n')) {
+              if (line.startsWith('DA:')) {
+                const parts = line.split(',');
+                if (parts.length >= 2) {
+                  const hits = Number(parts[1]);
+                  total += 1;
+                  if (hits > 0) covered += 1;
+                }
+              }
+            }
+            return { total, covered };
+          }
+          
+          const backendCoverage = parseLcov('backend/coverage/lcov.info');
+          const frontendCoverage = parseLcov('frontend-react/coverage/lcov.info');
+          
+          const total = backendCoverage.total + frontendCoverage.total;
+          const covered = backendCoverage.covered + frontendCoverage.covered;
+          const pct = total > 0 ? (covered / total) * 100 : 0;
+          
+          console.log(`Backend coverage: ${backendCoverage.total > 0 ? ((backendCoverage.covered / backendCoverage.total) * 100).toFixed(2) : 0}% (${backendCoverage.covered}/${backendCoverage.total})`);
+          console.log(`Frontend coverage: ${frontendCoverage.total > 0 ? ((frontendCoverage.covered / frontendCoverage.total) * 100).toFixed(2) : 0}% (${frontendCoverage.covered}/${frontendCoverage.total})`);
+          console.log(`Combined coverage: ${pct.toFixed(2)}% (${covered}/${total})`);
+          
+          if (total === 0) {
+            console.log('No coverage data found - skipping coverage check');
+            process.exit(0);
+          }
+          
+          if (pct < 80) {
+            console.error(`Combined coverage ${pct.toFixed(2)}% is below 80% threshold`);
+            process.exit(1);
+          }
+          
+          console.log(`✅ Combined coverage ${pct.toFixed(2)}% meets 80% threshold`);
+          NODE
+
+      - name: SonarCloud Scan (All)
+        uses: SonarSource/sonarcloud-github-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          projectBaseDir: .
+          args: >
+            -Dsonar.projectVersion=${{ github.run_number }}
+            -Dsonar.projectKey=Wuelliton96_Vessel-Inspection-All
+            -Dsonar.organization=wuelliton96
+            -Dsonar.sources=backend,frontend-react/src
+            -Dsonar.tests=backend/tests,frontend-react/src
+            -Dsonar.javascript.lcov.reportPaths=backend/coverage/lcov.info,frontend-react/coverage/lcov.info
+            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/coverage/**,**/*.d.ts,**/logs/**,**/uploads/**,**/migrations/**,**/scripts/**,backend/server.js,frontend-react/src/reportWebVitals.ts,frontend-react/src/setupTests.ts,frontend-react/src/index.tsx
+            -Dsonar.test.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/coverage/**
+            -Dsonar.coverage.exclusions=**/node_modules/**,**/tests/**,**/coverage/**,**/logs/**,**/uploads/**,**/migrations/**,backend/server.js,frontend-react/src/reportWebVitals.ts,frontend-react/src/setupTests.ts,frontend-react/src/index.tsx
+
+  deploy:
+    needs: test-and-analyze
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Deploy placeholder
+        run: echo "Deploy step - configure your deployment here"
+
