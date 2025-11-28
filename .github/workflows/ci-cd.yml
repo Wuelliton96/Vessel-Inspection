@@ -38,7 +38,7 @@ jobs:
 
       - name: Test frontend with coverage
         run: |
-          cd frontend
+          cd frontend-react
           npm test -- --coverage
 
       # Enviar coverage para o Codacy
@@ -52,4 +52,4 @@ jobs:
           bash <(curl -Ls https://coverage.codacy.com/get.sh) report \
             -l Javascript \
             -r backend/coverage/lcov.info \
-            -r frontend/coverage/lcov.info
+            -r frontend-react/coverage/lcov.info
