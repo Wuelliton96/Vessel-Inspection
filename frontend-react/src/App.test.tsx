@@ -1,18 +1,7 @@
 import React from 'react';
 
-// Mock react-router-dom
-const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
-  BrowserRouter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Routes: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Route: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Navigate: ({ to }: { to: string }) => <div>Navigate to {to}</div>,
-  useLocation: () => ({ pathname: '/', search: '', hash: '', state: null, key: 'default' }),
-  useNavigate: () => mockNavigate,
-  Link: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a>,
-  NavLink: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a>,
-  Outlet: () => <div />,
-}));
+// Mock react-router-dom usando o arquivo de mock
+jest.mock('react-router-dom', () => require('./__mocks__/react-router-dom'));
 
 // Mock styled-components
 jest.mock('styled-components', () => {
