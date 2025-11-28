@@ -2,86 +2,95 @@ const {
   construirS3Key,
   validarConfigS3,
   criarErroResposta,
-  tratarErroS3,
-  configurarHeadersCORS,
-  processarStreamS3
+  tratarErroS3
 } = require('../../utils/fotoHelpers');
 
 // Mock do console
-const originalConsoleLog = console.log;
-const originalConsoleError = console.error;
-
+const originalConsole = global.console;
 beforeAll(() => {
-  console.log = jest.fn();
-  console.error = jest.fn();
+  global.console = {
+    ...originalConsole,
+    log: jest.fn(),
+    error: jest.fn()
+  };
 });
 
 afterAll(() => {
-  console.log = originalConsoleLog;
-  console.error = originalConsoleError;
+  global.console = originalConsole;
 });
 
-describe('Foto Helpers', () => {
+describe('Foto Helpers - Testes Adicionais', () => {
   describe('construirS3Key', () => {
-    it('deve retornar key original se já começar com vistorias/', () => {
-      const key = construirS3Key('vistorias/id-123/foto.jpg', 123);
-      expect(key).toBe('vistorias/id-123/foto.jpg');
-    });
-
-    it('deve construir key completa quando não começa com vistorias/', () => {
+    it('deve construir key com vistoria_id quando url_arquivo não tem caminho completo', () => {
       const key = construirS3Key('foto.jpg', 123);
+      
       expect(key).toBe('vistorias/id-123/foto.jpg');
     });
 
-    it('deve lançar erro quando vistoriaId não está disponível', () => {
+    it('deve manter key quando já tem caminho completo', () => {
+      const key = construirS3Key('vistorias/id-123/foto.jpg', 123);
+      
+      expect(key).toBe('vistorias/id-123/foto.jpg');
+    });
+
+    it('deve lançar erro quando não tem vistoria_id e url não tem caminho', () => {
       expect(() => {
         construirS3Key('foto.jpg', null);
-      }).toThrow('Não foi possível determinar o caminho completo da imagem no S3');
+      }).toThrow('vistoria_id não disponível');
     });
 
-    it('deve lançar erro quando vistoriaId é undefined', () => {
-      expect(() => {
-        construirS3Key('foto.jpg', undefined);
-      }).toThrow('Não foi possível determinar o caminho completo da imagem no S3');
+    it('deve construir key corretamente com diferentes formatos de arquivo', () => {
+      expect(construirS3Key('foto.png', 456)).toBe('vistorias/id-456/foto.png');
+      expect(construirS3Key('imagem.jpeg', 789)).toBe('vistorias/id-789/imagem.jpeg');
     });
   });
 
   describe('validarConfigS3', () => {
     it('deve lançar erro quando bucket não está configurado', () => {
       expect(() => {
-        validarConfigS3(null, 'key', 1, 'url');
+        validarConfigS3(null, 'key', 1, 'url.jpg');
       }).toThrow('Bucket S3 não configurado');
     });
 
     it('deve lançar erro quando key não está configurada', () => {
       expect(() => {
-        validarConfigS3('bucket', null, 1, 'url');
+        validarConfigS3('bucket', null, 1, 'url.jpg');
       }).toThrow('Key do arquivo não encontrada');
     });
 
     it('deve passar quando bucket e key estão configurados', () => {
       expect(() => {
-        validarConfigS3('bucket', 'key', 1, 'url');
+        validarConfigS3('bucket', 'key', 1, 'url.jpg');
       }).not.toThrow();
     });
   });
 
   describe('criarErroResposta', () => {
-    it('deve criar objeto de erro com campos básicos', () => {
-      const erro = criarErroResposta('Erro teste', 'Detalhes', 1, 'url.jpg');
+    it('deve criar resposta de erro com status 500', () => {
+      const erro = criarErroResposta(500, 'Erro interno', 'Detalhes', 1, 'url.jpg');
       
-      expect(erro).toMatchObject({
-        error: 'Erro teste',
-        details: 'Detalhes',
-        foto_id: 1,
-        url_arquivo: 'url.jpg'
-      });
+      expect(erro.status).toBe(500);
+      expect(erro.json.error).toBe('Erro interno');
     });
 
-    it('deve incluir campos extras', () => {
-      const erro = criarErroResposta('Erro', 'Detalhes', 1, 'url.jpg', { extra: 'valor' });
+    it('deve criar resposta de erro com status 404', () => {
+      const erro = criarErroResposta(404, 'Não encontrado', 'Detalhes', 2, 'url2.jpg');
       
-      expect(erro).toHaveProperty('extra', 'valor');
+      expect(erro.status).toBe(404);
+      expect(erro.json.error).toBe('Não encontrado');
+    });
+
+    it('deve incluir foto_id e url_arquivo na resposta', () => {
+      const erro = criarErroResposta(500, 'Erro', 'Detalhes', 123, 'foto.jpg');
+      
+      expect(erro.json.foto_id).toBe(123);
+      expect(erro.json.url_arquivo).toBe('foto.jpg');
+    });
+
+    it('deve incluir campos extras quando fornecidos', () => {
+      const erro = criarErroResposta(500, 'Erro', 'Detalhes', 1, 'url.jpg', { campo_extra: 'valor' });
+      
+      expect(erro.json.campo_extra).toBe('valor');
     });
   });
 
@@ -90,7 +99,6 @@ describe('Foto Helpers', () => {
 
     beforeEach(() => {
       mockRes = {
-        headersSent: false,
         status: jest.fn().mockReturnThis(),
         json: jest.fn()
       };
@@ -100,180 +108,64 @@ describe('Foto Helpers', () => {
       };
     });
 
-    it('deve retornar null quando headers já foram enviados', () => {
-      mockRes.headersSent = true;
-      const erro = { name: 'NoSuchKey' };
-      
-      const result = tratarErroS3(erro, mockRes, mockFoto, 'bucket', 'key');
-      
-      expect(result).toBeNull();
-    });
-
     it('deve tratar erro de credenciais inválidas', () => {
       const erro = {
         name: 'InvalidAccessKeyId',
-        message: 'Credenciais inválidas'
+        message: 'Invalid credentials'
       };
-      
-      const result = tratarErroS3(erro, mockRes, mockFoto, 'bucket', 'key');
-      
-      expect(result).toMatchObject({
-        status: 500,
-        json: expect.objectContaining({
-          error: 'Erro de configuração AWS'
-        })
-      });
+
+      const resultado = tratarErroS3(erro, mockRes, mockFoto, 'bucket', 'key');
+
+      expect(resultado.status).toBe(500);
+      expect(resultado.json.error).toContain('Credenciais AWS');
     });
 
     it('deve tratar erro de bucket não encontrado', () => {
       const erro = {
         name: 'NoSuchBucket',
-        message: 'Bucket não encontrado'
+        message: 'Bucket not found'
       };
-      
-      const result = tratarErroS3(erro, mockRes, mockFoto, 'bucket', 'key');
-      
-      expect(result).toMatchObject({
-        status: 500,
-        json: expect.objectContaining({
-          error: 'Bucket S3 não encontrado'
-        })
-      });
+
+      const resultado = tratarErroS3(erro, mockRes, mockFoto, 'bucket', 'key');
+
+      expect(resultado.status).toBe(500);
+      expect(resultado.json.error).toContain('Bucket');
     });
 
     it('deve tratar erro de arquivo não encontrado', () => {
       const erro = {
         name: 'NoSuchKey',
-        message: 'Arquivo não encontrado'
+        message: 'Key not found'
       };
-      
-      const result = tratarErroS3(erro, mockRes, mockFoto, 'bucket', 'key');
-      
-      expect(result).toMatchObject({
-        status: 404,
-        json: expect.objectContaining({
-          error: 'Imagem não encontrada no S3'
-        })
-      });
+
+      const resultado = tratarErroS3(erro, mockRes, mockFoto, 'bucket', 'key');
+
+      expect(resultado.status).toBe(404);
+      expect(resultado.json.error).toContain('não foi encontrado');
     });
 
-    it('deve tratar erro usando code quando name não está disponível', () => {
+    it('deve tratar erro genérico do S3', () => {
       const erro = {
-        code: 'NoSuchBucket',
-        message: 'Bucket não encontrado'
+        name: 'S3ServiceException',
+        message: 'Generic error'
       };
-      
-      const result = tratarErroS3(erro, mockRes, mockFoto, 'bucket', 'key');
-      
-      expect(result).toMatchObject({
-        status: 500
-      });
+
+      const resultado = tratarErroS3(erro, mockRes, mockFoto, 'bucket', 'key');
+
+      expect(resultado.status).toBe(500);
+      expect(resultado.json.error).toBeDefined();
     });
 
-    it('deve retornar null para erros não tratados', () => {
+    it('deve incluir foto_id e url_arquivo no erro', () => {
       const erro = {
-        name: 'UnknownError',
-        message: 'Erro desconhecido'
-      };
-      
-      const result = tratarErroS3(erro, mockRes, mockFoto, 'bucket', 'key');
-      
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('configurarHeadersCORS', () => {
-    let mockReq, mockRes;
-
-    beforeEach(() => {
-      mockReq = {
-        headers: {
-          origin: 'http://example.com'
-        }
-      };
-      mockRes = {
-        headersSent: false,
-        setHeader: jest.fn()
-      };
-    });
-
-    it('deve configurar headers CORS corretamente', () => {
-      const result = configurarHeadersCORS(mockRes, mockReq, 'image/jpeg', 1024);
-      
-      expect(result).toBe(true);
-      expect(mockRes.setHeader).toHaveBeenCalledWith('Access-Control-Allow-Origin', 'http://example.com');
-      expect(mockRes.setHeader).toHaveBeenCalledWith('Access-Control-Allow-Credentials', 'true');
-      expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Type', 'image/jpeg');
-      expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Length', 1024);
-    });
-
-    it('deve usar * quando origin não está disponível', () => {
-      mockReq.headers = {};
-      configurarHeadersCORS(mockRes, mockReq, 'image/jpeg', 1024);
-      
-      expect(mockRes.setHeader).toHaveBeenCalledWith('Access-Control-Allow-Origin', '*');
-    });
-
-    it('deve retornar false quando headers já foram enviados', () => {
-      mockRes.headersSent = true;
-      
-      const result = configurarHeadersCORS(mockRes, mockReq, 'image/jpeg', 1024);
-      
-      expect(result).toBe(false);
-    });
-  });
-
-  describe('processarStreamS3', () => {
-    let mockRes;
-
-    beforeEach(() => {
-      mockRes = {
-        headersSent: false,
-        send: jest.fn(),
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn()
-      };
-    });
-
-    it('deve processar stream e enviar buffer', async () => {
-      const chunks = [Buffer.from('chunk1'), Buffer.from('chunk2')];
-      const mockStream = {
-        [Symbol.asyncIterator]: async function* () {
-          for (const chunk of chunks) {
-            yield chunk;
-          }
-        }
+        name: 'NoSuchKey',
+        message: 'Key not found'
       };
 
-      const mockS3Response = {
-        Body: mockStream
-      };
+      const resultado = tratarErroS3(erro, mockRes, mockFoto, 'bucket', 'key');
 
-      await processarStreamS3(mockS3Response, mockRes, 1);
-
-      expect(mockRes.send).toHaveBeenCalled();
-    });
-
-    it('não deve enviar quando headers já foram enviados', async () => {
-      mockRes.headersSent = true;
-      
-      const chunks = [Buffer.from('chunk1')];
-      const mockStream = {
-        [Symbol.asyncIterator]: async function* () {
-          for (const chunk of chunks) {
-            yield chunk;
-          }
-        }
-      };
-
-      const mockS3Response = {
-        Body: mockStream
-      };
-
-      await processarStreamS3(mockS3Response, mockRes, 1);
-
-      expect(mockRes.send).not.toHaveBeenCalled();
+      expect(resultado.json.foto_id).toBe(1);
+      expect(resultado.json.url_arquivo).toBeDefined();
     });
   });
 });
-

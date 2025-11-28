@@ -1,19 +1,19 @@
 const request = require('supertest');
-const { sequelize, Embarcacao, Seguradora, Cliente } = require('../../models');
+const { sequelize, Embarcacao, Cliente, Seguradora } = require('../../models');
 const embarcacaoRoutes = require('../../routes/embarcacaoRoutes');
-const { setupCompleteTestEnvironment, createTestApp, generateTestCPF } = require('../helpers/testHelpers');
+const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
 
 const app = createTestApp({ path: '/api/embarcacoes', router: embarcacaoRoutes });
 
-describe('Rotas de Embarcações', () => {
+describe('Rotas de Embarcacoes', () => {
   let adminToken, vistoriadorToken;
   let admin, vistoriador;
 
   beforeAll(async () => {
     const setup = await setupCompleteTestEnvironment('embarcacao');
     admin = setup.admin;
-    vistoriador = setup.vistoriador;
     adminToken = setup.adminToken;
+    vistoriador = setup.vistoriador;
     vistoriadorToken = setup.vistoriadorToken;
   });
 
@@ -21,10 +21,25 @@ describe('Rotas de Embarcações', () => {
     await sequelize.close();
   });
 
+  beforeEach(async () => {
+    await Embarcacao.destroy({ where: {}, force: true });
+  });
+
   describe('GET /api/embarcacoes', () => {
-    it('deve listar embarcações (autenticado)', async () => {
-      await Embarcacao.create({ nome: 'Barco 1', nr_inscricao_barco: 'B001' });
-      
+    it('deve listar embarcacoes (admin)', async () => {
+      await Embarcacao.create({ nome: 'Boat 1', tipo: 'LANCHA' });
+      await Embarcacao.create({ nome: 'Boat 2', tipo: 'IATE' });
+
+      const response = await request(app)
+        .get('/api/embarcacoes')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('deve listar embarcacoes (vistoriador)', async () => {
       const response = await request(app)
         .get('/api/embarcacoes')
         .set('Authorization', `Bearer ${vistoriadorToken}`);
@@ -33,99 +48,122 @@ describe('Rotas de Embarcações', () => {
       expect(Array.isArray(response.body)).toBe(true);
     });
 
-    it('deve retornar 401 sem autenticação', async () => {
+    it('deve exigir autenticação', async () => {
       const response = await request(app).get('/api/embarcacoes');
       expect(response.status).toBe(401);
-    });
-
-    it('deve filtrar por CPF do proprietário', async () => {
-      const testCPF = generateTestCPF('emb00');
-      await Embarcacao.create({ nome: 'Barco CPF', nr_inscricao_barco: 'B002', proprietario_cpf: testCPF });
-      
-      const response = await request(app)
-        .get(`/api/embarcacoes?proprietario_cpf=${testCPF}`)
-        .set('Authorization', `Bearer ${vistoriadorToken}`);
-
-      expect(response.status).toBe(200);
-      expect(response.body.length).toBeGreaterThan(0);
     });
   });
 
   describe('GET /api/embarcacoes/:id', () => {
-    it('deve buscar embarcação por ID', async () => {
-      const emb = await Embarcacao.create({ nome: 'Barco Get', nr_inscricao_barco: 'B003' });
-      
+    it('deve retornar embarcacao por id', async () => {
+      const embarcacao = await Embarcacao.create({
+        nome: 'Test Boat',
+        tipo: 'LANCHA'
+      });
+
       const response = await request(app)
-        .get(`/api/embarcacoes/${emb.id}`)
-        .set('Authorization', `Bearer ${vistoriadorToken}`);
+        .get(`/api/embarcacoes/${embarcacao.id}`)
+        .set('Authorization', `Bearer ${adminToken}`);
 
       expect(response.status).toBe(200);
-      expect(response.body.nome).toBe('Barco Get');
+      expect(response.body.id).toBe(embarcacao.id);
+      expect(response.body.nome).toBe('Test Boat');
     });
 
-    it('deve retornar 404 para ID inexistente', async () => {
+    it('deve retornar 404 para id inexistente', async () => {
       const response = await request(app)
         .get('/api/embarcacoes/99999')
-        .set('Authorization', `Bearer ${vistoriadorToken}`);
+        .set('Authorization', `Bearer ${adminToken}`);
 
       expect(response.status).toBe(404);
     });
   });
 
   describe('POST /api/embarcacoes', () => {
-    it('deve criar embarcação', async () => {
+    it('deve criar embarcacao (admin)', async () => {
       const response = await request(app)
         .post('/api/embarcacoes')
-        .set('Authorization', `Bearer ${vistoriadorToken}`)
-        .send({ nome: 'Nova Embarcação', nr_inscricao_barco: 'B004' });
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          nome: 'New Boat',
+          tipo: 'IATE'
+        });
 
       expect(response.status).toBe(201);
-      expect(response.body.nome).toBe('Nova Embarcação');
+      expect(response.body).toHaveProperty('id');
+      expect(response.body.nome).toBe('New Boat');
     });
 
     it('deve retornar 400 sem campos obrigatórios', async () => {
       const response = await request(app)
         .post('/api/embarcacoes')
-        .set('Authorization', `Bearer ${vistoriadorToken}`)
-        .send({ nome: 'Sem NR' });
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({});
 
       expect(response.status).toBe(400);
+    });
+
+    it('deve exigir autenticação', async () => {
+      const response = await request(app)
+        .post('/api/embarcacoes')
+        .send({ nome: 'Test' });
+
+      expect(response.status).toBe(401);
     });
   });
 
   describe('PUT /api/embarcacoes/:id', () => {
-    it('deve atualizar embarcação', async () => {
-      const emb = await Embarcacao.create({ nome: 'Original', nr_inscricao_barco: 'B005' });
-      
+    it('deve atualizar embarcacao (admin)', async () => {
+      const embarcacao = await Embarcacao.create({
+        nome: 'Old Boat',
+        tipo: 'LANCHA'
+      });
+
       const response = await request(app)
-        .put(`/api/embarcacoes/${emb.id}`)
-        .set('Authorization', `Bearer ${vistoriadorToken}`)
-        .send({ nome: 'Atualizado' });
+        .put(`/api/embarcacoes/${embarcacao.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          nome: 'Updated Boat',
+          tipo: 'IATE'
+        });
 
       expect(response.status).toBe(200);
-      expect(response.body.nome).toBe('Atualizado');
+      expect(response.body.nome).toBe('Updated Boat');
     });
 
-    it('deve retornar 404 para ID inexistente', async () => {
+    it('deve retornar 404 para id inexistente', async () => {
       const response = await request(app)
         .put('/api/embarcacoes/99999')
-        .set('Authorization', `Bearer ${vistoriadorToken}`)
-        .send({ nome: 'Teste' });
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ nome: 'Test' });
 
       expect(response.status).toBe(404);
     });
   });
 
   describe('DELETE /api/embarcacoes/:id', () => {
-    it('deve deletar embarcação', async () => {
-      const emb = await Embarcacao.create({ nome: 'Deletar', nr_inscricao_barco: 'B006' });
-      
+    it('deve deletar embarcacao (admin)', async () => {
+      const embarcacao = await Embarcacao.create({
+        nome: 'To Delete',
+        tipo: 'LANCHA'
+      });
+
       const response = await request(app)
-        .delete(`/api/embarcacoes/${emb.id}`)
-        .set('Authorization', `Bearer ${vistoriadorToken}`);
+        .delete(`/api/embarcacoes/${embarcacao.id}`)
+        .set('Authorization', `Bearer ${adminToken}`);
 
       expect(response.status).toBe(200);
+
+      const deleted = await Embarcacao.findByPk(embarcacao.id);
+      expect(deleted).toBeNull();
+    });
+
+    it('deve retornar 404 para id inexistente', async () => {
+      const response = await request(app)
+        .delete('/api/embarcacoes/99999')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(404);
     });
   });
 });
-

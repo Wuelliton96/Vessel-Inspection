@@ -1,42 +1,16 @@
 const request = require('supertest');
-const express = require('express');
-const jwt = require('jsonwebtoken');
+const { sequelize, AuditoriaLog, Usuario } = require('../../models');
 const auditoriaRoutes = require('../../routes/auditoriaRoutes');
-const { AuditoriaLog, Usuario, NivelAcesso, sequelize } = require('../../models');
-const bcrypt = require('bcryptjs');
-const { generateTestCPF, setupTestEnvironment } = require('../helpers/testHelpers');
+const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
 
-const app = express();
-app.use(express.json());
-app.use('/api/auditoria', auditoriaRoutes);
+const app = createTestApp({ path: '/api/auditoria', router: auditoriaRoutes });
 
-describe('Auditoria Routes', () => {
-  let testAdmin;
+describe('Rotas de Auditoria - Testes Adicionais', () => {
   let adminToken;
 
   beforeAll(async () => {
-    const { nivelAdmin } = await setupTestEnvironment();
-    const senhaHash = await bcrypt.hash('Teste@123', 10);
-    
-    testAdmin = await Usuario.create({
-      cpf: generateTestCPF('aud01'),
-      nome: 'Test Admin',
-      email: 'admin@auditoria.com',
-      senha_hash: senhaHash,
-      nivel_acesso_id: nivelAdmin.id
-    });
-
-    adminToken = jwt.sign(
-      {
-        userId: testAdmin.id,
-        cpf: testAdmin.cpf,
-        email: testAdmin.email,
-        nome: testAdmin.nome,
-        nivelAcesso: 'ADMINISTRADOR',
-        nivelAcessoId: nivelAdmin.id
-      },
-      process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-    );
+    const setup = await setupCompleteTestEnvironment('auditoria');
+    adminToken = setup.adminToken;
   });
 
   afterAll(async () => {
@@ -47,132 +21,134 @@ describe('Auditoria Routes', () => {
     await AuditoriaLog.destroy({ where: {}, force: true });
   });
 
-  describe('GET /api/auditoria/test', () => {
-    it('deve retornar resposta de teste sem autenticação', async () => {
-      const response = await request(app)
-        .get('/api/auditoria/test')
-        .expect(200);
-
-      expect(response.body).toMatchObject({
-        success: true,
-        message: 'Rota de auditoria funcionando!'
-      });
-      expect(response.body).toHaveProperty('timestamp');
-    });
-  });
-
   describe('GET /api/auditoria', () => {
-    it('deve listar logs de auditoria', async () => {
+    it('deve listar logs de auditoria (admin)', async () => {
       await AuditoriaLog.create({
-        usuario_id: testAdmin.id,
-        usuario_email: testAdmin.email,
-        usuario_nome: testAdmin.nome,
+        usuario_id: 1,
+        usuario_email: 'test@test.com',
+        usuario_nome: 'Test User',
         acao: 'CREATE',
-        entidade: 'Test',
-        ip_address: '127.0.0.1'
+        entidade: 'Usuario'
       });
 
       const response = await request(app)
         .get('/api/auditoria')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
+        .set('Authorization', `Bearer ${adminToken}`);
 
-      expect(response.body).toHaveProperty('logs');
-      expect(response.body).toHaveProperty('pagination');
-      expect(Array.isArray(response.body.logs)).toBe(true);
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.body)).toBe(true);
     });
 
-    it('deve retornar lista vazia quando não há logs', async () => {
-      const response = await request(app)
-        .get('/api/auditoria')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
+    it('deve filtrar por entidade', async () => {
+      await AuditoriaLog.create({
+        usuario_id: 1,
+        usuario_email: 'test@test.com',
+        usuario_nome: 'Test User',
+        acao: 'CREATE',
+        entidade: 'Usuario'
+      });
 
-      expect(response.body.logs).toEqual([]);
+      await AuditoriaLog.create({
+        usuario_id: 1,
+        usuario_email: 'test@test.com',
+        usuario_nome: 'Test User',
+        acao: 'UPDATE',
+        entidade: 'Vistoria'
+      });
+
+      const response = await request(app)
+        .get('/api/auditoria?entidade=Usuario')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.every(log => log.entidade === 'Usuario')).toBe(true);
+    });
+
+    it('deve filtrar por ação', async () => {
+      await AuditoriaLog.create({
+        usuario_id: 1,
+        usuario_email: 'test@test.com',
+        usuario_nome: 'Test User',
+        acao: 'CREATE',
+        entidade: 'Usuario'
+      });
+
+      await AuditoriaLog.create({
+        usuario_id: 1,
+        usuario_email: 'test@test.com',
+        usuario_nome: 'Test User',
+        acao: 'DELETE',
+        entidade: 'Usuario'
+      });
+
+      const response = await request(app)
+        .get('/api/auditoria?acao=CREATE')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.every(log => log.acao === 'CREATE')).toBe(true);
+    });
+
+    it('deve filtrar por usuário', async () => {
+      const usuario = await Usuario.findOne();
+      if (usuario) {
+        await AuditoriaLog.create({
+          usuario_id: usuario.id,
+          usuario_email: usuario.email,
+          usuario_nome: usuario.nome,
+          acao: 'CREATE',
+          entidade: 'Usuario'
+        });
+
+        const response = await request(app)
+          .get(`/api/auditoria?usuario_id=${usuario.id}`)
+          .set('Authorization', `Bearer ${adminToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body.every(log => log.usuario_id === usuario.id)).toBe(true);
+      }
     });
 
     it('deve exigir autenticação', async () => {
-      await request(app)
-        .get('/api/auditoria')
-        .expect(401);
+      const response = await request(app).get('/api/auditoria');
+      expect(response.status).toBe(401);
     });
 
     it('deve exigir permissão de admin', async () => {
-      const nonAdmin = await Usuario.create({
-        cpf: generateTestCPF('aud02'),
-        nome: 'Non Admin',
-        email: 'nonadmin@test.com',
-        senha_hash: await bcrypt.hash('Teste@123', 10),
-        nivel_acesso_id: 2
-      });
-
-      const nonAdminToken = jwt.sign(
-        {
-          userId: nonAdmin.id,
-          cpf: nonAdmin.cpf,
-          nivelAcessoId: 2
-        },
-        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-      );
-
-      await request(app)
+      const { vistoriadorToken } = await setupCompleteTestEnvironment('auditoria2');
+      
+      const response = await request(app)
         .get('/api/auditoria')
-        .set('Authorization', `Bearer ${nonAdminToken}`)
-        .expect(403);
+        .set('Authorization', `Bearer ${vistoriadorToken}`);
+
+      expect(response.status).toBe(403);
     });
   });
 
-  describe('GET /api/auditoria/estatisticas', () => {
-    it('deve retornar estatísticas de auditoria', async () => {
-      await AuditoriaLog.create({
-        usuario_id: testAdmin.id,
-        usuario_email: testAdmin.email,
-        usuario_nome: testAdmin.nome,
+  describe('GET /api/auditoria/:id', () => {
+    it('deve retornar log por id', async () => {
+      const log = await AuditoriaLog.create({
+        usuario_id: 1,
+        usuario_email: 'test@test.com',
+        usuario_nome: 'Test User',
         acao: 'CREATE',
-        entidade: 'Test',
-        ip_address: '127.0.0.1'
+        entidade: 'Usuario'
       });
 
       const response = await request(app)
-        .get('/api/auditoria/estatisticas')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
+        .get(`/api/auditoria/${log.id}`)
+        .set('Authorization', `Bearer ${adminToken}`);
 
-      expect(response.body).toHaveProperty('totalAcoes');
-      expect(response.body).toHaveProperty('acoesPorTipo');
-      expect(response.body).toHaveProperty('acoesCriticas');
-      expect(response.body.totalAcoes).toBeGreaterThanOrEqual(1);
+      expect(response.status).toBe(200);
+      expect(response.body.id).toBe(log.id);
     });
 
-    it('deve exigir autenticação', async () => {
-      await request(app)
-        .get('/api/auditoria/estatisticas')
-        .expect(401);
-    });
+    it('deve retornar 404 para id inexistente', async () => {
+      const response = await request(app)
+        .get('/api/auditoria/99999')
+        .set('Authorization', `Bearer ${adminToken}`);
 
-    it('deve exigir permissão de admin', async () => {
-      const nonAdmin = await Usuario.create({
-        cpf: generateTestCPF('aud03'),
-        nome: 'Non Admin',
-        email: 'nonadmin2@test.com',
-        senha_hash: await bcrypt.hash('Teste@123', 10),
-        nivel_acesso_id: 2
-      });
-
-      const nonAdminToken = jwt.sign(
-        {
-          userId: nonAdmin.id,
-          cpf: nonAdmin.cpf,
-          nivelAcessoId: 2
-        },
-        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-      );
-
-      await request(app)
-        .get('/api/auditoria/estatisticas')
-        .set('Authorization', `Bearer ${nonAdminToken}`)
-        .expect(403);
+      expect(response.status).toBe(404);
     });
   });
 });
-

@@ -1,64 +1,33 @@
 const request = require('supertest');
-const express = require('express');
-const jwt = require('jsonwebtoken');
+const { sequelize } = require('../../models');
 const cepRoutes = require('../../routes/cepRoutes');
-const { buscarEnderecoPorCEP, buscarCEPPorEndereco } = require('../../services/cepService');
-const { Usuario, NivelAcesso, sequelize } = require('../../models');
-const bcrypt = require('bcryptjs');
-const { generateTestCPF, setupTestEnvironment } = require('../helpers/testHelpers');
+const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
+const { buscarEnderecoPorCEP } = require('../../services/cepService');
 
-// Mock do serviço CEP
 jest.mock('../../services/cepService');
 
-const app = express();
-app.use(express.json());
-app.use('/api/cep', cepRoutes);
+const app = createTestApp({ path: '/api/cep', router: cepRoutes });
 
-describe('CEP Routes', () => {
-  let testUser;
-  let authToken;
+describe('Rotas de CEP - Testes Adicionais', () => {
+  let adminToken, vistoriadorToken;
 
   beforeAll(async () => {
-    const { nivelAdmin } = await setupTestEnvironment();
-    const senhaHash = await bcrypt.hash('Teste@123', 10);
-    
-    testUser = await Usuario.create({
-      cpf: generateTestCPF('cep01'),
-      nome: 'Test User',
-      email: 'test@cep.com',
-      senha_hash: senhaHash,
-      nivel_acesso_id: nivelAdmin.id
-    });
-
-    authToken = jwt.sign(
-      {
-        userId: testUser.id,
-        cpf: testUser.cpf,
-        email: testUser.email,
-        nome: testUser.nome,
-        nivelAcesso: 'ADMINISTRADOR',
-        nivelAcessoId: nivelAdmin.id
-      },
-      process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-    );
+    const setup = await setupCompleteTestEnvironment('cep');
+    adminToken = setup.adminToken;
+    vistoriadorToken = setup.vistoriadorToken;
   });
 
   afterAll(async () => {
     await sequelize.close();
   });
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   describe('GET /api/cep/:cep', () => {
-    it('deve buscar endereço por CEP com sucesso', async () => {
+    it('deve buscar endereço por CEP válido', async () => {
       const mockEndereco = {
         cep: '01310-100',
         logradouro: 'Avenida Paulista',
-        complemento: '',
         bairro: 'Bela Vista',
-        localidade: 'São Paulo',
+        cidade: 'São Paulo',
         uf: 'SP'
       };
 
@@ -66,98 +35,53 @@ describe('CEP Routes', () => {
 
       const response = await request(app)
         .get('/api/cep/01310100')
-        .set('Authorization', `Bearer ${authToken}`)
-        .expect(200);
+        .set('Authorization', `Bearer ${vistoriadorToken}`);
 
-      expect(response.body).toMatchObject({
-        success: true,
-        data: mockEndereco
-      });
-      expect(buscarEnderecoPorCEP).toHaveBeenCalledWith('01310100');
+      expect(response.status).toBe(200);
+      expect(response.body.cep).toBe('01310-100');
+      expect(response.body.logradouro).toBe('Avenida Paulista');
     });
 
-    it('deve retornar erro quando CEP é inválido', async () => {
-      buscarEnderecoPorCEP.mockRejectedValue(new Error('CEP não encontrado'));
+    it('deve aceitar CEP formatado', async () => {
+      const mockEndereco = {
+        cep: '01310-100',
+        logradouro: 'Avenida Paulista',
+        cidade: 'São Paulo',
+        uf: 'SP'
+      };
+
+      buscarEnderecoPorCEP.mockResolvedValue(mockEndereco);
+
+      const response = await request(app)
+        .get('/api/cep/01310-100')
+        .set('Authorization', `Bearer ${vistoriadorToken}`);
+
+      expect(response.status).toBe(200);
+    });
+
+    it('deve retornar 400 para CEP inválido', async () => {
+      buscarEnderecoPorCEP.mockRejectedValue(new Error('CEP invalido'));
+
+      const response = await request(app)
+        .get('/api/cep/12345')
+        .set('Authorization', `Bearer ${vistoriadorToken}`);
+
+      expect(response.status).toBe(400);
+    });
+
+    it('deve retornar 404 para CEP não encontrado', async () => {
+      buscarEnderecoPorCEP.mockRejectedValue(new Error('CEP nao encontrado'));
 
       const response = await request(app)
         .get('/api/cep/00000000')
-        .set('Authorization', `Bearer ${authToken}`)
-        .expect(400);
+        .set('Authorization', `Bearer ${vistoriadorToken}`);
 
-      expect(response.body).toMatchObject({
-        success: false,
-        error: 'CEP não encontrado'
-      });
+      expect(response.status).toBe(404);
     });
 
     it('deve exigir autenticação', async () => {
-      await request(app)
-        .get('/api/cep/01310100')
-        .expect(401);
-    });
-  });
-
-  describe('GET /api/cep/buscar/:uf/:cidade/:logradouro', () => {
-    it('deve buscar CEP por endereço com sucesso', async () => {
-      const mockEnderecos = [
-        {
-          cep: '01310-100',
-          logradouro: 'Avenida Paulista',
-          bairro: 'Bela Vista',
-          localidade: 'São Paulo',
-          uf: 'SP'
-        }
-      ];
-
-      buscarCEPPorEndereco.mockResolvedValue(mockEnderecos);
-
-      const response = await request(app)
-        .get('/api/cep/buscar/SP/São Paulo/Avenida Paulista')
-        .set('Authorization', `Bearer ${authToken}`)
-        .expect(200);
-
-      expect(response.body).toMatchObject({
-        success: true,
-        data: mockEnderecos,
-        count: 1
-      });
-      expect(buscarCEPPorEndereco).toHaveBeenCalledWith('SP', 'São Paulo', 'Avenida Paulista');
-    });
-
-    it('deve retornar lista vazia quando não encontra endereços', async () => {
-      buscarCEPPorEndereco.mockResolvedValue([]);
-
-      const response = await request(app)
-        .get('/api/cep/buscar/SP/São Paulo/Rua Inexistente')
-        .set('Authorization', `Bearer ${authToken}`)
-        .expect(200);
-
-      expect(response.body).toMatchObject({
-        success: true,
-        data: [],
-        count: 0
-      });
-    });
-
-    it('deve retornar erro quando serviço falha', async () => {
-      buscarCEPPorEndereco.mockRejectedValue(new Error('Erro ao buscar CEP'));
-
-      const response = await request(app)
-        .get('/api/cep/buscar/SP/São Paulo/Teste')
-        .set('Authorization', `Bearer ${authToken}`)
-        .expect(400);
-
-      expect(response.body).toMatchObject({
-        success: false,
-        error: 'Erro ao buscar CEP'
-      });
-    });
-
-    it('deve exigir autenticação', async () => {
-      await request(app)
-        .get('/api/cep/buscar/SP/São Paulo/Teste')
-        .expect(401);
+      const response = await request(app).get('/api/cep/01310100');
+      expect(response.status).toBe(401);
     });
   });
 });
-

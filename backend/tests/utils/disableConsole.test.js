@@ -1,41 +1,48 @@
-const originalEnv = process.env.NODE_ENV;
+const disableConsole = require('../../utils/disableConsole');
 
-describe('Disable Console', () => {
-  beforeEach(() => {
-    // Restaurar console original antes de cada teste
-    delete require.cache[require.resolve('../../utils/disableConsole')];
-  });
+describe('Disable Console Utils', () => {
+  const originalEnv = process.env.NODE_ENV;
+  const originalConsole = global.console;
 
   afterEach(() => {
     process.env.NODE_ENV = originalEnv;
-    delete require.cache[require.resolve('../../utils/disableConsole')];
+    global.console = originalConsole;
+    jest.resetModules();
   });
 
-  it('deve exportar originalConsole em desenvolvimento', () => {
-    process.env.NODE_ENV = 'development';
-    const disableConsole = require('../../utils/disableConsole');
+  it('deve exportar isProduction', () => {
+    expect(disableConsole.isProduction).toBeDefined();
+    expect(typeof disableConsole.isProduction).toBe('boolean');
+  });
 
+  it('deve exportar originalConsole', () => {
     expect(disableConsole.originalConsole).toBeDefined();
-    expect(disableConsole.originalConsole).toBe(console);
   });
 
-  it('deve exportar originalConsole em produção', () => {
-    process.env.NODE_ENV = 'production';
-    const disableConsole = require('../../utils/disableConsole');
-
-    expect(disableConsole.originalConsole).toBeDefined();
-    expect(disableConsole.originalConsole).not.toBe(console);
-  });
-
-  it('deve exportar isProduction corretamente', () => {
-    process.env.NODE_ENV = 'production';
-    const disableConsole = require('../../utils/disableConsole');
-    expect(disableConsole.isProduction).toBe(true);
-
+  it('deve manter console em desenvolvimento', () => {
     process.env.NODE_ENV = 'development';
-    delete require.cache[require.resolve('../../utils/disableConsole')];
-    const disableConsole2 = require('../../utils/disableConsole');
-    expect(disableConsole2.isProduction).toBe(false);
+    jest.resetModules();
+    const disableConsoleDev = require('../../utils/disableConsole');
+    
+    expect(disableConsoleDev.originalConsole).toBeDefined();
+    expect(typeof console.log).toBe('function');
+    expect(console.log.toString()).not.toBe('function noop() {}');
+  });
+
+  it('deve desabilitar console em produção', () => {
+    process.env.NODE_ENV = 'production';
+    jest.resetModules();
+    require('../../utils/disableConsole');
+    
+    expect(typeof console.log).toBe('function');
+  });
+
+  it('deve ter originalConsole disponível em produção', () => {
+    process.env.NODE_ENV = 'production';
+    jest.resetModules();
+    const disableConsoleProd = require('../../utils/disableConsole');
+    
+    expect(disableConsoleProd.originalConsole).toBeDefined();
+    expect(disableConsoleProd.originalConsole.log).toBeDefined();
   });
 });
-

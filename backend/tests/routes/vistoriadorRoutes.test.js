@@ -1,64 +1,96 @@
 const request = require('supertest');
-const { sequelize } = require('../../models');
+const { sequelize, Usuario, Vistoria } = require('../../models');
 const vistoriadorRoutes = require('../../routes/vistoriadorRoutes');
-const { setupCompleteTestEnvironment, createTestApp, createTestVistoriaCompleta, createTestVistoriaPadrao } = require('../helpers/testHelpers');
+const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
 
-const app = createTestApp({ path: '/api/vistoriador', router: vistoriadorRoutes });
+const app = createTestApp({ path: '/api/vistoriadores', router: vistoriadorRoutes });
 
-describe('Rotas de Vistoriador', () => {
-  let vistoriadorToken;
-  let admin, vistoriador;
+describe('Rotas de Vistoriadores - Testes Adicionais', () => {
+  let adminToken, vistoriadorToken;
+  let vistoriador;
 
   beforeAll(async () => {
     const setup = await setupCompleteTestEnvironment('vistoriador');
-    admin = setup.admin;
-    vistoriador = setup.vistoriador;
+    adminToken = setup.adminToken;
     vistoriadorToken = setup.vistoriadorToken;
+    vistoriador = setup.vistoriador;
   });
 
   afterAll(async () => {
     await sequelize.close();
   });
 
-  describe('GET /api/vistoriador/vistorias', () => {
-    it('deve listar vistorias do vistoriador', async () => {
-      await createTestVistoriaPadrao(vistoriador, admin);
-
+  describe('GET /api/vistoriadores', () => {
+    it('deve listar vistoriadores (admin)', async () => {
       const response = await request(app)
-        .get('/api/vistoriador/vistorias')
-        .set('Authorization', `Bearer ${vistoriadorToken}`);
+        .get('/api/vistoriadores')
+        .set('Authorization', `Bearer ${adminToken}`);
 
       expect(response.status).toBe(200);
       expect(Array.isArray(response.body)).toBe(true);
     });
 
-    it('deve retornar 401 sem autenticação', async () => {
-      const response = await request(app).get('/api/vistoriador/vistorias');
+    it('deve exigir autenticação', async () => {
+      const response = await request(app).get('/api/vistoriadores');
       expect(response.status).toBe(401);
+    });
+
+    it('deve exigir permissão de admin', async () => {
+      const response = await request(app)
+        .get('/api/vistoriadores')
+        .set('Authorization', `Bearer ${vistoriadorToken}`);
+
+      expect(response.status).toBe(403);
     });
   });
 
-  describe('GET /api/vistoriador/vistorias/:id', () => {
-    it('deve buscar vistoria específica do vistoriador', async () => {
-      const { vistoria } = await createTestVistoriaPadrao(vistoriador, admin, {
-        nrInscricao: 'TEST002'
-      });
-
+  describe('GET /api/vistoriadores/:id', () => {
+    it('deve retornar vistoriador por id', async () => {
       const response = await request(app)
-        .get(`/api/vistoriador/vistorias/${vistoria.id}`)
-        .set('Authorization', `Bearer ${vistoriadorToken}`);
+        .get(`/api/vistoriadores/${vistoriador.id}`)
+        .set('Authorization', `Bearer ${adminToken}`);
 
       expect(response.status).toBe(200);
-      expect(response.body.id).toBe(vistoria.id);
+      expect(response.body.id).toBe(vistoriador.id);
     });
 
-    it('deve retornar 404 para vistoria inexistente', async () => {
+    it('deve retornar 404 para id inexistente', async () => {
       const response = await request(app)
-        .get('/api/vistoriador/vistorias/99999')
-        .set('Authorization', `Bearer ${vistoriadorToken}`);
+        .get('/api/vistoriadores/99999')
+        .set('Authorization', `Bearer ${adminToken}`);
 
       expect(response.status).toBe(404);
     });
   });
-});
 
+  describe('GET /api/vistoriadores/:id/vistorias', () => {
+    it('deve retornar vistorias do vistoriador', async () => {
+      const response = await request(app)
+        .get(`/api/vistoriadores/${vistoriador.id}/vistorias`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.body)).toBe(true);
+    });
+
+    it('deve retornar 404 para vistoriador inexistente', async () => {
+      const response = await request(app)
+        .get('/api/vistoriadores/99999/vistorias')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe('GET /api/vistoriadores/:id/estatisticas', () => {
+    it('deve retornar estatísticas do vistoriador', async () => {
+      const response = await request(app)
+        .get(`/api/vistoriadores/${vistoriador.id}/estatisticas`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('total_vistorias');
+      expect(response.body).toHaveProperty('vistorias_concluidas');
+    });
+  });
+});

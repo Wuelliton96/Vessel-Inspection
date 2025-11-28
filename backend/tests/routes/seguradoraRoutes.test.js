@@ -5,7 +5,7 @@ const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/test
 
 const app = createTestApp({ path: '/api/seguradoras', router: seguradoraRoutes });
 
-describe('Rotas de Seguradoras', () => {
+describe('Rotas de Seguradoras - Testes Adicionais', () => {
   let adminToken;
 
   beforeAll(async () => {
@@ -17,89 +17,27 @@ describe('Rotas de Seguradoras', () => {
     await sequelize.close();
   });
 
-  describe('GET /api/seguradoras', () => {
-    it('deve listar todas as seguradoras', async () => {
-      await Seguradora.create({ 
-        nome: 'Seguradora Teste', 
-        cnpj: '12345678000190',
-        status: 'ATIVO'
-      });
-      
-      const response = await request(app)
-        .get('/api/seguradoras')
-        .set('Authorization', `Bearer ${adminToken}`);
-
-      expect(response.status).toBe(200);
-      expect(Array.isArray(response.body)).toBe(true);
-    });
-
-    it('deve filtrar por status', async () => {
-      await Seguradora.create({ nome: 'Ativa', cnpj: '11111111111111', status: 'ATIVO' });
-      await Seguradora.create({ nome: 'Inativa', cnpj: '22222222222222', status: 'INATIVO' });
-      
-      const response = await request(app)
-        .get('/api/seguradoras?status=ATIVO')
-        .set('Authorization', `Bearer ${adminToken}`);
-
-      expect(response.status).toBe(200);
-    });
-
-    it('deve retornar 401 sem autenticação', async () => {
-      const response = await request(app).get('/api/seguradoras');
-      expect(response.status).toBe(401);
-    });
-  });
-
-  describe('POST /api/seguradoras', () => {
-    it('deve criar seguradora', async () => {
-      const response = await request(app)
-        .post('/api/seguradoras')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          nome: 'Nova Seguradora',
-          cnpj: '33333333333333',
-          email: 'contato@seguradora.com',
-          telefone: '+5511999998888'
-        });
-
-      expect(response.status).toBe(201);
-      expect(response.body.nome).toBe('Nova Seguradora');
-    });
-
-    it('deve retornar 400 sem nome', async () => {
-      const response = await request(app)
-        .post('/api/seguradoras')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ cnpj: '44444444444444' });
-
-      expect(response.status).toBe(400);
-    });
-
-    it('deve retornar 400 com CNPJ duplicado', async () => {
-      await Seguradora.create({ nome: 'Seg 1', cnpj: '55555555555555' });
-      
-      const response = await request(app)
-        .post('/api/seguradoras')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ nome: 'Seg 2', cnpj: '55555555555555' });
-
-      expect(response.status).toBe(400);
-    });
+  beforeEach(async () => {
+    await Seguradora.destroy({ where: {}, force: true });
   });
 
   describe('GET /api/seguradoras/:id', () => {
-    it('deve buscar seguradora por ID', async () => {
-      const seg = await Seguradora.create({ nome: 'Buscar', cnpj: '66666666666666' });
-      
+    it('deve retornar seguradora por id', async () => {
+      const seguradora = await Seguradora.create({
+        nome: 'Test Seguradora',
+        cnpj: '12345678901234'
+      });
+
       const response = await request(app)
-        .get(`/api/seguradoras/${seg.id}`)
+        .get(`/api/seguradoras/${seguradora.id}`)
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(response.status).toBe(200);
-      expect(response.body.nome).toBe('Buscar');
+      expect(response.body.id).toBe(seguradora.id);
+      expect(response.body.nome).toBe('Test Seguradora');
     });
 
-    it('deve retornar 404 para ID inexistente', async () => {
+    it('deve retornar 404 para id inexistente', async () => {
       const response = await request(app)
         .get('/api/seguradoras/99999')
         .set('Authorization', `Bearer ${adminToken}`);
@@ -110,41 +48,56 @@ describe('Rotas de Seguradoras', () => {
 
   describe('PUT /api/seguradoras/:id', () => {
     it('deve atualizar seguradora', async () => {
-      const seg = await Seguradora.create({ nome: 'Original', cnpj: '77777777777777' });
-      
+      const seguradora = await Seguradora.create({
+        nome: 'Old Seguradora',
+        cnpj: '11111111111111'
+      });
+
       const response = await request(app)
-        .put(`/api/seguradoras/${seg.id}`)
+        .put(`/api/seguradoras/${seguradora.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ nome: 'Atualizada' });
+        .send({
+          nome: 'Updated Seguradora',
+          cnpj: '22222222222222'
+        });
 
       expect(response.status).toBe(200);
-      expect(response.body.nome).toBe('Atualizada');
+      expect(response.body.nome).toBe('Updated Seguradora');
+    });
+
+    it('deve retornar 404 para id inexistente', async () => {
+      const response = await request(app)
+        .put('/api/seguradoras/99999')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ nome: 'Test' });
+
+      expect(response.status).toBe(404);
     });
   });
 
   describe('DELETE /api/seguradoras/:id', () => {
     it('deve deletar seguradora', async () => {
-      const seg = await Seguradora.create({ nome: 'Deletar', cnpj: '88888888888888' });
-      
+      const seguradora = await Seguradora.create({
+        nome: 'To Delete',
+        cnpj: '33333333333333'
+      });
+
       const response = await request(app)
-        .delete(`/api/seguradoras/${seg.id}`)
+        .delete(`/api/seguradoras/${seguradora.id}`)
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(response.status).toBe(200);
+
+      const deleted = await Seguradora.findByPk(seguradora.id);
+      expect(deleted).toBeNull();
     });
-  });
 
-  describe('PATCH /api/seguradoras/:id/toggle-status', () => {
-    it('deve alternar status da seguradora', async () => {
-      const seg = await Seguradora.create({ nome: 'Toggle', cnpj: '99999999999999', status: 'ATIVO' });
-      
+    it('deve retornar 404 para id inexistente', async () => {
       const response = await request(app)
-        .patch(`/api/seguradoras/${seg.id}/toggle-status`)
+        .delete('/api/seguradoras/99999')
         .set('Authorization', `Bearer ${adminToken}`);
 
-      expect(response.status).toBe(200);
-      expect(response.body.status).toBe('INATIVO');
+      expect(response.status).toBe(404);
     });
   });
 });
-

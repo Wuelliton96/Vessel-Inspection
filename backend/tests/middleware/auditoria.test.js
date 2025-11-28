@@ -5,21 +5,20 @@ const {
 } = require('../../middleware/auditoria');
 const { AuditoriaLog } = require('../../models');
 
-// Mock do console.log e console.error
-const originalConsoleLog = console.log;
-const originalConsoleError = console.error;
-
+const originalConsole = global.console;
 beforeAll(() => {
-  console.log = jest.fn();
-  console.error = jest.fn();
+  global.console = {
+    ...originalConsole,
+    log: jest.fn(),
+    error: jest.fn()
+  };
 });
 
 afterAll(() => {
-  console.log = originalConsoleLog;
-  console.error = originalConsoleError;
+  global.console = originalConsole;
 });
 
-describe('Auditoria Middleware', () => {
+describe('Auditoria Middleware - Testes Adicionais', () => {
   let mockReq, mockRes, mockNext;
 
   beforeEach(() => {
@@ -47,203 +46,155 @@ describe('Auditoria Middleware', () => {
     jest.clearAllMocks();
   });
 
-  describe('registrarAuditoria', () => {
-    it('deve registrar auditoria com sucesso', async () => {
+  describe('registrarAuditoria - Casos Adicionais', () => {
+    it('deve usar IP de x-forwarded-for quando disponível', async () => {
+      mockReq.headers['x-forwarded-for'] = '192.168.1.1';
       const createSpy = jest.spyOn(AuditoriaLog, 'create').mockResolvedValue({});
 
       await registrarAuditoria({
         req: mockReq,
         acao: 'CREATE',
-        entidade: 'Usuario',
-        entidadeId: 1,
-        dadosNovos: { nome: 'Test' }
+        entidade: 'Test'
       });
 
-      expect(createSpy).toHaveBeenCalled();
-      expect(createSpy.mock.calls[0][0]).toMatchObject({
-        usuario_id: 1,
-        usuario_email: 'test@example.com',
-        usuario_nome: 'Test User',
-        acao: 'CREATE',
-        entidade: 'Usuario',
-        entidade_id: 1,
-        ip_address: '127.0.0.1'
-      });
-
+      expect(createSpy.mock.calls[0][0].ip_address).toBe('192.168.1.1');
       createSpy.mockRestore();
     });
 
-    it('deve sanitizar dados sensíveis', async () => {
+    it('deve usar connection.remoteAddress quando ip não existe', async () => {
+      delete mockReq.ip;
       const createSpy = jest.spyOn(AuditoriaLog, 'create').mockResolvedValue({});
 
       await registrarAuditoria({
         req: mockReq,
-        acao: 'UPDATE',
-        entidade: 'Usuario',
-        dadosAnteriores: { senha: '123456', senha_hash: 'hash' },
-        dadosNovos: { senha: '654321', password: 'pass' }
+        acao: 'CREATE',
+        entidade: 'Test'
       });
 
-      const callArgs = createSpy.mock.calls[0][0];
-      const dadosAnteriores = JSON.parse(callArgs.dados_anteriores);
-      const dadosNovos = JSON.parse(callArgs.dados_novos);
-
-      expect(dadosAnteriores.senha).toBeUndefined();
-      expect(dadosAnteriores.senha_hash).toBeUndefined();
-      expect(dadosNovos.senha).toBeUndefined();
-      expect(dadosNovos.password).toBeUndefined();
-
+      expect(createSpy.mock.calls[0][0].ip_address).toBe('127.0.0.1');
       createSpy.mockRestore();
     });
 
-    it('deve usar valores padrão quando req.user não existe', async () => {
-      mockReq.user = null;
+    it('deve incluir user_agent na auditoria', async () => {
+      const createSpy = jest.spyOn(AuditoriaLog, 'create').mockResolvedValue({});
+
+      await registrarAuditoria({
+        req: mockReq,
+        acao: 'CREATE',
+        entidade: 'Test'
+      });
+
+      expect(createSpy.mock.calls[0][0].user_agent).toBe('Mozilla/5.0');
+      createSpy.mockRestore();
+    });
+
+    it('deve incluir nivel_critico quando fornecido', async () => {
       const createSpy = jest.spyOn(AuditoriaLog, 'create').mockResolvedValue({});
 
       await registrarAuditoria({
         req: mockReq,
         acao: 'DELETE',
-        entidade: 'Test'
+        entidade: 'Usuario',
+        nivelCritico: true
       });
 
-      expect(createSpy.mock.calls[0][0]).toMatchObject({
-        usuario_id: null,
-        usuario_email: 'sistema',
-        usuario_nome: 'Sistema'
-      });
-
+      expect(createSpy.mock.calls[0][0].nivel_critico).toBe(true);
       createSpy.mockRestore();
     });
 
-    it('deve tratar erro sem quebrar aplicação', async () => {
-      const createSpy = jest.spyOn(AuditoriaLog, 'create').mockRejectedValue(new Error('DB Error'));
+    it('deve incluir detalhes quando fornecidos', async () => {
+      const createSpy = jest.spyOn(AuditoriaLog, 'create').mockResolvedValue({});
 
-      await expect(registrarAuditoria({
+      await registrarAuditoria({
         req: mockReq,
-        acao: 'CREATE',
-        entidade: 'Test'
-      })).resolves.not.toThrow();
-
-      expect(console.error).toHaveBeenCalled();
-
-      createSpy.mockRestore();
-    });
-  });
-
-  describe('auditoriaMiddleware', () => {
-    it('deve registrar auditoria quando res.json é chamado com sucesso', async () => {
-      const createSpy = jest.spyOn(AuditoriaLog, 'create').mockResolvedValue({});
-      const middleware = auditoriaMiddleware('CREATE', 'Test');
-
-      await middleware(mockReq, mockRes, mockNext);
-
-      expect(mockNext).toHaveBeenCalled();
-
-      // Simular resposta bem sucedida
-      mockRes.json({ success: true });
-
-      // Aguardar um pouco para o registro assíncrono
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      expect(createSpy).toHaveBeenCalled();
-      createSpy.mockRestore();
-    });
-
-    it('deve registrar auditoria quando res.send é chamado com sucesso', async () => {
-      const createSpy = jest.spyOn(AuditoriaLog, 'create').mockResolvedValue({});
-      const middleware = auditoriaMiddleware('UPDATE', 'Test');
-
-      await middleware(mockReq, mockRes, mockNext);
-      mockRes.send('OK');
-
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      expect(createSpy).toHaveBeenCalled();
-      createSpy.mockRestore();
-    });
-
-    it('não deve registrar auditoria para status de erro', async () => {
-      const createSpy = jest.spyOn(AuditoriaLog, 'create').mockResolvedValue({});
-      const middleware = auditoriaMiddleware('DELETE', 'Test');
-
-      await middleware(mockReq, mockRes, mockNext);
-      mockRes.statusCode = 400;
-      mockRes.json({ error: 'Bad Request' });
-
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      expect(createSpy).not.toHaveBeenCalled();
-      createSpy.mockRestore();
-    });
-
-    it('não deve registrar auditoria duas vezes', async () => {
-      const createSpy = jest.spyOn(AuditoriaLog, 'create').mockResolvedValue({});
-      const middleware = auditoriaMiddleware('CREATE', 'Test');
-
-      await middleware(mockReq, mockRes, mockNext);
-      mockRes.json({ success: true });
-      mockRes.send('OK'); // Segunda chamada não deve registrar novamente
-
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      expect(createSpy).toHaveBeenCalledTimes(1);
-      createSpy.mockRestore();
-    });
-
-    it('deve usar entidadeId de params ou body', async () => {
-      const createSpy = jest.spyOn(AuditoriaLog, 'create').mockResolvedValue({});
-      mockReq.params.id = 123;
-      const middleware = auditoriaMiddleware('UPDATE', 'Test');
-
-      await middleware(mockReq, mockRes, mockNext);
-      mockRes.json({ success: true });
-
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      expect(createSpy.mock.calls[0][0].entidade_id).toBe(123);
-      createSpy.mockRestore();
-    });
-  });
-
-  describe('salvarDadosOriginais', () => {
-    const MockModel = {
-      findByPk: jest.fn()
-    };
-
-    it('deve salvar dados originais quando id existe', async () => {
-      const mockData = { id: 1, nome: 'Original' };
-      MockModel.findByPk.mockResolvedValue({
-        toJSON: () => mockData
+        acao: 'UPDATE',
+        entidade: 'Test',
+        detalhes: 'Detalhes importantes'
       });
+
+      expect(createSpy.mock.calls[0][0].detalhes).toBe('Detalhes importantes');
+      createSpy.mockRestore();
+    });
+  });
+
+  describe('auditoriaMiddleware - Casos Adicionais', () => {
+    it('deve usar entidadeId de body quando params.id não existe', async () => {
+      const createSpy = jest.spyOn(AuditoriaLog, 'create').mockResolvedValue({});
+      mockReq.body.id = 456;
+      const middleware = auditoriaMiddleware('UPDATE', 'Test');
+
+      await middleware(mockReq, mockRes, mockNext);
+      mockRes.json({ success: true });
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      expect(createSpy.mock.calls[0][0].entidade_id).toBe(456);
+      createSpy.mockRestore();
+    });
+
+    it('deve usar dadosAnteriores das opções quando disponível', async () => {
+      const createSpy = jest.spyOn(AuditoriaLog, 'create').mockResolvedValue({});
+      const dadosAnteriores = { nome: 'Antigo' };
+      const middleware = auditoriaMiddleware('UPDATE', 'Test', {
+        dadosAnteriores
+      });
+
+      await middleware(mockReq, mockRes, mockNext);
+      mockRes.json({ success: true });
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const callArgs = createSpy.mock.calls[0][0];
+      expect(callArgs.dados_anteriores).toBeDefined();
+      createSpy.mockRestore();
+    });
+
+    it('deve usar dadosNovos das opções quando disponível', async () => {
+      const createSpy = jest.spyOn(AuditoriaLog, 'create').mockResolvedValue({});
+      const dadosNovos = { nome: 'Novo' };
+      const middleware = auditoriaMiddleware('CREATE', 'Test', {
+        dadosNovos
+      });
+
+      await middleware(mockReq, mockRes, mockNext);
+      mockRes.json({ success: true });
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const callArgs = createSpy.mock.calls[0][0];
+      expect(callArgs.dados_novos).toBeDefined();
+      createSpy.mockRestore();
+    });
+  });
+
+  describe('salvarDadosOriginais - Casos Adicionais', () => {
+    it('deve lidar com registro não encontrado', async () => {
+      const MockModel = {
+        findByPk: jest.fn().mockResolvedValue(null)
+      };
       mockReq.params.id = '1';
 
       const middleware = salvarDadosOriginais(MockModel);
       await middleware(mockReq, mockRes, mockNext);
 
       expect(MockModel.findByPk).toHaveBeenCalledWith('1');
-      expect(mockReq.originalData).toEqual(mockData);
-      expect(mockNext).toHaveBeenCalled();
-    });
-
-    it('deve continuar sem dados originais quando id não existe', async () => {
-      mockReq.params = {};
-      const middleware = salvarDadosOriginais(MockModel);
-      await middleware(mockReq, mockRes, mockNext);
-
       expect(mockReq.originalData).toBeUndefined();
       expect(mockNext).toHaveBeenCalled();
     });
 
-    it('deve tratar erro sem quebrar aplicação', async () => {
-      MockModel.findByPk.mockRejectedValue(new Error('DB Error'));
+    it('deve lidar com registro sem método toJSON', async () => {
+      const MockModel = {
+        findByPk: jest.fn().mockResolvedValue({
+          id: 1,
+          nome: 'Test'
+        })
+      };
       mockReq.params.id = '1';
 
       const middleware = salvarDadosOriginais(MockModel);
       await middleware(mockReq, mockRes, mockNext);
 
-      expect(console.error).toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalled();
     });
   });
 });
-

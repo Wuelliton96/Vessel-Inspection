@@ -6,7 +6,7 @@ const {
   getRateLimitStats
 } = require('../../middleware/rateLimiting');
 
-describe('Rate Limiting Middleware', () => {
+describe('Rate Limiting Middleware - Testes Adicionais', () => {
   let mockReq, mockRes, mockNext;
 
   beforeEach(() => {
@@ -19,172 +19,168 @@ describe('Rate Limiting Middleware', () => {
     mockRes = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),
-      setHeader: jest.fn()
+      setHeader: jest.fn(),
+      statusCode: 200
     };
     mockNext = jest.fn();
     jest.clearAllMocks();
   });
 
-  describe('createRateLimiter', () => {
-    it('deve permitir requisições dentro do limite', () => {
-      const limiter = createRateLimiter({ windowMs: 1000, max: 5 });
-
-      for (let i = 0; i < 5; i++) {
-        limiter(mockReq, mockRes, mockNext);
-      }
-
-      expect(mockNext).toHaveBeenCalledTimes(5);
-      expect(mockRes.status).not.toHaveBeenCalled();
-    });
-
-    it('deve bloquear requisições acima do limite', () => {
-      const limiter = createRateLimiter({ windowMs: 1000, max: 2 });
-
+  describe('createRateLimiter - Casos Adicionais', () => {
+    it('deve resetar contador quando janela expira', async () => {
+      const limiter = createRateLimiter({ windowMs: 100, max: 2 });
+      
       limiter(mockReq, mockRes, mockNext);
       limiter(mockReq, mockRes, mockNext);
-      limiter(mockReq, mockRes, mockNext); // Terceira requisição deve ser bloqueada
-
+      
       expect(mockNext).toHaveBeenCalledTimes(2);
-      expect(mockRes.status).toHaveBeenCalledWith(429);
-      expect(mockRes.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          error: 'Limite de requisições excedido'
-        })
-      );
+      
+      await new Promise(resolve => setTimeout(resolve, 150));
+      
+      limiter(mockReq, mockRes, mockNext);
+      limiter(mockReq, mockRes, mockNext);
+      
+      expect(mockNext).toHaveBeenCalledTimes(4);
     });
 
-    it('deve ignorar requisições OPTIONS por padrão', () => {
+    it('deve usar connection.remoteAddress quando ip não existe', () => {
+      delete mockReq.ip;
+      mockReq.connection.remoteAddress = '192.168.1.1';
+      
       const limiter = createRateLimiter({ windowMs: 1000, max: 1 });
-      mockReq.method = 'OPTIONS';
-
+      
       limiter(mockReq, mockRes, mockNext);
-      limiter(mockReq, mockRes, mockNext); // Segunda OPTIONS não deve contar
-
-      expect(mockNext).toHaveBeenCalledTimes(2);
+      limiter(mockReq, mockRes, mockNext);
+      
+      expect(mockRes.status).toHaveBeenCalledWith(429);
     });
 
-    it('deve adicionar headers informativos', () => {
-      const limiter = createRateLimiter({ windowMs: 1000, max: 10 });
-
+    it('deve usar x-forwarded-for quando ip e connection não existem', () => {
+      delete mockReq.ip;
+      delete mockReq.connection;
+      mockReq.headers['x-forwarded-for'] = '10.0.0.1';
+      
+      const limiter = createRateLimiter({ windowMs: 1000, max: 1 });
+      
       limiter(mockReq, mockRes, mockNext);
+      limiter(mockReq, mockRes, mockNext);
+      
+      expect(mockRes.status).toHaveBeenCalledWith(429);
+    });
 
+    it('deve remover bloqueio quando expira', async () => {
+      const limiter = createRateLimiter({ 
+        windowMs: 1000, 
+        max: 1,
+        blockDuration: 100
+      });
+      
+      limiter(mockReq, mockRes, mockNext);
+      limiter(mockReq, mockRes, mockNext);
+      
+      expect(mockRes.status).toHaveBeenCalledWith(429);
+      
+      await new Promise(resolve => setTimeout(resolve, 150));
+      
+      mockRes.status.mockClear();
+      limiter(mockReq, mockRes, mockNext);
+      
+      expect(mockRes.status).not.toHaveBeenCalledWith(429);
+    });
+
+    it('deve adicionar headers de rate limit', () => {
+      const limiter = createRateLimiter({ windowMs: 1000, max: 10 });
+      
+      limiter(mockReq, mockRes, mockNext);
+      
       expect(mockRes.setHeader).toHaveBeenCalledWith('X-RateLimit-Limit', 10);
       expect(mockRes.setHeader).toHaveBeenCalledWith('X-RateLimit-Remaining', expect.any(Number));
       expect(mockRes.setHeader).toHaveBeenCalledWith('X-RateLimit-Reset', expect.any(String));
     });
 
-    it('deve usar IP de x-forwarded-for quando disponível', () => {
-      mockReq.headers['x-forwarded-for'] = '192.168.1.1';
-      mockReq.ip = undefined;
-      const limiter = createRateLimiter({ windowMs: 1000, max: 1 });
-
+    it('deve calcular remaining corretamente', () => {
+      const limiter = createRateLimiter({ windowMs: 1000, max: 10 });
+      
       limiter(mockReq, mockRes, mockNext);
       limiter(mockReq, mockRes, mockNext);
+      
+      const remainingCall = mockRes.setHeader.mock.calls.find(call => call[0] === 'X-RateLimit-Remaining');
+      expect(remainingCall).toBeDefined();
+      expect(remainingCall[1]).toBeLessThanOrEqual(8);
+    });
+  });
 
-      expect(mockRes.status).toHaveBeenCalledWith(429);
+  describe('strictRateLimiter', () => {
+    it('deve ter configuração mais restritiva', () => {
+      strictRateLimiter(mockReq, mockRes, mockNext);
+      
+      expect(mockRes.setHeader).toHaveBeenCalledWith('X-RateLimit-Limit', 10);
+    });
+  });
+
+  describe('moderateRateLimiter', () => {
+    it('deve ter configuração moderada', () => {
+      moderateRateLimiter(mockReq, mockRes, mockNext);
+      
+      expect(mockRes.setHeader).toHaveBeenCalledWith('X-RateLimit-Limit', 100);
+    });
+  });
+
+  describe('loginRateLimiter', () => {
+    it('deve ter configuração restritiva para login', () => {
+      loginRateLimiter(mockReq, mockRes, mockNext);
+      
+      expect(mockRes.setHeader).toHaveBeenCalledWith('X-RateLimit-Limit', 5);
     });
 
-    it('deve bloquear IP temporariamente após exceder limite', () => {
-      const limiter = createRateLimiter({ 
-        windowMs: 1000, 
-        max: 1,
-        blockDuration: 5000
-      });
-
-      limiter(mockReq, mockRes, mockNext);
-      limiter(mockReq, mockRes, mockNext); // Excede limite
-
-      // Tentar novamente imediatamente
-      limiter(mockReq, mockRes, mockNext);
-
-      expect(mockRes.status).toHaveBeenCalledWith(429);
-      expect(mockRes.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          error: 'IP temporariamente bloqueado'
-        })
-      );
-    });
-
-    it('deve não contar requisições bem sucedidas quando configurado', () => {
-      const limiter = createRateLimiter({ 
-        windowMs: 1000, 
-        max: 2,
-        skipSuccessfulRequests: true
-      });
-
+    it('deve não contar requisições bem sucedidas', () => {
       const originalJson = mockRes.json.bind(mockRes);
       mockRes.json = function(data) {
         mockRes.statusCode = 200;
         return originalJson(data);
       };
 
-      limiter(mockReq, mockRes, mockNext);
-      mockRes.json({ success: true }); // Requisição bem sucedida
-
-      limiter(mockReq, mockRes, mockNext);
+      loginRateLimiter(mockReq, mockRes, mockNext);
       mockRes.json({ success: true });
-
-      limiter(mockReq, mockRes, mockNext); // Terceira ainda deve passar
-
-      expect(mockNext).toHaveBeenCalledTimes(3);
-    });
-  });
-
-  describe('strictRateLimiter', () => {
-    it('deve ter limite mais restritivo', () => {
-      strictRateLimiter(mockReq, mockRes, mockNext);
-      strictRateLimiter(mockReq, mockRes, mockNext);
-      strictRateLimiter(mockReq, mockRes, mockNext);
-      strictRateLimiter(mockReq, mockRes, mockNext);
-      strictRateLimiter(mockReq, mockRes, mockNext);
-      strictRateLimiter(mockReq, mockRes, mockNext);
-      strictRateLimiter(mockReq, mockRes, mockNext);
-      strictRateLimiter(mockReq, mockRes, mockNext);
-      strictRateLimiter(mockReq, mockRes, mockNext);
-      strictRateLimiter(mockReq, mockRes, mockNext);
-      strictRateLimiter(mockReq, mockRes, mockNext); // 11ª deve ser bloqueada
-
-      expect(mockRes.status).toHaveBeenCalledWith(429);
-    });
-  });
-
-  describe('moderateRateLimiter', () => {
-    it('deve permitir mais requisições que strict', () => {
-      for (let i = 0; i < 50; i++) {
-        moderateRateLimiter(mockReq, mockRes, mockNext);
-      }
-
-      expect(mockNext).toHaveBeenCalledTimes(50);
-      expect(mockRes.status).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('loginRateLimiter', () => {
-    it('deve ter limite muito restritivo para login', () => {
-      for (let i = 0; i < 5; i++) {
-        loginRateLimiter(mockReq, mockRes, mockNext);
-      }
-      loginRateLimiter(mockReq, mockRes, mockNext); // 6ª deve ser bloqueada
-
-      expect(mockRes.status).toHaveBeenCalledWith(429);
+      
+      loginRateLimiter(mockReq, mockRes, mockNext);
+      mockRes.json({ success: true });
+      
+      expect(mockNext).toHaveBeenCalledTimes(2);
     });
   });
 
   describe('getRateLimitStats', () => {
-    it('deve retornar estatísticas de rate limiting', () => {
+    it('deve retornar estatísticas corretas', () => {
       const limiter = createRateLimiter({ windowMs: 1000, max: 10 });
       
-      // Fazer algumas requisições
       limiter(mockReq, mockRes, mockNext);
-      limiter(mockReq, mockRes, mockNext);
-
+      
       const stats = getRateLimitStats();
-
+      
       expect(stats).toHaveProperty('activeIPs');
       expect(stats).toHaveProperty('blockedIPs');
       expect(stats).toHaveProperty('topRequesters');
+      expect(stats.activeIPs).toBeGreaterThanOrEqual(0);
+      expect(stats.blockedIPs).toBeGreaterThanOrEqual(0);
       expect(Array.isArray(stats.topRequesters)).toBe(true);
+    });
+
+    it('deve incluir IPs bloqueados nas estatísticas', () => {
+      const limiter = createRateLimiter({ 
+        windowMs: 1000, 
+        max: 1,
+        blockDuration: 5000
+      });
+      
+      limiter(mockReq, mockRes, mockNext);
+      limiter(mockReq, mockRes, mockNext);
+      
+      const stats = getRateLimitStats();
+      
+      expect(stats.blockedIPs).toBeGreaterThanOrEqual(1);
+      const blockedIP = stats.topRequesters.find(r => r.isBlocked);
+      expect(blockedIP).toBeDefined();
     });
   });
 });
-

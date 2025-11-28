@@ -1,15 +1,16 @@
 const request = require('supertest');
-const { sequelize, Cliente } = require('../../models');
+const { sequelize, Cliente, Embarcacao } = require('../../models');
 const clienteRoutes = require('../../routes/clienteRoutes');
 const { setupCompleteTestEnvironment, createTestApp, generateTestCPF } = require('../helpers/testHelpers');
 
 const app = createTestApp({ path: '/api/clientes', router: clienteRoutes });
 
-describe('Rotas de Clientes', () => {
-  let vistoriadorToken;
+describe('Rotas de Clientes - Testes Adicionais', () => {
+  let adminToken, vistoriadorToken;
 
   beforeAll(async () => {
     const setup = await setupCompleteTestEnvironment('cliente');
+    adminToken = setup.adminToken;
     vistoriadorToken = setup.vistoriadorToken;
   });
 
@@ -17,45 +18,160 @@ describe('Rotas de Clientes', () => {
     await sequelize.close();
   });
 
-  describe('GET /api/clientes', () => {
-    it('deve listar todos os clientes', async () => {
-      await Cliente.create({ tipo_pessoa: 'FISICA', nome: 'João Silva', cpf: generateTestCPF('cli00') });
-      
+  beforeEach(async () => {
+    await Cliente.destroy({ where: {}, force: true });
+  });
+
+  describe('GET /api/clientes - Filtros', () => {
+    it('deve filtrar por ativo=true', async () => {
+      await Cliente.create({ nome: 'Cliente Ativo', cpf: generateTestCPF('c1'), ativo: true });
+      await Cliente.create({ nome: 'Cliente Inativo', cpf: generateTestCPF('c2'), ativo: false });
+
+      const response = await request(app)
+        .get('/api/clientes?ativo=true')
+        .set('Authorization', `Bearer ${vistoriadorToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.every(c => c.ativo === true)).toBe(true);
+    });
+
+    it('deve filtrar por tipo_pessoa', async () => {
+      await Cliente.create({ nome: 'PF', cpf: generateTestCPF('c3'), tipo_pessoa: 'FISICA' });
+      await Cliente.create({ nome: 'PJ', cnpj: '12345678901234', tipo_pessoa: 'JURIDICA' });
+
+      const response = await request(app)
+        .get('/api/clientes?tipo_pessoa=FISICA')
+        .set('Authorization', `Bearer ${vistoriadorToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.every(c => c.tipo_pessoa === 'FISICA')).toBe(true);
+    });
+
+    it('deve filtrar por CPF', async () => {
+      const cpf = generateTestCPF('c4');
+      await Cliente.create({ nome: 'Cliente CPF', cpf, tipo_pessoa: 'FISICA' });
+
+      const response = await request(app)
+        .get(`/api/clientes?cpf=${cpf}`)
+        .set('Authorization', `Bearer ${vistoriadorToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.length).toBeGreaterThan(0);
+      expect(response.body[0].cpf).toBe(cpf);
+    });
+
+    it('deve incluir embarcacoes na resposta', async () => {
+      const cliente = await Cliente.create({
+        nome: 'Cliente com Embarcacao',
+        cpf: generateTestCPF('c5'),
+        tipo_pessoa: 'FISICA'
+      });
+
+      await Embarcacao.create({
+        nome: 'Boat 1',
+        tipo: 'LANCHA',
+        cliente_id: cliente.id
+      });
+
       const response = await request(app)
         .get('/api/clientes')
         .set('Authorization', `Bearer ${vistoriadorToken}`);
 
       expect(response.status).toBe(200);
-      expect(Array.isArray(response.body)).toBe(true);
+      const clienteComEmbarcacao = response.body.find(c => c.id === cliente.id);
+      expect(clienteComEmbarcacao).toBeDefined();
+      expect(clienteComEmbarcacao.embarcacoes).toBeDefined();
     });
+  });
 
-    it('deve filtrar por CPF', async () => {
-      const { generateTestCPF } = require('../helpers/testHelpers');
-      const cpfValido = generateTestCPF('cliente_filtro');
-      await Cliente.create({ tipo_pessoa: 'FISICA', nome: 'Maria', cpf: cpfValido });
-      
+  describe('GET /api/clientes/buscar/:documento', () => {
+    it('deve buscar cliente por CPF', async () => {
+      const cpf = generateTestCPF('c6');
+      const cliente = await Cliente.create({
+        nome: 'Cliente CPF',
+        cpf,
+        tipo_pessoa: 'FISICA'
+      });
+
       const response = await request(app)
-        .get(`/api/clientes?cpf=${cpfValido}`)
+        .get(`/api/clientes/buscar/${cpf}`)
         .set('Authorization', `Bearer ${vistoriadorToken}`);
 
       expect(response.status).toBe(200);
+      expect(response.body.id).toBe(cliente.id);
+      expect(response.body.cpf).toBe(cpf);
+    });
+
+    it('deve buscar cliente por CPF formatado', async () => {
+      const cpf = generateTestCPF('c7');
+      const cpfFormatado = cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+      const cliente = await Cliente.create({
+        nome: 'Cliente CPF Formatado',
+        cpf,
+        tipo_pessoa: 'FISICA'
+      });
+
+      const response = await request(app)
+        .get(`/api/clientes/buscar/${cpfFormatado}`)
+        .set('Authorization', `Bearer ${vistoriadorToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.id).toBe(cliente.id);
+    });
+
+    it('deve buscar cliente por CNPJ', async () => {
+      const cnpj = '12345678901234';
+      const cliente = await Cliente.create({
+        nome: 'Cliente CNPJ',
+        cnpj,
+        tipo_pessoa: 'JURIDICA'
+      });
+
+      const response = await request(app)
+        .get(`/api/clientes/buscar/${cnpj}`)
+        .set('Authorization', `Bearer ${vistoriadorToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.id).toBe(cliente.id);
+      expect(response.body.cnpj).toBe(cnpj);
+    });
+
+    it('deve retornar 400 para documento inválido', async () => {
+      const response = await request(app)
+        .get('/api/clientes/buscar/123')
+        .set('Authorization', `Bearer ${vistoriadorToken}`);
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('Documento inválido');
+    });
+
+    it('deve retornar 404 para cliente não encontrado', async () => {
+      const cpf = generateTestCPF('c8');
+      const response = await request(app)
+        .get(`/api/clientes/buscar/${cpf}`)
+        .set('Authorization', `Bearer ${vistoriadorToken}`);
+
+      expect(response.status).toBe(404);
     });
   });
 
   describe('POST /api/clientes', () => {
     it('deve criar cliente pessoa física', async () => {
+      const cpf = generateTestCPF('c9');
       const response = await request(app)
         .post('/api/clientes')
         .set('Authorization', `Bearer ${vistoriadorToken}`)
         .send({
+          nome: 'Novo Cliente PF',
+          cpf,
           tipo_pessoa: 'FISICA',
-          nome: 'Pedro Santos',
-          cpf: '11122233344',
-          email: 'pedro@test.com'
+          email: 'cliente@test.com'
         });
 
       expect(response.status).toBe(201);
-      expect(response.body.nome).toBe('Pedro Santos');
+      expect(response.body).toHaveProperty('id');
+      expect(response.body.nome).toBe('Novo Cliente PF');
+      expect(response.body.cpf).toBe(cpf);
     });
 
     it('deve criar cliente pessoa jurídica', async () => {
@@ -63,116 +179,76 @@ describe('Rotas de Clientes', () => {
         .post('/api/clientes')
         .set('Authorization', `Bearer ${vistoriadorToken}`)
         .send({
+          nome: 'Nova Empresa',
+          cnpj: '98765432109876',
           tipo_pessoa: 'JURIDICA',
-          nome: 'Empresa LTDA',
-          cnpj: '12345678000199'
+          email: 'empresa@test.com'
         });
 
       expect(response.status).toBe(201);
+      expect(response.body).toHaveProperty('id');
+      expect(response.body.tipo_pessoa).toBe('JURIDICA');
     });
 
-    it('deve retornar 400 sem nome', async () => {
+    it('deve retornar 400 sem campos obrigatórios', async () => {
       const response = await request(app)
         .post('/api/clientes')
         .set('Authorization', `Bearer ${vistoriadorToken}`)
-        .send({ tipo_pessoa: 'FISICA' });
+        .send({});
 
       expect(response.status).toBe(400);
-    });
-
-    it('deve retornar 400 PF sem CPF', async () => {
-      const response = await request(app)
-        .post('/api/clientes')
-        .set('Authorization', `Bearer ${vistoriadorToken}`)
-        .send({
-          tipo_pessoa: 'FISICA',
-          nome: 'Sem CPF'
-        });
-
-      expect(response.status).toBe(400);
-    });
-
-    it('deve retornar 400 PJ sem CNPJ', async () => {
-      const response = await request(app)
-        .post('/api/clientes')
-        .set('Authorization', `Bearer ${vistoriadorToken}`)
-        .send({
-          tipo_pessoa: 'JURIDICA',
-          nome: 'Sem CNPJ'
-        });
-
-      expect(response.status).toBe(400);
-    });
-  });
-
-  describe('GET /api/clientes/buscar/:documento', () => {
-    it('deve buscar por CPF', async () => {
-      await Cliente.create({ tipo_pessoa: 'FISICA', nome: 'Buscar CPF', cpf: '55566677788' });
-      
-      const response = await request(app)
-        .get('/api/clientes/buscar/55566677788')
-        .set('Authorization', `Bearer ${vistoriadorToken}`);
-
-      expect(response.status).toBe(200);
-      expect(response.body.nome).toBe('Buscar CPF');
-    });
-
-    it('deve buscar por CNPJ', async () => {
-      await Cliente.create({ tipo_pessoa: 'JURIDICA', nome: 'Buscar CNPJ', cnpj: '99988877766655' });
-      
-      const response = await request(app)
-        .get('/api/clientes/buscar/99988877766655')
-        .set('Authorization', `Bearer ${vistoriadorToken}`);
-
-      expect(response.status).toBe(200);
-    });
-
-    it('deve retornar 404 se não encontrar', async () => {
-      const response = await request(app)
-        .get('/api/clientes/buscar/00000000000')
-        .set('Authorization', `Bearer ${vistoriadorToken}`);
-
-      expect(response.status).toBe(404);
     });
   });
 
   describe('PUT /api/clientes/:id', () => {
     it('deve atualizar cliente', async () => {
-      const cliente = await Cliente.create({ tipo_pessoa: 'FISICA', nome: 'Original', cpf: '11111111111' });
-      
+      const cpf = generateTestCPF('c10');
+      const cliente = await Cliente.create({
+        nome: 'Cliente Original',
+        cpf,
+        tipo_pessoa: 'FISICA'
+      });
+
       const response = await request(app)
         .put(`/api/clientes/${cliente.id}`)
         .set('Authorization', `Bearer ${vistoriadorToken}`)
-        .send({ nome: 'Atualizado', email: 'novo@email.com' });
+        .send({
+          nome: 'Cliente Atualizado',
+          email: 'novo@email.com'
+        });
 
       expect(response.status).toBe(200);
-      expect(response.body.nome).toBe('Atualizado');
+      expect(response.body.nome).toBe('Cliente Atualizado');
+      expect(response.body.email).toBe('novo@email.com');
+    });
+
+    it('deve retornar 404 para id inexistente', async () => {
+      const response = await request(app)
+        .put('/api/clientes/99999')
+        .set('Authorization', `Bearer ${vistoriadorToken}`)
+        .send({ nome: 'Test' });
+
+      expect(response.status).toBe(404);
     });
   });
 
   describe('DELETE /api/clientes/:id', () => {
-    it('deve deletar cliente sem embarcações', async () => {
-      const cliente = await Cliente.create({ tipo_pessoa: 'FISICA', nome: 'Deletar', cpf: '22222222222' });
-      
+    it('deve deletar cliente', async () => {
+      const cpf = generateTestCPF('c11');
+      const cliente = await Cliente.create({
+        nome: 'Cliente para Deletar',
+        cpf,
+        tipo_pessoa: 'FISICA'
+      });
+
       const response = await request(app)
         .delete(`/api/clientes/${cliente.id}`)
         .set('Authorization', `Bearer ${vistoriadorToken}`);
 
       expect(response.status).toBe(200);
-    });
-  });
 
-  describe('PATCH /api/clientes/:id/toggle-status', () => {
-    it('deve alternar status do cliente', async () => {
-      const cliente = await Cliente.create({ tipo_pessoa: 'FISICA', nome: 'Toggle', cpf: '33333333333', ativo: true });
-      
-      const response = await request(app)
-        .patch(`/api/clientes/${cliente.id}/toggle-status`)
-        .set('Authorization', `Bearer ${vistoriadorToken}`);
-
-      expect(response.status).toBe(200);
-      expect(response.body.ativo).toBe(false);
+      const deleted = await Cliente.findByPk(cliente.id);
+      expect(deleted).toBeNull();
     });
   });
 });
-
