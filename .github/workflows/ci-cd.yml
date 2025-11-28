@@ -122,14 +122,19 @@ jobs:
             echo "Normalizando caminhos do backend..."
             # Converter barras invertidas para barras normais
             sed -i 's#\\#/#g' backend/coverage/lcov.info
-            # Garantir caminhos relativos começando com backend/
+            # Remover caminhos absolutos do Windows (C:/, D:/, etc)
+            sed -i 's#SF:[A-Z]:/#SF:#g' backend/coverage/lcov.info
+            # Remover caminhos absolutos do Linux/Mac
+            sed -i 's#SF:/.*/backend/#SF:backend/#g' backend/coverage/lcov.info
             # Se o caminho já contém backend/, normalizar
             sed -i 's#SF:.*/backend/#SF:backend/#g' backend/coverage/lcov.info
-            # Se o caminho não começa com backend/, adicionar o prefixo
+            # Se o caminho não começa com backend/ e não é um caminho absoluto, adicionar o prefixo
             sed -i 's#^SF:\([^/].*\)#SF:backend/\1#g' backend/coverage/lcov.info
             # Garantir que caminhos que já começam com backend/ permaneçam corretos
             sed -i 's#^SF:backend/backend/#SF:backend/#g' backend/coverage/lcov.info
             echo "Backend LCOV normalizado"
+            echo "Primeiras linhas SF do backend LCOV:"
+            grep "^SF:" backend/coverage/lcov.info | head -5
           fi
           
           # Normalizar caminhos no frontend LCOV (se existir)
