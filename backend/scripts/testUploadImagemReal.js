@@ -7,6 +7,7 @@ const { S3Client, ListObjectsV2Command, GetObjectCommand } = require('@aws-sdk/c
 const { s3Client, bucket } = require('../config/aws');
 const sequelize = require('../config/database');
 const { Foto, Vistoria, VistoriaChecklistItem, TipoFotoChecklist, Usuario } = require('../models');
+const { criarImagemTeste, removerArquivoTeste, tratarErroUpload, tratarErroCritico } = require('./helpers/testHelpers');
 
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000';
 
@@ -77,28 +78,8 @@ async function testUploadImagemReal() {
     // 3. Criar uma imagem JPEG válida (miniatura de 100x100 pixels)
     console.log('3. Criando imagem de teste...');
     const testImagePath = path.join(__dirname, '../uploads/test-imagem.jpg');
-    const uploadDir = path.dirname(testImagePath);
-    
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    
-    // Criar uma imagem JPEG mínima válida (header JPEG)
-    // Isso cria um JPEG válido de 1x1 pixel
-    const jpegHeader = Buffer.from([
-      0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x01, 0x00, 0x48,
-      0x00, 0x48, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43, 0x00, 0x08, 0x06, 0x06, 0x07, 0x06, 0x05, 0x08,
-      0x07, 0x07, 0x07, 0x09, 0x09, 0x08, 0x0A, 0x0C, 0x14, 0x0D, 0x0C, 0x0B, 0x0B, 0x0C, 0x19, 0x12,
-      0x13, 0x0F, 0x14, 0x1D, 0x1A, 0x1F, 0x1E, 0x1D, 0x1A, 0x1C, 0x1C, 0x20, 0x24, 0x2E, 0x27, 0x20,
-      0x22, 0x2C, 0x23, 0x1C, 0x1C, 0x28, 0x37, 0x29, 0x2C, 0x30, 0x31, 0x34, 0x34, 0x34, 0x1F, 0x27,
-      0x39, 0x3D, 0x38, 0x32, 0x3C, 0x2E, 0x33, 0x34, 0x32, 0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x00, 0x01,
-      0x00, 0x01, 0x01, 0x01, 0x11, 0x00, 0xFF, 0xC4, 0x00, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0xFF, 0xC4, 0x00, 0x14,
-      0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00, 0x40, 0xFF, 0xD9
-    ]);
-    
-    fs.writeFileSync(testImagePath, jpegHeader);
+    criarImagemTeste(testImagePath);
+    const jpegHeader = fs.readFileSync(testImagePath);
     console.log(`✓ Imagem de teste criada: ${testImagePath} (${jpegHeader.length} bytes)\n`);
     
     // 4. Fazer upload
@@ -156,7 +137,7 @@ async function testUploadImagemReal() {
             Key: s3Key
           });
           
-          const getResult = await s3Client.send(getCommand);
+          await s3Client.send(getCommand);
           console.log('✓ Arquivo encontrado no S3');
           console.log(`  - Key: ${s3Key}`);
           console.log(`  - URL: https://${bucket}.s3.us-east-1.amazonaws.com/${s3Key}`);
@@ -166,29 +147,19 @@ async function testUploadImagemReal() {
       }
       
       // 7. Limpar
-      if (fs.existsSync(testImagePath)) {
-        fs.unlinkSync(testImagePath);
-        console.log('\n✓ Arquivo de teste removido');
-      }
+      removerArquivoTeste(testImagePath);
+      console.log('\n✓ Arquivo de teste removido');
       
       console.log('\n========================================');
       console.log('✓ TESTE CONCLUÍDO COM SUCESSO!');
       console.log('========================================\n');
       
     } catch (uploadError) {
-      console.error('\n✗ Erro no upload:', uploadError.response?.data || uploadError.message);
-      if (uploadError.response?.data) {
-        console.error('  Detalhes:', JSON.stringify(uploadError.response.data, null, 2));
-      }
-      throw uploadError;
+      tratarErroUpload(uploadError);
     }
     
   } catch (error) {
-    console.error('\n✗ ERRO CRÍTICO:', error.message);
-    if (error.stack) {
-      console.error(error.stack);
-    }
-    process.exit(1);
+    tratarErroCritico(error);
   } finally {
     await sequelize.close();
   }

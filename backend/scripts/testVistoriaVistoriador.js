@@ -3,6 +3,7 @@
  */
 
 const { Vistoria, Embarcacao, Local, StatusVistoria, Usuario, NivelAcesso } = require('../models');
+const { validarEntidade, construirStatusIds, tratarErroCritico } = require('./helpers/testHelpers');
 
 async function testVistoriaVistoriador() {
   try {
@@ -10,20 +11,14 @@ async function testVistoriaVistoriador() {
 
     // Buscar um vistoriador
     const nivelVistoriador = await NivelAcesso.findOne({ where: { nome: 'VISTORIADOR' } });
-    if (!nivelVistoriador) {
-      console.log('[ERRO] Nível VISTORIADOR não encontrado');
-      process.exit(1);
-    }
+    validarEntidade(nivelVistoriador, 'Nível VISTORIADOR não encontrado');
 
     const vistoriador = await Usuario.findOne({
       where: { nivel_acesso_id: nivelVistoriador.id },
       include: [{ model: NivelAcesso, as: 'NivelAcesso' }]
     });
 
-    if (!vistoriador) {
-      console.log('[ERRO] Nenhum vistoriador encontrado');
-      process.exit(1);
-    }
+    validarEntidade(vistoriador, 'Nenhum vistoriador encontrado');
 
     console.log(`[OK] Vistoriador encontrado: ${vistoriador.nome} (ID: ${vistoriador.id})\n`);
 
@@ -64,11 +59,7 @@ async function testVistoriaVistoriador() {
         console.log(`   Data Criação: ${vistoria.created_at}`);
         
         // Verificar se seria retornada pela rota
-        const statusIds = [];
-        if (statusPendente) statusIds.push(statusPendente.id);
-        if (statusEmAndamento) statusIds.push(statusEmAndamento.id);
-        if (statusConcluida) statusIds.push(statusConcluida.id);
-        
+        const statusIds = construirStatusIds(statusPendente, statusEmAndamento, statusConcluida);
         const seriaRetornada = statusIds.includes(vistoria.status_id);
         console.log(`   Seria retornada pela rota: ${seriaRetornada ? '[OK] SIM' : '[ERRO] NÃO'}`);
       });
@@ -77,11 +68,7 @@ async function testVistoriaVistoriador() {
     // Testar a query que a rota usa
     console.log('\n=== TESTE DA QUERY DA ROTA ===\n');
     
-    const statusIds = [];
-    if (statusPendente) statusIds.push(statusPendente.id);
-    if (statusEmAndamento) statusIds.push(statusEmAndamento.id);
-    if (statusConcluida) statusIds.push(statusConcluida.id);
-
+    const statusIds = construirStatusIds(statusPendente, statusEmAndamento, statusConcluida);
     console.log('Status IDs que serão buscados:', statusIds);
 
     const vistoriasFiltradas = await Vistoria.findAll({
@@ -140,7 +127,7 @@ async function testVistoriaVistoriador() {
     process.exit(0);
   } catch (error) {
     console.error('[ERRO] Erro no teste:', error);
-    process.exit(1);
+    tratarErroCritico(error);
   }
 }
 

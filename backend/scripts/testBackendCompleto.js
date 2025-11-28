@@ -2,6 +2,8 @@
  * Teste completo do backend - valida todas as rotas, modelos e funcionalidades
  */
 
+const { tratarErroCritico } = require('./helpers/testHelpers');
+
 async function testBackendCompleto() {
   try {
     console.log('=== TESTE COMPLETO DO BACKEND ===\n');
@@ -57,7 +59,7 @@ async function testBackendCompleto() {
     // 3. Testar configuração do banco
     console.log('\n3. TESTANDO CONFIGURAÇÃO DO BANCO:');
     try {
-      const db = require('../config/database');
+      require('../config/database');
       console.log('   OK: Configuração do banco carregada');
     } catch (err) {
       console.log(`   ERRO: ${err.message}`);
@@ -177,9 +179,7 @@ async function testBackendCompleto() {
     console.log('\n=== TESTE CONCLUÍDO ===\n');
     process.exit(todasValido ? 0 : 1);
   } catch (error) {
-    console.error('ERRO CRÍTICO:', error.message);
-    console.error('Stack:', error.stack);
-    process.exit(1);
+    tratarErroCritico(error);
   }
 }
 
