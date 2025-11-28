@@ -38,7 +38,7 @@ describe('AuthContext', () => {
     <AuthProvider>{children}</AuthProvider>
   );
 
-  const createMockResponse = (overrides = {}) => ({
+  const createMockResponse = (overrides: { usuario?: Partial<any>; token?: string } = {}) => ({
     token: 'mock-token',
     usuario: {
       id: 1,
@@ -48,7 +48,7 @@ describe('AuthContext', () => {
       ativo: true,
       createdAt: '2023-01-01',
       updatedAt: '2023-01-01',
-      ...overrides.usuario,
+      ...(overrides.usuario || {}),
     },
     ...overrides,
   });
