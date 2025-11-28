@@ -17,7 +17,9 @@
     "install:all": "npm install && cd backend && npm install && cd ../frontend-react && npm install",
     "test:coverage:backend": "cd backend && npm run test:coverage",
     "test:coverage:frontend": "cd frontend-react && npm run test:coverage",
-    "test:coverage:all": "npm run test:coverage:backend && npm run test:coverage:frontend"
+    "test:coverage:all": "npm run test:coverage:backend && npm run test:coverage:frontend",
+    "validate:coverage": "node scripts/validate-coverage.js",
+    "pre-push:coverage": "npm run test:coverage:all && npm run validate:coverage"
   
   },
   "devDependencies": {

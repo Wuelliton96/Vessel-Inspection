@@ -30,20 +30,86 @@ jobs:
           cd frontend-react
           npm ci
 
-      # Rodar testes + coverage (NÃO quebrar o job se falhar)
+      # Rodar testes + coverage
       - name: Test backend with coverage
-        continue-on-error: true
         run: |
           cd backend
-          npm test -- --coverage --passWithNoTests
+          npm test -- --coverage --passWithNoTests --ci --watchAll=false
+        continue-on-error: true
 
       - name: Test frontend with coverage
-        continue-on-error: true
         run: |
           cd frontend-react
-          npm test -- --coverage --passWithNoTests
+          npm test -- --coverage --passWithNoTests --ci --watchAll=false
+        continue-on-error: true
 
-      # Enviar coverage para o Codacy SEMPRE
+      # Verificar se os relatórios de cobertura foram gerados
+      - name: Verify coverage reports
+        run: |
+          echo "Verificando relatórios de cobertura..."
+          
+          if [ -f backend/coverage/lcov.info ]; then
+            echo "✅ Backend LCOV encontrado"
+            echo "Linhas no relatório backend:"
+            grep -c "^DA:" backend/coverage/lcov.info || echo "0"
+          else
+            echo "⚠️  Backend LCOV NÃO encontrado em backend/coverage/lcov.info"
+          fi
+          
+          if [ -f frontend-react/coverage/lcov.info ]; then
+            echo "✅ Frontend LCOV encontrado"
+            echo "Linhas no relatório frontend:"
+            grep -c "^DA:" frontend-react/coverage/lcov.info || echo "0"
+          else
+            echo "⚠️  Frontend LCOV NÃO encontrado em frontend-react/coverage/lcov.info"
+          fi
+          
+          # Calcular cobertura combinada
+          if [ -f backend/coverage/lcov.info ] && [ -f frontend-react/coverage/lcov.info ]; then
+            echo ""
+            echo "📊 Calculando cobertura combinada..."
+            node - <<'NODE'
+            const fs = require('fs');
+            
+            function parseLcov(filePath) {
+              if (!fs.existsSync(filePath)) return { total: 0, covered: 0 };
+              const content = fs.readFileSync(filePath, 'utf8');
+              let total = 0, covered = 0;
+              for (const line of content.split('\n')) {
+                if (line.startsWith('DA:')) {
+                  const parts = line.substring(3).split(',');
+                  if (parts.length >= 2) {
+                    const hits = parseInt(parts[1], 10) || 0;
+                    total += 1;
+                    if (hits > 0) covered += 1;
+                  }
+                }
+              }
+              return { total, covered };
+            }
+            
+            const backend = parseLcov('backend/coverage/lcov.info');
+            const frontend = parseLcov('frontend-react/coverage/lcov.info');
+            
+            const total = backend.total + frontend.total;
+            const covered = backend.covered + frontend.covered;
+            const pct = total > 0 ? (covered / total) * 100 : 0;
+            
+            console.log(`Backend: ${backend.total > 0 ? ((backend.covered / backend.total) * 100).toFixed(2) : 0}% (${backend.covered}/${backend.total})`);
+            console.log(`Frontend: ${frontend.total > 0 ? ((frontend.covered / frontend.total) * 100).toFixed(2) : 0}% (${frontend.covered}/${frontend.total})`);
+            console.log(`\n🎯 Cobertura Combinada: ${pct.toFixed(2)}% (${covered}/${total} linhas)`);
+            
+            if (pct >= 50) {
+              console.log('✅ Cobertura acima de 50%!');
+              process.exit(0);
+            } else {
+              console.log('⚠️  Cobertura abaixo de 50%');
+              process.exit(0); // Não falhar o build, apenas avisar
+            }
+            NODE
+          fi
+
+      # Enviar coverage para o Codacy SEMPRE (apenas se os arquivos existirem)
       - name: Send coverage to Codacy
         if: always()
         env:
@@ -52,10 +118,29 @@ jobs:
           CODACY_USERNAME: Wuelliton96
           CODACY_PROJECT_NAME: Vessel-Inspection
         run: |
-          bash <(curl -Ls https://coverage.codacy.com/get.sh) report \
-            -l Javascript \
-            -r backend/coverage/lcov.info \
-            -r frontend-react/coverage/lcov.info
+          COMMIT_SHA=$(git rev-parse HEAD)
+          
+          # Upload backend coverage
+          if [ -f backend/coverage/lcov.info ]; then
+            echo "📤 Enviando cobertura do backend para Codacy..."
+            bash <(curl -Ls https://coverage.codacy.com/get.sh) report \
+              -r backend/coverage/lcov.info \
+              -t $COMMIT_SHA \
+              -c $COMMIT_SHA || echo "⚠️  Falha ao enviar backend coverage, continuando..."
+          else
+            echo "⚠️  Backend coverage não encontrado, pulando..."
+          fi
+          
+          # Upload frontend coverage
+          if [ -f frontend-react/coverage/lcov.info ]; then
+            echo "📤 Enviando cobertura do frontend para Codacy..."
+            bash <(curl -Ls https://coverage.codacy.com/get.sh) report \
+              -r frontend-react/coverage/lcov.info \
+              -t $COMMIT_SHA \
+              -c $COMMIT_SHA || echo "⚠️  Falha ao enviar frontend coverage, continuando..."
+          else
+            echo "⚠️  Frontend coverage não encontrado, pulando..."
+          fi
 
       # Setup Java para SonarCloud Scanner
       - name: Setup Java
@@ -63,6 +148,40 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+
+      # Preparar relatórios LCOV para SonarCloud (normalizar caminhos)
+      - name: Prepare LCOV reports for SonarCloud
+        if: always()
+        run: |
+          echo "🔧 Preparando relatórios LCOV para SonarCloud..."
+          
+          # Normalizar caminhos no backend LCOV (se existir)
+          if [ -f backend/coverage/lcov.info ]; then
+            echo "Normalizando caminhos do backend..."
+            # Converter barras invertidas para barras normais
+            sed -i 's#\\#/#g' backend/coverage/lcov.info
+            # Garantir caminhos relativos começando com backend/
+            sed -i 's#SF:.*/backend/#SF:backend/#g' backend/coverage/lcov.info
+            sed -i 's#^SF:backend/#SF:backend/#g' backend/coverage/lcov.info
+            echo "✅ Backend LCOV normalizado"
+          fi
+          
+          # Normalizar caminhos no frontend LCOV (se existir)
+          if [ -f frontend-react/coverage/lcov.info ]; then
+            echo "Normalizando caminhos do frontend..."
+            # Converter barras invertidas para barras normais
+            sed -i 's#\\#/#g' frontend-react/coverage/lcov.info
+            # Garantir caminhos relativos começando com frontend-react/src/
+            sed -i 's#SF:.*/frontend-react/src/#SF:frontend-react/src/#g' frontend-react/coverage/lcov.info
+            sed -i 's#^SF:src/#SF:frontend-react/src/#g' frontend-react/coverage/lcov.info
+            echo "✅ Frontend LCOV normalizado"
+          fi
+          
+          # Verificar se pelo menos um relatório existe
+          if [ ! -f backend/coverage/lcov.info ] && [ ! -f frontend-react/coverage/lcov.info ]; then
+            echo "⚠️  Nenhum relatório LCOV encontrado!"
+            exit 1
+          fi
 
       # SonarCloud Scan com cobertura
       - name: SonarCloud Scan
