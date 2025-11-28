@@ -2,13 +2,24 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import Laudos from './Laudos';
-import { laudoService } from '../services/api';
+import { laudoService, vistoriaService } from '../services/api';
+
+// Mock react-router-dom
+const mockNavigate = jest.fn();
+jest.mock('react-router-dom', () => ({
+  BrowserRouter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  useNavigate: () => mockNavigate,
+  Link: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a>,
+}));
 
 jest.mock('../services/api', () => ({
   laudoService: {
     listar: jest.fn(),
     download: jest.fn(),
     excluir: jest.fn()
+  },
+  vistoriaService: {
+    getAll: jest.fn()
   }
 }));
 
@@ -46,6 +57,7 @@ const mockLaudos = [
 describe('Página Laudos', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (vistoriaService.getAll as jest.Mock).mockResolvedValue([]);
   });
 
   it('deve renderizar título da página', async () => {

@@ -1,8 +1,19 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter } from 'react-router-dom';
 import LaudoForm from './LaudoForm';
 import { laudoService } from '../services/api';
+
+// Mock react-router-dom
+const mockNavigate = jest.fn();
+const mockUseParams = jest.fn(() => ({ vistoriaId: '1', id: undefined }));
+
+jest.mock('react-router-dom', () => ({
+  BrowserRouter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  useNavigate: () => mockNavigate,
+  useParams: () => mockUseParams(),
+  Link: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a>,
+}));
 
 jest.mock('../services/api', () => ({
   laudoService: {
@@ -12,14 +23,14 @@ jest.mock('../services/api', () => ({
     atualizar: jest.fn(),
     gerarPDF: jest.fn(),
     download: jest.fn()
+  },
+  vistoriaService: {
+    buscarPorId: jest.fn(),
+    getAll: jest.fn()
+  },
+  configuracaoLaudoService: {
+    buscar: jest.fn()
   }
-}));
-
-const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
-  useNavigate: () => mockNavigate,
-  useParams: () => ({ vistoriaId: '1' })
 }));
 
 describe('Página LaudoForm', () => {
@@ -110,8 +121,8 @@ describe('Página LaudoForm', () => {
     );
 
     await waitFor(() => {
-      const inputVersao = screen.getByPlaceholderText('Ex: BS 2021-01') as HTMLInputElement;
-      expect(inputVersao.value).toBe('BS 2021-01');
+      const inputVersao = screen.getByPlaceholderText('Ex: BS 2021-01');
+      expect((inputVersao as HTMLInputElement).value).toBe('BS 2021-01');
     });
   });
 
@@ -123,9 +134,9 @@ describe('Página LaudoForm', () => {
     );
 
     await waitFor(() => {
-      const input = screen.getByPlaceholderText('Ex: Sea Doo RXT X 325') as HTMLInputElement;
+      const input = screen.getByPlaceholderText('Ex: Sea Doo RXT X 325');
       fireEvent.change(input, { target: { value: 'Yamaha VX' } });
-      expect(input.value).toBe('Yamaha VX');
+      expect((input as HTMLInputElement).value).toBe('Yamaha VX');
     });
   });
 
@@ -139,9 +150,7 @@ describe('Página LaudoForm', () => {
     };
 
     (laudoService.buscarPorId as jest.Mock).mockResolvedValue(mockLaudo);
-
-    const { useParams } = require('react-router-dom');
-    useParams.mockReturnValue({ id: '1' });
+    mockUseParams.mockReturnValue({ id: '1' });
 
     render(
       <BrowserRouter>

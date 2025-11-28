@@ -6,6 +6,7 @@ module.exports = {
     '!src/reportWebVitals.ts',
     '!src/setupTests.ts',
     '!src/react-app-env.d.ts',
+    '!src/__mocks__/**',
   ],
   coverageThreshold: {
     global: {
