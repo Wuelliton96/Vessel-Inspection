@@ -1,11 +1,23 @@
-import React from 'react';
-
-// Mock react-router-dom usando o arquivo de mock
-jest.mock('react-router-dom', () => require('./__mocks__/react-router-dom'));
+// Mock react-router-dom inline
+jest.mock('react-router-dom', () => {
+  const React = require('react');
+  return {
+    BrowserRouter: ({ children }: { children: any }) => React.createElement('div', null, children),
+    Routes: ({ children }: { children: any }) => React.createElement('div', null, children),
+    Route: ({ children }: { children: any }) => React.createElement('div', null, children),
+    Navigate: ({ to }: { to: string }) => React.createElement('div', null, `Navigate to ${to}`),
+    useLocation: () => ({ pathname: '/', search: '', hash: '', state: null, key: 'default' }),
+    useNavigate: () => jest.fn(),
+    Link: ({ to, children }: { to: string; children: any }) => React.createElement('a', { href: to }, children),
+    NavLink: ({ to, children }: { to: string; children: any }) => React.createElement('a', { href: to }, children),
+    Outlet: () => React.createElement('div', null),
+  };
+});
 
 // Mock styled-components
 jest.mock('styled-components', () => {
   const actual = jest.requireActual('styled-components');
+  const React = require('react');
   return {
     ...actual,
     default: (tag: any) => (strings: TemplateStringsArray, ...values: any[]) => {
@@ -20,10 +32,13 @@ jest.mock('styled-components', () => {
 });
 
 // Mock dos outros módulos necessários
-jest.mock('./contexts/AuthContext', () => ({
-  AuthProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  useAuth: () => ({ user: null, login: jest.fn(), logout: jest.fn(), isAuthenticated: false }),
-}));
+jest.mock('./contexts/AuthContext', () => {
+  const React = require('react');
+  return {
+    AuthProvider: ({ children }: { children: any }) => React.createElement('div', null, children),
+    useAuth: () => ({ user: null, login: jest.fn(), logout: jest.fn(), isAuthenticated: false }),
+  };
+});
 
 jest.mock('./hooks/useAccessControl', () => ({
   useAccessControl: () => ({ isAdmin: false, isVistoriador: false }),
@@ -36,28 +51,40 @@ jest.mock('./config/queryClient', () => ({
   },
 }));
 
-jest.mock('@tanstack/react-query', () => ({
-  QueryClientProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  QueryClient: jest.fn(() => ({
-    invalidateQueries: jest.fn(),
-    setQueryData: jest.fn(),
-  })),
-}));
+jest.mock('@tanstack/react-query', () => {
+  const React = require('react');
+  return {
+    QueryClientProvider: ({ children }: { children: any }) => React.createElement('div', null, children),
+    QueryClient: jest.fn(() => ({
+      invalidateQueries: jest.fn(),
+      setQueryData: jest.fn(),
+    })),
+  };
+});
 
-jest.mock('./components/Layout/Layout', () => ({
-  __esModule: true,
-  default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
+jest.mock('./components/Layout/Layout', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: ({ children }: { children: any }) => React.createElement('div', null, children),
+  };
+});
 
-jest.mock('./pages/Login', () => ({
-  __esModule: true,
-  default: () => <div>Login</div>,
-}));
+jest.mock('./pages/Login', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: () => React.createElement('div', null, 'Login'),
+  };
+});
 
-jest.mock('./pages/PasswordUpdate', () => ({
-  __esModule: true,
-  default: () => <div>PasswordUpdate</div>,
-}));
+jest.mock('./pages/PasswordUpdate', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: () => React.createElement('div', null, 'PasswordUpdate'),
+  };
+});
 
 describe('App Component', () => {
   test('App module can be imported', () => {
@@ -71,3 +98,4 @@ describe('App Component', () => {
   });
 });
 
+export {};
