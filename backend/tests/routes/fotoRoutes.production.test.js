@@ -28,34 +28,77 @@ describe('Rotas de Fotos - Testes de Produção', () => {
   let testFoto;
   let testVistoria;
   let authToken;
+  let usuario;
+  let embarcacao;
+  let local;
+  let statusVistoria;
 
   beforeAll(async () => {
+    // Garantir que o banco está sincronizado
+    if (global.syncTestDatabase) {
+      await global.syncTestDatabase();
+    }
+
     app = express();
     app.use(express.json());
     app.use('/api/fotos', fotoRoutes);
 
-    // Criar dados de teste
-    const { generateTestCPF } = require('../helpers/testHelpers');
-    const nivelAcesso = await NivelAcesso.findOne({ where: { nome: 'ADMINISTRADOR' } });
-    const usuario = await Usuario.create({
-      cpf: generateTestCPF('foto01'),
-      nome: 'Teste User',
-      email: 'teste@teste.com',
-      senha_hash: 'hash',
-      nivel_acesso_id: nivelAcesso.id
+    // Criar dados de teste usando helpers
+    const { setupCompleteTestEnvironment, generateTestCPF } = require('../helpers/testHelpers');
+    const { Embarcacao, Local, StatusVistoria } = require('../../models');
+    
+    // Setup do ambiente de teste
+    const { admin, nivelAdmin } = await setupCompleteTestEnvironment('foto');
+    usuario = admin;
+
+    // Criar embarcação de teste
+    embarcacao = await Embarcacao.create({
+      nome: 'Barco Teste Foto',
+      nr_inscricao_barco: 'FOTO001',
+      proprietario_nome: 'Proprietário Teste',
+      proprietario_email: 'proprietario@teste.com'
+    });
+
+    // Criar local de teste
+    local = await Local.create({
+      tipo: 'MARINA',
+      nome_local: 'Marina Teste Foto',
+      cep: '12345-678',
+      logradouro: 'Rua das Marinhas',
+      numero: '123',
+      bairro: 'Centro',
+      cidade: 'Rio de Janeiro',
+      estado: 'RJ'
+    });
+
+    // Criar status de vistoria de teste
+    statusVistoria = await StatusVistoria.create({
+      nome: 'EM_ANDAMENTO_FOTO',
+      descricao: 'Em andamento para teste de foto'
     });
 
     testVistoria = await Vistoria.create({
-      embarcacao_id: 1,
-      local_id: 1,
+      embarcacao_id: embarcacao.id,
+      local_id: local.id,
       vistoriador_id: usuario.id,
-      status_id: 1
+      status_id: statusVistoria.id
     });
+
+    // Criar tipo de foto se não existir
+    const { TipoFotoChecklist } = require('../../models');
+    let tipoFoto = await TipoFotoChecklist.findOne({ where: { codigo: 'TESTE_FOTO' } });
+    if (!tipoFoto) {
+      tipoFoto = await TipoFotoChecklist.create({
+        codigo: 'TESTE_FOTO',
+        nome_exibicao: 'Foto de Teste',
+        descricao: 'Foto para testes'
+      });
+    }
 
     testFoto = await Foto.create({
       url_arquivo: 'vistorias/id-1/teste.jpg',
       vistoria_id: testVistoria.id,
-      tipo_foto_id: 1
+      tipo_foto_id: tipoFoto.id
     });
 
     // Gerar token de autenticação
@@ -70,6 +113,10 @@ describe('Rotas de Fotos - Testes de Produção', () => {
   afterAll(async () => {
     if (testFoto) await testFoto.destroy();
     if (testVistoria) await testVistoria.destroy();
+    if (embarcacao) await embarcacao.destroy();
+    if (local) await local.destroy();
+    if (statusVistoria) await statusVistoria.destroy();
+    if (usuario) await usuario.destroy();
   });
 
   describe('GET /api/fotos/:id/imagem', () => {

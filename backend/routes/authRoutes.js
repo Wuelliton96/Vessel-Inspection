@@ -11,7 +11,7 @@ const { validarCPF, limparCPF } = require('../utils/validators');
 
 router.post('/register', registerValidation, async (req, res) => {
   try {
-    const { nome, email, senha, nivelAcessoId } = req.body;
+    const { nome, email, senha, nivelAcessoId, cpf } = req.body;
 
     if (!nome || !email || !senha) {
       return res.status(400).json({ error: 'Nome, email e senha são obrigatórios.' });
@@ -19,6 +19,25 @@ router.post('/register', registerValidation, async (req, res) => {
 
     if (req.body.id !== undefined) {
       return res.status(400).json({ error: 'Campo ID não deve ser enviado. O ID é gerado automaticamente.' });
+    }
+
+    // Validar CPF se fornecido
+    let cpfLimpo = null;
+    if (cpf) {
+      cpfLimpo = limparCPF(cpf);
+      if (!validarCPF(cpfLimpo)) {
+        return res.status(400).json({ 
+          error: 'CPF inválido',
+          message: 'Por favor, digite um CPF válido.',
+          code: 'CPF_INVALIDO'
+        });
+      }
+      
+      // Verificar se CPF já está cadastrado
+      const usuarioComCPF = await Usuario.findOne({ where: { cpf: cpfLimpo } });
+      if (usuarioComCPF) {
+        return res.status(400).json({ error: 'CPF já cadastrado.' });
+      }
     }
 
     const usuarioExistente = await Usuario.findOne({ where: { email: email.toLowerCase() } });
@@ -37,7 +56,8 @@ router.post('/register', registerValidation, async (req, res) => {
       nome,
       email: email.toLowerCase(),
       senha_hash: senhaHash,
-      nivel_acesso_id: nivelAcessoFinal
+      nivel_acesso_id: nivelAcessoFinal,
+      ...(cpfLimpo && { cpf: cpfLimpo })
     });
 
     const usuarioCompleto = await Usuario.findByPk(usuario.id, {

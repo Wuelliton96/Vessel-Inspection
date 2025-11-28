@@ -30,10 +30,12 @@ describe('Rotas de Clientes', () => {
     });
 
     it('deve filtrar por CPF', async () => {
-      await Cliente.create({ tipo_pessoa: 'FISICA', nome: 'Maria', cpf: '98765432100' });
+      const { generateTestCPF } = require('../helpers/testHelpers');
+      const cpfValido = generateTestCPF('cliente_filtro');
+      await Cliente.create({ tipo_pessoa: 'FISICA', nome: 'Maria', cpf: cpfValido });
       
       const response = await request(app)
-        .get('/api/clientes?cpf=98765432100')
+        .get(`/api/clientes?cpf=${cpfValido}`)
         .set('Authorization', `Bearer ${vistoriadorToken}`);
 
       expect(response.status).toBe(200);

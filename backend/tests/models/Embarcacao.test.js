@@ -66,14 +66,16 @@ describe('Modelo Embarcacao', () => {
 
   describe('Validações de unicidade', () => {
     it('deve falhar ao criar embarcação com número de casco duplicado', async () => {
+      const timestamp = Date.now();
+      const nrDuplicado = `DUPLICADO_${timestamp}`;
       const embarcacaoData1 = {
         nome: 'Barco 1',
-        nr_inscricao_barco: 'DUPLICADO001'
+        nr_inscricao_barco: nrDuplicado
       };
 
       const embarcacaoData2 = {
         nome: 'Barco 2',
-        nr_inscricao_barco: 'DUPLICADO001'
+        nr_inscricao_barco: nrDuplicado
       };
 
       await Embarcacao.create(embarcacaoData1);
@@ -85,11 +87,12 @@ describe('Modelo Embarcacao', () => {
     let embarcacao;
 
     beforeEach(async () => {
+      const timestamp = Date.now();
       embarcacao = await Embarcacao.create({
         nome: 'Barco CRUD',
-        nr_inscricao_barco: 'CRUD001',
+        nr_inscricao_barco: `CRUD_${timestamp}`,
         proprietario_nome: 'Proprietário CRUD',
-        proprietario_email: 'crud@teste.com'
+        proprietario_email: `crud_${timestamp}@teste.com`
       });
     });
 
@@ -101,7 +104,7 @@ describe('Modelo Embarcacao', () => {
 
     it('deve buscar embarcação por número do casco', async () => {
       const embarcacaoEncontrada = await Embarcacao.findOne({
-        where: { nr_inscricao_barco: 'CRUD001' }
+        where: { nr_inscricao_barco: embarcacao.nr_inscricao_barco } // Usar o número real da embarcação criada
       });
       expect(embarcacaoEncontrada).toBeDefined();
       expect(embarcacaoEncontrada.id).toBe(embarcacao.id);

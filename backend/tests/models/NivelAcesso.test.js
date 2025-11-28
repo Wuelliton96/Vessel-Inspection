@@ -58,13 +58,15 @@ describe('Modelo NivelAcesso', () => {
 
   describe('Validações de unicidade', () => {
     it('deve falhar ao criar nível com nome duplicado', async () => {
+      const timestamp = Date.now();
+      const nomeDuplicado = `NIVEL_DUPLICADO_${timestamp}`;
       const nivelData1 = {
-        nome: 'NIVEL_DUPLICADO',
+        nome: nomeDuplicado,
         descricao: 'Primeiro nível'
       };
 
       const nivelData2 = {
-        nome: 'NIVEL_DUPLICADO',
+        nome: nomeDuplicado,
         descricao: 'Segundo nível'
       };
 
@@ -77,8 +79,9 @@ describe('Modelo NivelAcesso', () => {
     let nivel;
 
     beforeEach(async () => {
+      const timestamp = Date.now();
       nivel = await NivelAcesso.create({
-        nome: 'NIVEL_CRUD',
+        nome: `NIVEL_CRUD_${timestamp}`,
         descricao: 'Nível para testes CRUD'
       });
     });
@@ -86,12 +89,12 @@ describe('Modelo NivelAcesso', () => {
     it('deve buscar nível por ID', async () => {
       const nivelEncontrado = await NivelAcesso.findByPk(nivel.id);
       expect(nivelEncontrado).toBeDefined();
-      expect(nivelEncontrado.nome).toBe('NIVEL_CRUD');
+      expect(nivelEncontrado.nome).toBe(nivel.nome); // Usar o nome real do nível criado
     });
 
     it('deve buscar nível por nome', async () => {
       const nivelEncontrado = await NivelAcesso.findOne({
-        where: { nome: 'NIVEL_CRUD' }
+        where: { nome: nivel.nome } // Usar o nome real do nível criado
       });
       expect(nivelEncontrado).toBeDefined();
       expect(nivelEncontrado.id).toBe(nivel.id);

@@ -62,17 +62,28 @@ router.post('/', async (req, res) => {
     }
     
     console.log('Criando local:', nome_local || tipo);
-    const local = await Local.create({
-      tipo,
-      nome_local: nome_local || null,
-      cep: cep || null,
-      logradouro: logradouro || null,
-      numero: numero || null,
-      complemento: complemento || null,
-      bairro: bairro || null,
-      cidade: cidade || null,
-      estado: estado || null
-    });
+    let local;
+    try {
+      local = await Local.create({
+        tipo,
+        nome_local: nome_local || null,
+        cep: cep || null,
+        logradouro: logradouro || null,
+        numero: numero || null,
+        complemento: complemento || null,
+        bairro: bairro || null,
+        cidade: cidade || null,
+        estado: estado || null
+      });
+    } catch (createError) {
+      // Se for erro de validação do Sequelize, retornar 400
+      if (createError.name === 'SequelizeValidationError') {
+        const errors = createError.errors.map(e => e.message).join(', ');
+        return res.status(400).json({ error: `Erro de validação: ${errors}` });
+      }
+      // Outros erros, retornar 500
+      throw createError;
+    }
     
     console.log('Local criado com ID:', local.id);
     logRouteEnd('POST', '/api/locais', 201);

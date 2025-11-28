@@ -111,10 +111,11 @@ describe('Modelo Local', () => {
     let local;
 
     beforeEach(async () => {
+      const timestamp = Date.now();
       local = await Local.create({
         tipo: 'MARINA',
-        nome_local: 'Marina CRUD',
-        cep: '12345-678',
+        nome_local: `Marina CRUD ${timestamp}`,
+        cep: `12345-${timestamp.toString().slice(-3)}`,
         cidade: 'Rio de Janeiro',
         estado: 'RJ'
       });
@@ -123,7 +124,7 @@ describe('Modelo Local', () => {
     it('deve buscar local por ID', async () => {
       const localEncontrado = await Local.findByPk(local.id);
       expect(localEncontrado).toBeDefined();
-      expect(localEncontrado.nome_local).toBe('Marina CRUD');
+      expect(localEncontrado.nome_local).toBe(local.nome_local); // Usar o nome real do local criado
     });
 
     it('deve buscar local por tipo', async () => {

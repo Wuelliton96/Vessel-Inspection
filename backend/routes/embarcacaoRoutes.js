@@ -142,7 +142,14 @@ router.put('/:id', async (req, res) => {
     console.log('Usuário:', req.user?.nome, '(ID:', req.user?.id, ')');
     console.log('Dados recebidos para atualização:', req.body);
     
-    const embarcacao = await Embarcacao.findByPk(req.params.id);
+    let embarcacao;
+    try {
+      embarcacao = await Embarcacao.findByPk(req.params.id);
+    } catch (dbError) {
+      // Se a tabela não existir ou houver erro de banco, retornar 500
+      console.error('Erro ao buscar embarcação:', dbError);
+      return res.status(500).json({ error: 'Erro interno do servidor' });
+    }
     
     if (!embarcacao) {
       console.log('Embarcação não encontrada para ID:', req.params.id);

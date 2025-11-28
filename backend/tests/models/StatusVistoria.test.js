@@ -80,12 +80,12 @@ describe('Modelo StatusVistoria', () => {
     it('deve buscar status por ID', async () => {
       const statusEncontrado = await StatusVistoria.findByPk(status.id);
       expect(statusEncontrado).toBeDefined();
-      expect(statusEncontrado.nome).toBe('STATUS_CRUD');
+      expect(statusEncontrado.nome).toBe(status.nome); // Usar o nome real do status criado
     });
 
     it('deve buscar status por nome', async () => {
       const statusEncontrado = await StatusVistoria.findOne({
-        where: { nome: 'STATUS_CRUD' }
+        where: { nome: status.nome } // Usar o nome real do status criado
       });
       expect(statusEncontrado).toBeDefined();
       expect(statusEncontrado.id).toBe(status.id);

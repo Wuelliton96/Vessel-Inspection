@@ -214,9 +214,27 @@ describe('Rotas de Laudos', () => {
 
   describe('DELETE /api/laudos/:id', () => {
     it('deve deletar laudo (admin)', async () => {
+      // Criar uma nova vistoria concluída para este teste (vistoria_id é unique)
+      const embarcacao2 = await Embarcacao.create({
+        nome: 'Embarcação Teste Delete',
+        nr_inscricao_barco: `EMB-DEL-${Date.now()}`
+      });
+
+      const statusConcluida2 = await StatusVistoria.findOne({ where: { nome: 'CONCLUIDA' } });
+      const vistoriaConcluida2 = await Vistoria.create({
+        embarcacao_id: embarcacao2.id,
+        local_id: vistoriaConcluida.local_id,
+        vistoriador_id: vistoriador.id,
+        administrador_id: admin.id,
+        status_id: statusConcluida2.id,
+        data_conclusao: new Date()
+      });
+
+      // Usar timestamp para garantir número único
+      const numeroUnico = `TEMP${Date.now()}`;
       const laudo = await Laudo.create({
-        vistoria_id: vistoriaConcluida.id,
-        numero_laudo: 'TEMP005'
+        vistoria_id: vistoriaConcluida2.id,
+        numero_laudo: numeroUnico
       });
 
       const response = await request(app)

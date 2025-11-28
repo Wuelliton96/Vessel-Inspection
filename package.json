@@ -6,7 +6,6 @@
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend-react && npm run dev",
-    "dev:frontend-vue": "cd frontend && npm run dev",
     "build": "cd frontend-react && npm run build",
     "test": "cd backend && npm test",
     "test:coverage": "cd backend && npm run test:coverage",

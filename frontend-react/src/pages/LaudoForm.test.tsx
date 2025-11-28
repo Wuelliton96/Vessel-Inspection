@@ -4,8 +4,15 @@ import { BrowserRouter } from 'react-router-dom';
 import LaudoForm from './LaudoForm';
 import { laudoService } from '../services/api';
 
-// Mock react-router-dom usando o arquivo de mock
-jest.mock('react-router-dom', () => require('../__mocks__/react-router-dom'));
+// Mock react-router-dom inline para evitar loops
+const mockNavigate = jest.fn();
+const mockUseParams = jest.fn<{ vistoriaId?: string; id?: string }, []>(() => ({ vistoriaId: '1' }));
+jest.mock('react-router-dom', () => ({
+  BrowserRouter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  useNavigate: () => mockNavigate,
+  useParams: () => mockUseParams(),
+  Link: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a>,
+}));
 
 jest.mock('../services/api', () => ({
   laudoService: {
@@ -133,7 +140,6 @@ describe('Página LaudoForm', () => {
   });
 
   it('deve carregar laudo existente ao editar', async () => {
-    const { mockUseParams } = require('../__mocks__/react-router-dom');
     const mockLaudo = {
       id: 1,
       numero_laudo: '251111A',
@@ -143,7 +149,7 @@ describe('Página LaudoForm', () => {
     };
 
     (laudoService.buscarPorId as jest.Mock).mockResolvedValue(mockLaudo);
-    (mockUseParams as jest.Mock).mockReturnValue({ id: '1', vistoriaId: undefined });
+    mockUseParams.mockReturnValue({ id: '1' });
 
     render(
       <BrowserRouter>

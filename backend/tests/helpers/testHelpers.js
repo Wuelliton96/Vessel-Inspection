@@ -311,6 +311,13 @@ const createTestStatusVistoria = async (overrides = {}) => {
   };
 
   const statusData = { ...defaultData, ...overrides };
+  
+  // Verificar se o status já existe antes de criar
+  const statusExistente = await StatusVistoria.findOne({ where: { nome: statusData.nome } });
+  if (statusExistente) {
+    return statusExistente;
+  }
+  
   return await StatusVistoria.create(statusData);
 };
 
@@ -390,42 +397,137 @@ const mockRequestData = {
  * Setup básico do ambiente de teste (sequelize sync + níveis de acesso)
  */
 const setupTestEnvironment = async () => {
+  // Garantir que a sincronização global foi executada
+  if (global.syncTestDatabase) {
+    try {
+      await global.syncTestDatabase();
+    } catch (error) {
+      console.warn('[testHelpers] Erro ao aguardar sincronização global:', error.message);
+    }
+  }
+  
   try {
-    // Tentar sincronizar com force: true
-    // Se falhar, tentar sem force (pode ser que as tabelas já existam)
+    // Garantir que a conexão está estabelecida
+    await sequelize.authenticate();
+    
+    // Sempre tentar sincronizar para garantir que as tabelas existem
     try {
       await sequelize.sync({ force: true });
+      await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (syncError) {
-      // Se falhar, tentar apenas sincronizar sem dropar
+      // Se force falhar, tentar alter
       try {
-        await sequelize.sync({ alter: false });
-      } catch (altError) {
-        // Se ainda falhar, apenas continuar (tabelas podem já estar criadas)
-        console.warn('[testHelpers] Aviso ao sincronizar banco:', altError.message);
+        await sequelize.sync({ alter: true });
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (alterError) {
+        // Se alter também falhar, tentar sync simples
+        try {
+          await sequelize.sync();
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (simpleError) {
+          console.warn('[testHelpers] Aviso: Erro na sincronização, mas continuando:', simpleError.message);
+        }
       }
     }
   } catch (error) {
-    // Se tudo falhar, apenas logar e continuar
-    console.warn('[testHelpers] Erro ao sincronizar banco, continuando:', error.message);
+    console.warn('[testHelpers] Erro ao verificar banco:', error.message);
+    // Tentar sincronizar mesmo com erro
+    try {
+      await sequelize.sync({ force: true });
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (syncError) {
+      console.warn('[testHelpers] Erro na sincronização de fallback:', syncError.message);
+    }
   }
   
-  // Verificar se os níveis já existem, se não, criar
-  let nivelAdmin = await NivelAcesso.findByPk(1);
-  if (!nivelAdmin) {
-    nivelAdmin = await NivelAcesso.create({ 
-      id: 1, 
-      nome: 'ADMINISTRADOR', 
-      descricao: 'Admin' 
+  // Aguardar um pouco para garantir que as tabelas foram criadas
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  // Usar findOrCreate para garantir que os níveis existam
+  let nivelAdmin;
+  try {
+    [nivelAdmin] = await NivelAcesso.findOrCreate({
+      where: { id: 1 },
+      defaults: { 
+        id: 1,
+        nome: 'ADMINISTRADOR', 
+        descricao: 'Admin' 
+      }
     });
+  } catch (error) {
+    // Se findOrCreate falhar, tentar buscar
+    try {
+      nivelAdmin = await NivelAcesso.findByPk(1);
+      if (!nivelAdmin) {
+        // Se não existir, criar
+        nivelAdmin = await NivelAcesso.create({ 
+          id: 1, 
+          nome: 'ADMINISTRADOR', 
+          descricao: 'Admin' 
+        });
+      }
+    } catch (createError) {
+      // Se o erro for porque a tabela não existe, tentar sincronizar novamente
+      if (createError.message.includes('não existe') || createError.message.includes('does not exist') || createError.message.includes('relation')) {
+        console.log('[testHelpers] Tabela não existe, tentando sincronizar novamente...');
+        try {
+          await sequelize.sync({ force: true });
+          await new Promise(resolve => setTimeout(resolve, 500));
+          nivelAdmin = await NivelAcesso.create({ 
+            id: 1, 
+            nome: 'ADMINISTRADOR', 
+            descricao: 'Admin' 
+          });
+        } catch (retryError) {
+          throw new Error(`Não foi possível criar nível ADMINISTRADOR após sincronização: ${retryError.message}`);
+        }
+      } else {
+        throw new Error(`Não foi possível criar ou encontrar nível ADMINISTRADOR: ${createError.message}`);
+      }
+    }
   }
   
-  let nivelVistoriador = await NivelAcesso.findByPk(2);
-  if (!nivelVistoriador) {
-    nivelVistoriador = await NivelAcesso.create({ 
-      id: 2, 
-      nome: 'VISTORIADOR', 
-      descricao: 'Vistoriador' 
+  let nivelVistoriador;
+  try {
+    [nivelVistoriador] = await NivelAcesso.findOrCreate({
+      where: { id: 2 },
+      defaults: { 
+        id: 2,
+        nome: 'VISTORIADOR', 
+        descricao: 'Vistoriador' 
+      }
     });
+  } catch (error) {
+    // Se findOrCreate falhar, tentar buscar
+    try {
+      nivelVistoriador = await NivelAcesso.findByPk(2);
+      if (!nivelVistoriador) {
+        // Se não existir, criar
+        nivelVistoriador = await NivelAcesso.create({ 
+          id: 2, 
+          nome: 'VISTORIADOR', 
+          descricao: 'Vistoriador' 
+        });
+      }
+    } catch (createError) {
+      // Se o erro for porque a tabela não existe, tentar sincronizar novamente
+      if (createError.message.includes('não existe') || createError.message.includes('does not exist') || createError.message.includes('relation')) {
+        console.log('[testHelpers] Tabela não existe, tentando sincronizar novamente...');
+        try {
+          await sequelize.sync({ force: true });
+          await new Promise(resolve => setTimeout(resolve, 500));
+          nivelVistoriador = await NivelAcesso.create({ 
+            id: 2, 
+            nome: 'VISTORIADOR', 
+            descricao: 'Vistoriador' 
+          });
+        } catch (retryError) {
+          throw new Error(`Não foi possível criar nível VISTORIADOR após sincronização: ${retryError.message}`);
+        }
+      } else {
+        throw new Error(`Não foi possível criar ou encontrar nível VISTORIADOR: ${createError.message}`);
+      }
+    }
   }
   
   return { nivelAdmin, nivelVistoriador };
@@ -436,29 +538,49 @@ const setupTestEnvironment = async () => {
  * Garante que sempre tenha exatamente 11 dígitos numéricos
  */
 const generateTestCPF = (suffix = '') => {
-  const base = '123456789';
-  let uniquePart;
+  // Gerar 9 primeiros dígitos baseados no suffix
+  let base = '';
   if (suffix !== '' && suffix !== null && suffix !== undefined) {
-    // Extrair apenas dígitos do suffix e pegar últimos 2
     const suffixStr = String(suffix).replace(/\D/g, '');
     if (suffixStr.length > 0) {
-      uniquePart = suffixStr.slice(-2).padStart(2, '0');
+      base = suffixStr.slice(-9).padStart(9, '0');
     } else {
-      // Se não houver dígitos, usar hash do suffix
       let hash = 0;
       for (let i = 0; i < String(suffix).length; i++) {
         hash = ((hash << 5) - hash) + String(suffix).charCodeAt(i);
-        hash = hash & hash; // Convert to 32bit integer
+        hash = hash & hash;
       }
-      uniquePart = String(Math.abs(hash)).slice(-2).padStart(2, '0');
+      base = String(Math.abs(hash)).padStart(9, '0').slice(-9);
     }
   } else {
-    // Usar últimos 2 dígitos do timestamp
-    uniquePart = String(Date.now()).slice(-2).padStart(2, '0');
+    base = String(Date.now()).slice(-9).padStart(9, '0');
   }
-  const cpf = `${base}${uniquePart}`;
-  // Garantir exatamente 11 dígitos numéricos
-  return cpf.length === 11 && /^\d{11}$/.test(cpf) ? cpf : '12345678900';
+  
+  // Garantir que não seja todos os dígitos iguais
+  if (/^(\d)\1{8}$/.test(base)) {
+    base = '123456789';
+  }
+  
+  // Calcular primeiro dígito verificador
+  let soma = 0;
+  for (let i = 0; i < 9; i++) {
+    soma += parseInt(base.charAt(i)) * (10 - i);
+  }
+  let resto = (soma * 10) % 11;
+  if (resto === 10 || resto === 11) resto = 0;
+  const digito1 = resto;
+  
+  // Calcular segundo dígito verificador
+  soma = 0;
+  for (let i = 0; i < 9; i++) {
+    soma += parseInt(base.charAt(i)) * (11 - i);
+  }
+  soma += digito1 * 2;
+  resto = (soma * 10) % 11;
+  if (resto === 10 || resto === 11) resto = 0;
+  const digito2 = resto;
+  
+  return base + digito1 + digito2;
 };
 
 // Contador global para garantir CPFs únicos entre testes
@@ -483,21 +605,110 @@ const createTestUsers = async (senhaHash, nivelAdmin, nivelVistoriador, suffix =
     vistoriadorCPF = `123456789${String(vistCPFNum).padStart(2, '0')}`;
   }
   
-  const admin = await Usuario.create({
-    cpf: adminCPF,
-    nome: 'Admin',
-    email: `admin${suffix}@test${timestamp}.com`,
-    senha_hash: senhaHash,
-    nivel_acesso_id: nivelAdmin.id
-  });
+  let admin, vistoriador;
   
-  const vistoriador = await Usuario.create({
-    cpf: vistoriadorCPF,
-    nome: 'Vistoriador',
-    email: `vist${suffix}@test${timestamp}.com`,
-    senha_hash: senhaHash,
-    nivel_acesso_id: nivelVistoriador.id
-  });
+  // Tentar criar usuário com retry
+  let adminCreated = false;
+  let retries = 0;
+  const maxRetries = 3;
+  
+  while (!adminCreated && retries < maxRetries) {
+    try {
+      admin = await Usuario.create({
+        cpf: adminCPF,
+        nome: 'Admin',
+        email: `admin${suffix}@test${timestamp}.com`,
+        senha_hash: senhaHash,
+        nivel_acesso_id: nivelAdmin.id
+      });
+      adminCreated = true;
+    } catch (error) {
+      const errorMessage = error.message || String(error);
+      const errorName = error.name || '';
+      
+      // Se for erro de tabela ou qualquer erro do Sequelize, tentar sincronizar
+      if (errorMessage.includes('não existe') || 
+          errorMessage.includes('does not exist') || 
+          errorMessage.includes('relation') ||
+          errorMessage.includes('cache lookup failed') ||
+          errorName.includes('Sequelize') ||
+          errorName.includes('Database')) {
+        
+        console.log(`[testHelpers] Erro ao criar admin (tentativa ${retries + 1}/${maxRetries}): ${errorName} - ${errorMessage.substring(0, 100)}`);
+        
+        if (retries < maxRetries - 1) {
+          try {
+            await sequelize.sync({ force: true });
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            // Recriar níveis de acesso após sincronização
+            const { nivelAdmin: newNivelAdmin, nivelVistoriador: newNivelVistoriador } = await setupTestEnvironment();
+            nivelAdmin = newNivelAdmin;
+            nivelVistoriador = newNivelVistoriador;
+          } catch (syncError) {
+            console.warn(`[testHelpers] Erro na sincronização: ${syncError.message}`);
+          }
+          retries++;
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } else {
+          throw new Error(`Não foi possível criar usuário admin após ${maxRetries} tentativas: ${errorName} - ${errorMessage}`);
+        }
+      } else {
+        // Erro não relacionado a tabela, lançar imediatamente
+        throw error;
+      }
+    }
+  }
+  
+  // Tentar criar vistoriador com retry
+  let vistoriadorCreated = false;
+  retries = 0;
+  
+  while (!vistoriadorCreated && retries < maxRetries) {
+    try {
+      vistoriador = await Usuario.create({
+        cpf: vistoriadorCPF,
+        nome: 'Vistoriador',
+        email: `vist${suffix}@test${timestamp}.com`,
+        senha_hash: senhaHash,
+        nivel_acesso_id: nivelVistoriador.id
+      });
+      vistoriadorCreated = true;
+    } catch (error) {
+      const errorMessage = error.message || String(error);
+      const errorName = error.name || '';
+      
+      // Se for erro de tabela ou qualquer erro do Sequelize, tentar sincronizar
+      if (errorMessage.includes('não existe') || 
+          errorMessage.includes('does not exist') || 
+          errorMessage.includes('relation') ||
+          errorMessage.includes('cache lookup failed') ||
+          errorName.includes('Sequelize') ||
+          errorName.includes('Database')) {
+        
+        console.log(`[testHelpers] Erro ao criar vistoriador (tentativa ${retries + 1}/${maxRetries}): ${errorName} - ${errorMessage.substring(0, 100)}`);
+        
+        if (retries < maxRetries - 1) {
+          try {
+            await sequelize.sync({ force: true });
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            // Recriar níveis de acesso após sincronização
+            const { nivelAdmin: newNivelAdmin, nivelVistoriador: newNivelVistoriador } = await setupTestEnvironment();
+            nivelAdmin = newNivelAdmin;
+            nivelVistoriador = newNivelVistoriador;
+          } catch (syncError) {
+            console.warn(`[testHelpers] Erro na sincronização: ${syncError.message}`);
+          }
+          retries++;
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } else {
+          throw new Error(`Não foi possível criar usuário vistoriador após ${maxRetries} tentativas: ${errorName} - ${errorMessage}`);
+        }
+      } else {
+        // Erro não relacionado a tabela, lançar imediatamente
+        throw error;
+      }
+    }
+  }
   
   return { admin, vistoriador };
 };

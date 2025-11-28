@@ -4,8 +4,13 @@ import { BrowserRouter } from 'react-router-dom';
 import Laudos from './Laudos';
 import { laudoService, vistoriaService } from '../services/api';
 
-// Mock react-router-dom usando o arquivo de mock
-jest.mock('react-router-dom', () => require('../__mocks__/react-router-dom'));
+// Mock react-router-dom inline para evitar loops
+const mockNavigate = jest.fn();
+jest.mock('react-router-dom', () => ({
+  BrowserRouter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  useNavigate: () => mockNavigate,
+  Link: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a>,
+}));
 
 jest.mock('../services/api', () => ({
   laudoService: {
