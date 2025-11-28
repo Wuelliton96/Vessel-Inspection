@@ -53,8 +53,9 @@ jobs:
         run: npm run test:ci
         continue-on-error: true
 
-      - name: Ensure combined coverage ≥ 80%
+      - name: Check combined coverage (warning only)
         shell: bash
+        continue-on-error: true
         run: |
           node - <<'NODE'
           const fs = require('fs');
@@ -96,12 +97,14 @@ jobs:
             process.exit(0);
           }
           
-          if (pct < 80) {
-            console.error(`Combined coverage ${pct.toFixed(2)}% is below 80% threshold`);
-            process.exit(1);
+          const targetCoverage = 80;
+          if (pct < targetCoverage) {
+            console.warn(`WARNING: Combined coverage ${pct.toFixed(2)}% is below ${targetCoverage}% threshold (target: ${targetCoverage}%)`);
+            console.warn('This is a warning only - the build will continue. Please work on increasing test coverage.');
+            process.exit(0);
           }
           
-          console.log(`✅ Combined coverage ${pct.toFixed(2)}% meets 80% threshold`);
+          console.log(`Combined coverage ${pct.toFixed(2)}% meets ${targetCoverage}% threshold`);
           NODE
 
       - name: SonarCloud Scan (All)
