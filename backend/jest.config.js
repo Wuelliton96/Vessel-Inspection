@@ -20,6 +20,18 @@ module.exports = {
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/tests/',
+    '/coverage/',
+    '/logs/',
+    '/uploads/',
+    '/migrations/',
+    '/scripts/',
+    'jest.config.js',
+    'server.js',
+    'newrelic.js'
+  ],
   verbose: true,
   testTimeout: 30000,
   forceExit: true,

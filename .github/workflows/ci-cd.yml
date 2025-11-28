@@ -123,8 +123,12 @@ jobs:
             # Converter barras invertidas para barras normais
             sed -i 's#\\#/#g' backend/coverage/lcov.info
             # Garantir caminhos relativos começando com backend/
+            # Se o caminho já contém backend/, normalizar
             sed -i 's#SF:.*/backend/#SF:backend/#g' backend/coverage/lcov.info
-            sed -i 's#^SF:backend/#SF:backend/#g' backend/coverage/lcov.info
+            # Se o caminho não começa com backend/, adicionar o prefixo
+            sed -i 's#^SF:\([^/].*\)#SF:backend/\1#g' backend/coverage/lcov.info
+            # Garantir que caminhos que já começam com backend/ permaneçam corretos
+            sed -i 's#^SF:backend/backend/#SF:backend/#g' backend/coverage/lcov.info
             echo "Backend LCOV normalizado"
           fi
           
