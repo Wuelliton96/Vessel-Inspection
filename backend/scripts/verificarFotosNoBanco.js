@@ -7,7 +7,7 @@ async function verificarFotos() {
   
   try {
     await sequelize.authenticate();
-    console.log('✓ Conexão com banco estabelecida\n');
+    console.log('[OK] Conexão com banco estabelecida\n');
     
     // 1. Contar total de fotos
     const totalFotos = await Foto.count();
@@ -25,7 +25,7 @@ async function verificarFotos() {
     });
     
     if (ultimasFotos.length === 0) {
-      console.log('  ⚠ Nenhuma foto encontrada no banco\n');
+      console.log('  [AVISO] Nenhuma foto encontrada no banco\n');
     } else {
       ultimasFotos.forEach((foto, index) => {
         console.log(`  ${index + 1}. Foto ID: ${foto.id}`);

@@ -30,7 +30,7 @@ function perguntar(questao) {
 
 async function recuperarUsuariosEmMassa(dataInicio, dataFim) {
   try {
-    console.log('\n🔍 Buscando usuários deletados...\n');
+    console.log('\n[PROCURANDO] Buscando usuários deletados...\n');
 
     // Construir filtro de data
     const where = {

@@ -7,7 +7,7 @@ async function testFotoAndChecklist() {
   
   try {
     await sequelize.authenticate();
-    console.log('✓ Conexão com banco estabelecida\n');
+    console.log('[OK] Conexão com banco estabelecida\n');
     
     // 1. Buscar uma vistoria com checklist
     const vistoria = await Vistoria.findOne({
@@ -20,21 +20,21 @@ async function testFotoAndChecklist() {
     });
     
     if (!vistoria) {
-      console.log('⚠ Nenhuma vistoria encontrada.');
+      console.log('[AVISO] Nenhuma vistoria encontrada.');
       return;
     }
     
-    console.log(`✓ Vistoria encontrada: ID ${vistoria.id}`);
-    console.log(`✓ Itens de checklist: ${vistoria.checklistItens?.length || 0}\n`);
+    console.log(`[OK] Vistoria encontrada: ID ${vistoria.id}`);
+    console.log(`[OK] Itens de checklist: ${vistoria.checklistItens?.length || 0}\n`);
     
     // 2. Buscar um tipo de foto
     const tipoFoto = await TipoFotoChecklist.findOne();
     if (!tipoFoto) {
-      console.log('⚠ Nenhum tipo de foto encontrado.');
+      console.log('[AVISO] Nenhum tipo de foto encontrado.');
       return;
     }
     
-    console.log(`✓ Tipo de foto: ${tipoFoto.nome_exibicao} (ID: ${tipoFoto.id})\n`);
+    console.log(`[OK] Tipo de foto: ${tipoFoto.nome_exibicao} (ID: ${tipoFoto.id})\n`);
     
     // 3. Buscar item de checklist pendente
     const checklistItem = await VistoriaChecklistItem.findOne({
@@ -45,11 +45,11 @@ async function testFotoAndChecklist() {
     });
     
     if (!checklistItem) {
-      console.log('⚠ Nenhum item de checklist pendente encontrado.');
+      console.log('[AVISO] Nenhum item de checklist pendente encontrado.');
       return;
     }
     
-    console.log(`✓ Item de checklist: "${checklistItem.nome}" (ID: ${checklistItem.id})`);
+    console.log(`[OK] Item de checklist: "${checklistItem.nome}" (ID: ${checklistItem.id})`);
     console.log(`  - Status: ${checklistItem.status}`);
     console.log(`  - Foto ID: ${checklistItem.foto_id || 'null'}\n`);
     
@@ -61,7 +61,7 @@ async function testFotoAndChecklist() {
       observacao: 'Foto de teste - será deletada'
     });
     
-    console.log(`✓ Foto criada: ID ${fotoTest.id}`);
+    console.log(`[OK] Foto criada: ID ${fotoTest.id}`);
     console.log(`  - url_arquivo: ${fotoTest.url_arquivo}`);
     console.log(`  - vistoria_id: ${fotoTest.vistoria_id}`);
     console.log(`  - tipo_foto_id: ${fotoTest.tipo_foto_id}\n`);
@@ -85,9 +85,9 @@ async function testFotoAndChecklist() {
     });
     
     if (itemEncontrado) {
-      console.log(`✓ Item encontrado por busca exata: "${itemEncontrado.nome}"`);
+      console.log(`[OK] Item encontrado por busca exata: "${itemEncontrado.nome}"`);
     } else {
-      console.log('⚠ Item não encontrado por busca exata. Tentando busca parcial...');
+      console.log('[AVISO] Item não encontrado por busca exata. Tentando busca parcial...');
       
       const todosItens = await VistoriaChecklistItem.findAll({
         where: {
@@ -144,7 +144,7 @@ async function testFotoAndChecklist() {
         });
         
         if (itemEncontrado) {
-          console.log(`✓ Item encontrado por palavra-chave: "${itemEncontrado.nome}"`);
+          console.log(`[OK] Item encontrado por palavra-chave: "${itemEncontrado.nome}"`);
         }
       }
       
@@ -173,12 +173,12 @@ async function testFotoAndChecklist() {
         });
         
         if (itemEncontrado) {
-          console.log(`✓ Item encontrado por busca parcial: "${itemEncontrado.nome}"`);
+          console.log(`[OK] Item encontrado por busca parcial: "${itemEncontrado.nome}"`);
         }
       }
       
       if (itemEncontrado) {
-        console.log(`✓ Item encontrado por busca parcial: "${itemEncontrado.nome}"`);
+        console.log(`[OK] Item encontrado por busca parcial: "${itemEncontrado.nome}"`);
       } else {
         console.log(`✗ Nenhum item encontrado para "${nomeTipoFoto}"`);
       }
@@ -194,13 +194,13 @@ async function testFotoAndChecklist() {
         concluido_em: new Date()
       });
       
-      console.log(`✓ Item "${itemEncontrado.nome}" atualizado`);
+      console.log(`[OK] Item "${itemEncontrado.nome}" atualizado`);
       console.log(`  - Status: CONCLUIDO`);
       console.log(`  - Foto ID: ${fotoTest.id}`);
       
       // Verificar atualização
       const itemAtualizado = await VistoriaChecklistItem.findByPk(itemEncontrado.id);
-      console.log(`✓ Verificação no banco:`);
+      console.log(`[OK] Verificação no banco:`);
       console.log(`  - Status: ${itemAtualizado.status}`);
       console.log(`  - Foto ID: ${itemAtualizado.foto_id}`);
       console.log(`  - Concluído em: ${itemAtualizado.concluido_em}`);
@@ -216,7 +216,7 @@ async function testFotoAndChecklist() {
     });
     
     if (fotoNoBanco) {
-      console.log(`✓ Foto encontrada no banco: ID ${fotoNoBanco.id}`);
+      console.log(`[OK] Foto encontrada no banco: ID ${fotoNoBanco.id}`);
       console.log(`  - url_arquivo: ${fotoNoBanco.url_arquivo}`);
       console.log(`  - vistoria_id: ${fotoNoBanco.vistoria_id}`);
       console.log(`  - tipo_foto_id: ${fotoNoBanco.tipo_foto_id}`);
@@ -232,14 +232,14 @@ async function testFotoAndChecklist() {
         foto_id: null,
         concluido_em: null
       });
-      console.log('✓ Checklist revertido');
+      console.log('[OK] Checklist revertido');
     }
     
     await fotoTest.destroy();
-    console.log('✓ Foto deletada');
+    console.log('[OK] Foto deletada');
     
     console.log('\n========================================');
-    console.log('✓ TODOS OS TESTES CONCLUÍDOS COM SUCESSO!');
+    console.log('[OK] TODOS OS TESTES CONCLUÍDOS COM SUCESSO!');
     console.log('========================================\n');
     
   } catch (error) {

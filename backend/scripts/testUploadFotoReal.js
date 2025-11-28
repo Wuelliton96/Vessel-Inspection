@@ -18,10 +18,10 @@ async function testUploadFotoReal() {
     console.log('1. Verificando se o backend está rodando...');
     try {
       const healthCheck = await axios.get(`${API_BASE_URL}/health`, { timeout: 5000 });
-      console.log('✓ Backend está rodando\n');
+      console.log('[OK] Backend está rodando\n');
     } catch (error) {
       if (error.code === 'ECONNREFUSED') {
-        console.error('✗ Backend não está rodando. Por favor, inicie o servidor com: npm run dev\n');
+        console.error('[ERRO] Backend não está rodando. Por favor, inicie o servidor com: npm run dev\n');
         process.exit(1);
       }
       throw error;
@@ -40,12 +40,12 @@ async function testUploadFotoReal() {
     });
     
     if (!vistoria) {
-      console.error('✗ Nenhuma vistoria encontrada no banco.');
+      console.error('[ERRO] Nenhuma vistoria encontrada no banco.');
       process.exit(1);
     }
     
-    console.log(`✓ Vistoria encontrada: ID ${vistoria.id}`);
-    console.log(`✓ Itens de checklist pendentes: ${vistoria.checklistItens?.length || 0}\n`);
+    console.log(`[OK] Vistoria encontrada: ID ${vistoria.id}`);
+    console.log(`[OK] Itens de checklist pendentes: ${vistoria.checklistItens?.length || 0}\n`);
     
     // 3. Buscar token de autenticação (usar um usuário de teste)
     console.log('3. Buscando usuário de teste no banco...');
@@ -56,12 +56,12 @@ async function testUploadFotoReal() {
     });
     
     if (!usuario) {
-      console.error('✗ Nenhum usuário ativo encontrado no banco.');
+      console.error('[ERRO] Nenhum usuário ativo encontrado no banco.');
       process.exit(1);
     }
     
-    console.log(`✓ Usuário encontrado: ${usuario.nome} (CPF: ${usuario.cpf})`);
-    console.log('⚠ Para testar o upload, você precisa fazer login manualmente.');
+    console.log(`[OK] Usuário encontrado: ${usuario.nome} (CPF: ${usuario.cpf})`);
+    console.log('[AVISO] Para testar o upload, você precisa fazer login manualmente.');
     console.log('   Após fazer login no frontend, você pode testar o upload pela interface.\n');
     console.log('   Ou forneça um token JWT válido via variável de ambiente TOKEN\n');
     
@@ -85,7 +85,7 @@ async function testUploadFotoReal() {
             
             token = loginResponse.data.token;
             loginSucesso = true;
-            console.log('✓ Login realizado com sucesso\n');
+            console.log('[OK] Login realizado com sucesso\n');
             break;
           } catch (loginError) {
             // Continuar tentando
@@ -93,18 +93,18 @@ async function testUploadFotoReal() {
         }
         
         if (!loginSucesso) {
-          console.error('✗ Não foi possível fazer login automaticamente.');
+          console.error('[ERRO] Não foi possível fazer login automaticamente.');
           console.log('   Por favor, faça login manualmente e teste o upload pelo frontend.\n');
           console.log('   Ou defina a variável de ambiente TOKEN com um token JWT válido:\n');
           console.log('   TOKEN=seu_token_aqui node backend/scripts/testUploadFotoReal.js\n');
           process.exit(1);
         }
       } catch (error) {
-        console.error('✗ Erro ao fazer login:', error.response?.data || error.message);
+        console.error('[ERRO] Erro ao fazer login:', error.response?.data || error.message);
         process.exit(1);
       }
     } else {
-      console.log('✓ Token fornecido via variável de ambiente\n');
+      console.log('[OK] Token fornecido via variável de ambiente\n');
     }
     
     // 4. Buscar tipos de foto disponíveis
@@ -115,12 +115,12 @@ async function testUploadFotoReal() {
     
     const tiposFoto = tiposResponse.data;
     if (!tiposFoto || tiposFoto.length === 0) {
-      console.error('✗ Nenhum tipo de foto encontrado.');
+      console.error('[ERRO] Nenhum tipo de foto encontrado.');
       process.exit(1);
     }
     
     const tipoFoto = tiposFoto[0];
-    console.log(`✓ Tipo de foto selecionado: ${tipoFoto.nome_exibicao} (ID: ${tipoFoto.id})\n`);
+    console.log(`[OK] Tipo de foto selecionado: ${tipoFoto.nome_exibicao} (ID: ${tipoFoto.id})\n`);
     
     // 5. Criar uma imagem de teste
     console.log('5. Criando imagem de teste...');
@@ -134,7 +134,7 @@ async function testUploadFotoReal() {
     }
     
     fs.writeFileSync(testImagePath, imageBuffer);
-    console.log(`✓ Imagem de teste criada: ${testImagePath}\n`);
+    console.log(`[OK] Imagem de teste criada: ${testImagePath}\n`);
     
     // 6. Preparar FormData para upload
     console.log('6. Preparando upload da foto...');
@@ -164,7 +164,7 @@ async function testUploadFotoReal() {
       });
       
       const fotoCriada = uploadResponse.data;
-      console.log('✓ Upload realizado com sucesso!');
+      console.log('[OK] Upload realizado com sucesso!');
       console.log(`  - Foto ID: ${fotoCriada.id}`);
       console.log(`  - url_arquivo: ${fotoCriada.url_arquivo}`);
       console.log(`  - vistoria_id: ${fotoCriada.vistoria_id}`);
@@ -178,14 +178,14 @@ async function testUploadFotoReal() {
       console.log('8. Verificando foto no banco de dados...');
       const fotoNoBanco = await Foto.findByPk(fotoCriada.id);
       if (fotoNoBanco) {
-        console.log('✓ Foto encontrada no banco');
+        console.log('[OK] Foto encontrada no banco');
         console.log(`  - ID: ${fotoNoBanco.id}`);
         console.log(`  - url_arquivo: ${fotoNoBanco.url_arquivo}`);
         console.log(`  - vistoria_id: ${fotoNoBanco.vistoria_id}`);
         console.log(`  - tipo_foto_id: ${fotoNoBanco.tipo_foto_id}`);
         console.log(`  - created_at: ${fotoNoBanco.created_at}\n`);
       } else {
-        console.error('✗ Foto não encontrada no banco!\n');
+        console.error('[ERRO] Foto não encontrada no banco!\n');
       }
       
       // 9. Verificar se foi salva no S3 (se usando S3)
@@ -200,7 +200,7 @@ async function testUploadFotoReal() {
           });
           
           const getResult = await s3Client.send(getCommand);
-          console.log('✓ Arquivo encontrado no S3');
+          console.log('[OK] Arquivo encontrado no S3');
           console.log(`  - Key: ${s3Key}`);
           console.log(`  - ContentType: ${getResult.ContentType}`);
           console.log(`  - ContentLength: ${getResult.ContentLength} bytes`);
@@ -217,15 +217,15 @@ async function testUploadFotoReal() {
           console.log(`   ${objects.length} arquivo(s) na pasta vistorias/${vistoria.id}/`);
           
         } catch (error) {
-          console.error(`✗ Erro ao verificar arquivo no S3: ${error.message}\n`);
+          console.error(`[ERRO] Erro ao verificar arquivo no S3: ${error.message}\n`);
         }
       } else {
         console.log('9. Modo local - verificar arquivo localmente...');
         const localPath = path.join(__dirname, '../uploads/fotos', `vistoria-${vistoria.id}`, fotoCriada.url_arquivo);
         if (fs.existsSync(localPath)) {
-          console.log(`✓ Arquivo encontrado localmente: ${localPath}\n`);
+          console.log(`[OK] Arquivo encontrado localmente: ${localPath}\n`);
         } else {
-          console.error(`✗ Arquivo não encontrado: ${localPath}\n`);
+          console.error(`[ERRO] Arquivo não encontrado: ${localPath}\n`);
         }
       }
       
@@ -240,40 +240,40 @@ async function testUploadFotoReal() {
       });
       
       if (itensAtualizados.length > 0) {
-        console.log(`✓ ${itensAtualizados.length} item(ns) do checklist vinculado(s) à foto:`);
+        console.log(`[OK] ${itensAtualizados.length} item(ns) do checklist vinculado(s) à foto:`);
         itensAtualizados.forEach(item => {
           console.log(`  - "${item.nome}" (ID: ${item.id})`);
         });
       } else {
-        console.log('⚠ Nenhum item do checklist foi vinculado à foto');
+        console.log('[AVISO] Nenhum item do checklist foi vinculado à foto');
         console.log('  (Isso pode ser normal se não houver correspondência no mapeamento)');
       }
       
       // 11. Limpar arquivo de teste local
       if (fs.existsSync(testImagePath)) {
         fs.unlinkSync(testImagePath);
-        console.log('\n✓ Arquivo de teste local removido');
+        console.log('\n[OK] Arquivo de teste local removido');
       }
       
       console.log('\n========================================');
-      console.log('✓ TESTE CONCLUÍDO COM SUCESSO!');
+      console.log('[OK] TESTE CONCLUÍDO COM SUCESSO!');
       console.log('========================================\n');
       
       console.log('RESUMO:');
-      console.log('- Foto enviada via API ✓');
-      console.log('- Foto salva no banco de dados ✓');
+      console.log('- Foto enviada via API [OK]');
+      console.log('- Foto salva no banco de dados [OK]');
       if (UPLOAD_STRATEGY === 's3') {
-        console.log('- Foto salva no S3 ✓');
-        console.log('- Pasta por vistoria criada ✓');
+        console.log('- Foto salva no S3 [OK]');
+        console.log('- Pasta por vistoria criada [OK]');
       } else {
-        console.log('- Foto salva localmente ✓');
+        console.log('- Foto salva localmente [OK]');
       }
       if (itensAtualizados.length > 0) {
-        console.log('- Checklist vinculado automaticamente ✓');
+        console.log('- Checklist vinculado automaticamente [OK]');
       }
       
     } catch (uploadError) {
-      console.error('✗ Erro ao fazer upload:', uploadError.response?.data || uploadError.message);
+      console.error('[ERRO] Erro ao fazer upload:', uploadError.response?.data || uploadError.message);
       if (uploadError.response?.data) {
         console.error('  Detalhes:', JSON.stringify(uploadError.response.data, null, 2));
       }
@@ -281,7 +281,7 @@ async function testUploadFotoReal() {
     }
     
   } catch (error) {
-    console.error('\n✗ ERRO CRÍTICO:', error.message);
+    console.error('\n[ERRO] ERRO CRÍTICO:', error.message);
     if (error.stack) {
       console.error(error.stack);
     }

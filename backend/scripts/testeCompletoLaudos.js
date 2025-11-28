@@ -60,25 +60,25 @@ const testeCompleto = async () => {
     log('║   TESTE COMPLETO - SISTEMA DE LAUDOS      ║', 'blue');
     log('╚════════════════════════════════════════════╝\n', 'blue');
 
-    log('📋 Iniciando testes...', 'yellow');
+    log('[INFO] Iniciando testes...', 'yellow');
     await wait(1000);
 
     log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'blue');
-    log('1️⃣  AUTENTICAÇÃO', 'bold');
+    log('1.  AUTENTICAÇÃO', 'bold');
     log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n', 'blue');
 
     try {
-      log('🔐 Fazendo login como ADMIN...', 'yellow');
+      log('[AUTENTICANDO] Fazendo login como ADMIN...', 'yellow');
       const loginAdmin = await axios.post(`${API_BASE_URL}/api/auth/login`, {
         email: 'admin@sgvn.com',
         senha: 'admin123'
       });
       adminToken = loginAdmin.data.token;
-      log('✅ Admin autenticado com sucesso!', 'green');
+      log('[OK] Admin autenticado com sucesso!', 'green');
       log(`   Email: admin@sgvn.com`, 'green');
       log(`   Token: ${adminToken.substring(0, 20)}...`, 'green');
     } catch (error) {
-      log('❌ Erro no login admin:', 'red');
+      log('[ERRO] Erro no login admin:', 'red');
       log(`   ${error.response?.data?.error || error.message}`, 'red');
       log('   Execute: node scripts/seedDatabase.js', 'yellow');
       throw error;
@@ -87,28 +87,28 @@ const testeCompleto = async () => {
     await wait(500);
 
     try {
-      log('🔐 Fazendo login como VISTORIADOR...', 'yellow');
+      log('[AUTENTICANDO] Fazendo login como VISTORIADOR...', 'yellow');
       const loginVist = await axios.post(`${API_BASE_URL}/api/auth/login`, {
         email: 'joao.silva@sgvn.com',
         senha: 'senha123'
       });
       vistoriadorToken = loginVist.data.token;
-      log('✅ Vistoriador autenticado com sucesso!', 'green');
+      log('[OK] Vistoriador autenticado com sucesso!', 'green');
       log(`   Email: joao.silva@sgvn.com`, 'green');
     } catch (error) {
-      log('❌ Erro no login vistoriador:', 'red');
+      log('[ERRO] Erro no login vistoriador:', 'red');
       log(`   ${error.response?.data?.error || error.message}`, 'red');
       throw error;
     }
 
     log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'blue');
-    log('2️⃣  CRIAR EMBARCAÇÃO E LOCAL', 'bold');
+    log('2.  CRIAR EMBARCAÇÃO E LOCAL', 'bold');
     log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n', 'blue');
 
     let embarcacaoId, localId;
 
     try {
-      log('🚤 Criando embarcação de teste...', 'yellow');
+      log('[CRIANDO] Criando embarcação de teste...', 'yellow');
       const embarcacao = await axios.post(`${API_BASE_URL}/api/embarcacoes`, {
         nome: 'Sea Doo RXT X 325 - TESTE',
         nr_inscricao_barco: `TESTE-${Date.now()}`,
@@ -124,10 +124,10 @@ const testeCompleto = async () => {
       });
       
       embarcacaoId = embarcacao.data.id;
-      log(`✅ Embarcação criada! ID: ${embarcacaoId}`, 'green');
+      log(`[OK] Embarcação criada! ID: ${embarcacaoId}`, 'green');
       log(`   Nome: ${embarcacao.data.nome}`, 'green');
     } catch (error) {
-      log('❌ Erro ao criar embarcação:', 'red');
+      log('[ERRO] Erro ao criar embarcação:', 'red');
       log(`   ${error.response?.data?.error || error.message}`, 'red');
       throw error;
     }
@@ -135,7 +135,7 @@ const testeCompleto = async () => {
     await wait(500);
 
     try {
-      log('📍 Criando local de teste...', 'yellow');
+      log('[CRIANDO] Criando local de teste...', 'yellow');
       const local = await axios.post(`${API_BASE_URL}/api/locais`, {
         tipo: 'MARINA',
         nome_local: 'Marina Casarini Centro',
@@ -150,19 +150,19 @@ const testeCompleto = async () => {
       });
       
       localId = local.data.id;
-      log(`✅ Local criado! ID: ${localId}`, 'green');
+      log(`[OK] Local criado! ID: ${localId}`, 'green');
       log(`   Nome: ${local.data.nome_local}`, 'green');
     } catch (error) {
-      log('❌ Erro ao criar local:', 'red');
+      log('[ERRO] Erro ao criar local:', 'red');
       throw error;
     }
 
     log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'blue');
-    log('3️⃣  CRIAR VISTORIA', 'bold');
+    log('3.  CRIAR VISTORIA', 'bold');
     log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n', 'blue');
 
     try {
-      log('📝 Criando vistoria de teste...', 'yellow');
+      log('[CRIANDO] Criando vistoria de teste...', 'yellow');
       
       const usuarios = await axios.get(`${API_BASE_URL}/api/usuarios`, {
         headers: { Authorization: `Bearer ${adminToken}` }
@@ -186,20 +186,20 @@ const testeCompleto = async () => {
       });
       
       vistoriaCriada = vistoria.data;
-      log(`✅ Vistoria criada! ID: ${vistoriaCriada.id}`, 'green');
+      log(`[OK] Vistoria criada! ID: ${vistoriaCriada.id}`, 'green');
       log(`   Status: ${vistoriaCriada.StatusVistoria?.nome}`, 'green');
     } catch (error) {
-      log('❌ Erro ao criar vistoria:', 'red');
+      log('[ERRO] Erro ao criar vistoria:', 'red');
       log(`   ${error.response?.data?.error || error.message}`, 'red');
       throw error;
     }
 
     log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'blue');
-    log('4️⃣  MARCAR VISTORIA COMO CONCLUÍDA', 'bold');
+    log('4.  MARCAR VISTORIA COMO CONCLUÍDA', 'bold');
     log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n', 'blue');
 
     try {
-      log('✓ Mudando status para CONCLUÍDA...', 'yellow');
+      log('[OK] Mudando status para CONCLUIDA...', 'yellow');
       
       const { sequelize } = require('../models');
       const { StatusVistoria } = require('../models');
@@ -207,7 +207,7 @@ const testeCompleto = async () => {
       const statusConcluida = await StatusVistoria.findOne({ where: { nome: 'CONCLUIDA' } });
       
       if (!statusConcluida) {
-        log('⚠️  Status CONCLUIDA não existe, criando...', 'yellow');
+        log('[AVISO] Status CONCLUIDA não existe, criando...', 'yellow');
         const novoStatus = await StatusVistoria.create({
           nome: 'CONCLUIDA',
           descricao: 'Vistoria concluída'
@@ -231,16 +231,16 @@ const testeCompleto = async () => {
       );
       
       vistoriaCriada = vistoriaAtualizada.data;
-      log(`✅ Vistoria marcada como CONCLUÍDA!`, 'green');
+      log(`[OK] Vistoria marcada como CONCLUÍDA!`, 'green');
       log(`   Status: ${vistoriaCriada.StatusVistoria?.nome || 'CONCLUIDA'}`, 'green');
     } catch (error) {
-      log('❌ Erro ao atualizar vistoria:', 'red');
+      log('[ERRO] Erro ao atualizar vistoria:', 'red');
       log(`   ${error.response?.data?.error || error.message}`, 'red');
       throw error;
     }
 
     log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'blue');
-    log('5️⃣  CRIAR LAUDO (RASCUNHO)', 'bold');
+    log('5.  CRIAR LAUDO (RASCUNHO)', 'bold');
     log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n', 'blue');
 
     try {
@@ -367,22 +367,22 @@ const testeCompleto = async () => {
       );
       
       laudoCriado = laudo.data;
-      log(`✅ Laudo criado (RASCUNHO)! ID: ${laudoCriado.id}`, 'green');
+      log(`[OK] Laudo criado (RASCUNHO)! ID: ${laudoCriado.id}`, 'green');
       log(`   Número: ${laudoCriado.numero_laudo}`, 'green');
       log(`   Versão: ${laudoCriado.versao}`, 'green');
     } catch (error) {
-      log('❌ Erro ao criar laudo:', 'red');
+      log('[ERRO] Erro ao criar laudo:', 'red');
       log(`   ${error.response?.data?.error || error.message}`, 'red');
       log(`   Detalhes: ${JSON.stringify(error.response?.data)}`, 'red');
       throw error;
     }
 
     log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'blue');
-    log('6️⃣  GERAR PDF DO LAUDO', 'bold');
+    log('6.  GERAR PDF DO LAUDO', 'bold');
     log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n', 'blue');
 
     try {
-      log('🖨️  Gerando PDF...', 'yellow');
+      log('[GERANDO]  Gerando PDF...', 'yellow');
       
       const pdfResponse = await axios.post(
         `${API_BASE_URL}/api/laudos/${laudoCriado.id}/gerar-pdf`,
@@ -392,38 +392,38 @@ const testeCompleto = async () => {
         }
       );
       
-      log(`✅ PDF gerado com sucesso!`, 'green');
+      log(`[OK] PDF gerado com sucesso!`, 'green');
       log(`   URL: ${pdfResponse.data.laudo.url_pdf}`, 'green');
       log(`   Download em: ${pdfResponse.data.downloadUrl}`, 'green');
     } catch (error) {
-      log('❌ Erro ao gerar PDF:', 'red');
+      log('[ERRO] Erro ao gerar PDF:', 'red');
       log(`   ${error.response?.data?.error || error.message}`, 'red');
       throw error;
     }
 
     log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'blue');
-    log('7️⃣  LISTAR LAUDOS', 'bold');
+    log('7.  LISTAR LAUDOS', 'bold');
     log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n', 'blue');
 
     try {
-      log('📋 Listando todos os laudos...', 'yellow');
+      log('[INFO] Listando todos os laudos...', 'yellow');
       
       const laudos = await axios.get(`${API_BASE_URL}/api/laudos`, {
         headers: { Authorization: `Bearer ${adminToken}` }
       });
       
-      log(`✅ ${laudos.data.length} laudo(s) encontrado(s)`, 'green');
+      log(`[OK] ${laudos.data.length} laudo(s) encontrado(s)`, 'green');
       
       laudos.data.forEach((l, index) => {
         log(`   ${index + 1}. ${l.numero_laudo} - Vistoria #${l.vistoria_id} - ${l.url_pdf ? 'PDF Gerado' : 'Rascunho'}`, 'green');
       });
     } catch (error) {
-      log('❌ Erro ao listar laudos:', 'red');
+      log('[ERRO] Erro ao listar laudos:', 'red');
       throw error;
     }
 
     log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'blue');
-    log('8️⃣  BUSCAR LAUDO ESPECÍFICO', 'bold');
+    log('8.  BUSCAR LAUDO ESPECÍFICO', 'bold');
     log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n', 'blue');
 
     try {
@@ -433,22 +433,22 @@ const testeCompleto = async () => {
         headers: { Authorization: `Bearer ${adminToken}` }
       });
       
-      log(`✅ Laudo encontrado!`, 'green');
+      log(`[OK] Laudo encontrado!`, 'green');
       log(`   Número: ${laudo.data.numero_laudo}`, 'green');
       log(`   Proprietário: ${laudo.data.proprietario}`, 'green');
       log(`   Embarcação: ${laudo.data.nome_moto_aquatica}`, 'green');
       log(`   Valor em Risco: R$ ${parseFloat(laudo.data.valor_risco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'green');
     } catch (error) {
-      log('❌ Erro ao buscar laudo:', 'red');
+      log('[ERRO] Erro ao buscar laudo:', 'red');
       throw error;
     }
 
     log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'blue');
-    log('9️⃣  ATUALIZAR LAUDO', 'bold');
+    log('9.  ATUALIZAR LAUDO', 'bold');
     log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n', 'blue');
 
     try {
-      log('✏️  Atualizando campo de observações...', 'yellow');
+      log('[ATUALIZANDO]  Atualizando campo de observações...', 'yellow');
       
       const laudoAtualizado = await axios.put(
         `${API_BASE_URL}/api/laudos/${laudoCriado.id}`,
@@ -460,10 +460,10 @@ const testeCompleto = async () => {
         }
       );
       
-      log(`✅ Laudo atualizado!`, 'green');
+      log(`[OK] Laudo atualizado!`, 'green');
       log(`   Nova observação: ${laudoAtualizado.data.observacoes_vistoria}`, 'green');
     } catch (error) {
-      log('❌ Erro ao atualizar laudo:', 'red');
+      log('[ERRO] Erro ao atualizar laudo:', 'red');
       throw error;
     }
 
@@ -483,38 +483,38 @@ const testeCompleto = async () => {
         
         if (fs.existsSync(pdfPath)) {
           const stats = fs.statSync(pdfPath);
-          log(`✅ PDF encontrado no servidor!`, 'green');
+          log(`[OK] PDF encontrado no servidor!`, 'green');
           log(`   Caminho: ${laudo.data.url_pdf}`, 'green');
           log(`   Tamanho: ${(stats.size / 1024).toFixed(2)} KB`, 'green');
         } else {
-          log(`⚠️  PDF não encontrado no caminho: ${pdfPath}`, 'yellow');
+          log(`[AVISO]  PDF não encontrado no caminho: ${pdfPath}`, 'yellow');
         }
       } else {
-        log(`⚠️  URL do PDF não definida`, 'yellow');
+        log(`[AVISO]  URL do PDF não definida`, 'yellow');
       }
     } catch (error) {
-      log('❌ Erro ao verificar PDF:', 'red');
+      log('[ERRO] Erro ao verificar PDF:', 'red');
       throw error;
     }
 
     log('\n╔════════════════════════════════════════════╗', 'green');
-    log('║         ✅ TODOS OS TESTES PASSARAM!      ║', 'green');
+    log('║         [OK] TODOS OS TESTES PASSARAM!      ║', 'green');
     log('╚════════════════════════════════════════════╝\n', 'green');
 
     log('📊 RESUMO DOS TESTES:', 'bold');
-    log(`   ✅ Embarcação criada: ID ${embarcacaoId}`, 'green');
-    log(`   ✅ Local criado: ID ${localId}`, 'green');
-    log(`   ✅ Vistoria criada: ID ${vistoriaCriada.id}`, 'green');
-    log(`   ✅ Vistoria concluída`, 'green');
-    log(`   ✅ Laudo criado: ${laudoCriado.numero_laudo}`, 'green');
-    log(`   ✅ PDF gerado com sucesso`, 'green');
-    log(`   ✅ Sistema funcionando perfeitamente!\n`, 'green');
+    log(`   [OK] Embarcação criada: ID ${embarcacaoId}`, 'green');
+    log(`   [OK] Local criado: ID ${localId}`, 'green');
+    log(`   [OK] Vistoria criada: ID ${vistoriaCriada.id}`, 'green');
+    log(`   [OK] Vistoria concluída`, 'green');
+    log(`   [OK] Laudo criado: ${laudoCriado.numero_laudo}`, 'green');
+    log(`   [OK] PDF gerado com sucesso`, 'green');
+    log(`   [OK] Sistema funcionando perfeitamente!\n`, 'green');
 
     log('🎓 SISTEMA PRONTO PARA APRESENTAÇÃO DO TCC!\n', 'bold');
 
   } catch (error) {
     log('\n╔════════════════════════════════════════════╗', 'red');
-    log('║         ❌ ERRO NOS TESTES                ║', 'red');
+    log('║         [ERRO] ERRO NOS TESTES                ║', 'red');
     log('╚════════════════════════════════════════════╝\n', 'red');
     
     log(`Erro: ${error.message}`, 'red');

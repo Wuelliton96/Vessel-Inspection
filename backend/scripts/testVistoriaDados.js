@@ -27,11 +27,11 @@ async function testVistoriaDados() {
     });
 
     if (!vistoria) {
-      console.log('❌ Nenhuma vistoria encontrada');
+      console.log('[ERRO] Nenhuma vistoria encontrada');
       process.exit(1);
     }
 
-    console.log(`✅ Vistoria encontrada: ID ${vistoria.id}\n`);
+    console.log(`[OK] Vistoria encontrada: ID ${vistoria.id}\n`);
 
     // Verificar createdAt
     console.log('=== VERIFICAÇÃO DE DATA DE CRIAÇÃO ===');
@@ -40,7 +40,7 @@ async function testVistoriaDados() {
     
     if (vistoria.createdAt) {
       const data = new Date(vistoria.createdAt);
-      console.log(`✅ Data formatada (createdAt): ${data.toLocaleDateString('pt-BR', { 
+      console.log(`[OK] Data formatada (createdAt): ${data.toLocaleDateString('pt-BR', { 
         day: '2-digit', 
         month: '2-digit', 
         year: 'numeric',
@@ -49,7 +49,7 @@ async function testVistoriaDados() {
       })}`);
     } else if (vistoria.created_at) {
       const data = new Date(vistoria.created_at);
-      console.log(`✅ Data formatada (created_at): ${data.toLocaleDateString('pt-BR', { 
+      console.log(`[OK] Data formatada (created_at): ${data.toLocaleDateString('pt-BR', { 
         day: '2-digit', 
         month: '2-digit', 
         year: 'numeric',
@@ -57,13 +57,13 @@ async function testVistoriaDados() {
         minute: '2-digit'
       })}`);
     } else {
-      console.log('❌ PROBLEMA: Nenhuma data de criação encontrada!');
+      console.log('[ERRO] PROBLEMA: Nenhuma data de criação encontrada!');
     }
 
     // Verificar Local
     console.log('\n=== VERIFICAÇÃO DE LOCAL ===');
     if (vistoria.Local) {
-      console.log('✅ Local encontrado:');
+      console.log('[OK] Local encontrado:');
       console.log(`   ID: ${vistoria.Local.id}`);
       console.log(`   Tipo: ${vistoria.Local.tipo || 'N/A'}`);
       console.log(`   Nome: ${vistoria.Local.nome_local || 'N/A'}`);

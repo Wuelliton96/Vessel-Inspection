@@ -1,5 +1,6 @@
 const request = require('supertest');
 const app = require('../../server');
+const bcrypt = require('bcryptjs');
 const { 
   Usuario, 
   NivelAcesso, 
@@ -10,6 +11,7 @@ const {
   Laudo,
   Cliente
 } = require('../../models');
+const { generateTestCPF } = require('../helpers/testHelpers');
 
 describe('Laudo - Preenchimento Automático', () => {
   let adminToken;
@@ -30,34 +32,40 @@ describe('Laudo - Preenchimento Automático', () => {
       await NivelAcesso.create({ nome: 'VISTORIADOR', descricao: 'Vistoriador' });
 
     // Criar usuário admin
+    const senhaHash = await bcrypt.hash('senha123', 10);
+    const adminCPF = generateTestCPF('laudo_admin');
     adminUser = await Usuario.create({
       nome: 'Admin Teste',
-      cpf: '111.111.111-11',
-      senha: 'senha123',
+      cpf: adminCPF,
+      senha_hash: senhaHash,
       nivel_acesso_id: nivelAdmin.id,
-      ativo: true
+      ativo: true,
+      email: 'admin@laudo.com'
     });
 
     // Criar usuário vistoriador
+    const vistCPF = generateTestCPF('laudo_vist');
     vistoriadorUser = await Usuario.create({
       nome: 'Vistoriador Teste',
-      cpf: '222.222.222-22',
-      senha: 'senha123',
+      cpf: vistCPF,
+      senha_hash: senhaHash,
       nivel_acesso_id: nivelVistoriador.id,
-      ativo: true
+      ativo: true,
+      email: 'vist@laudo.com'
     });
 
     // Login para obter token
     const loginResponse = await request(app)
       .post('/api/auth/login')
-      .send({ cpf: '111.111.111-11', senha: 'senha123' });
+      .send({ cpf: adminCPF, senha: 'senha123' });
     
     adminToken = loginResponse.body.token;
 
     // Criar cliente
+    const clienteCPF = generateTestCPF('laudo_cliente');
     cliente = await Cliente.create({
       nome: 'Cliente Teste',
-      cpf: '333.333.333-33',
+      cpf: clienteCPF,
       endereco: 'Rua Teste, 123, Centro, São Paulo/SP'
     });
 
@@ -66,7 +74,7 @@ describe('Laudo - Preenchimento Automático', () => {
       nome: 'Barco Teste Preenchimento',
       nr_inscricao_barco: 'BR-2024-TEST',
       proprietario_nome: 'João Silva',
-      proprietario_cpf: '444.444.444-44',
+      proprietario_cpf: generateTestCPF('laudo_prop'),
       tipo_embarcacao: 'LANCHA',
       ano_fabricacao: 2020,
       valor_embarcacao: 150000.00,
@@ -84,9 +92,14 @@ describe('Laudo - Preenchimento Automático', () => {
       cep: '20000-000'
     });
 
-    // Criar status concluída
-    statusConcluida = await StatusVistoria.findOne({ where: { nome: 'CONCLUIDA' } }) ||
-      await StatusVistoria.create({ nome: 'CONCLUIDA', descricao: 'Vistoria concluída' });
+    // Criar status concluída com nome único
+    const timestamp = Date.now();
+    const statusNome = `CONCLUIDA_${timestamp}`;
+    const [status, created] = await StatusVistoria.findOrCreate({
+      where: { nome: statusNome },
+      defaults: { nome: statusNome, descricao: 'Vistoria concluída' }
+    });
+    statusConcluida = status;
 
     // Criar vistoria concluída
     vistoria = await Vistoria.create({

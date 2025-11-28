@@ -4,7 +4,7 @@ const { gerarLaudoPDF } = require('../services/laudoService');
 
 async function testarPDF() {
   try {
-    console.log('🧪 Testando geração de PDF diretamente...\n');
+    console.log('[TESTANDO] Testando geração de PDF diretamente...\n');
 
     const laudo = await Laudo.findByPk(4, {
       include: [
@@ -19,12 +19,12 @@ async function testarPDF() {
     });
 
     if (!laudo) {
-      console.log('❌ Laudo ID 3 não encontrado');
+      console.log('[ERRO] Laudo ID 3 não encontrado');
       console.log('   Execute primeiro: node scripts/testeCompletoLaudos.js');
       process.exit(1);
     }
 
-    console.log('✅ Laudo encontrado:', laudo.numero_laudo);
+    console.log('[OK] Laudo encontrado:', laudo.numero_laudo);
     console.log('   Vistoria:', laudo.vistoria_id);
     
     const fotos = await Foto.findAll({
@@ -36,11 +36,11 @@ async function testarPDF() {
 
     console.log(`   Fotos: ${fotos.length}\n`);
 
-    console.log('📄 Gerando PDF...');
+    console.log('[GERANDO] Gerando PDF...');
     
     const resultado = await gerarLaudoPDF(laudo, laudo.Vistoria, fotos);
     
-    console.log('\n✅ PDF gerado com sucesso!');
+    console.log('\n[OK] PDF gerado com sucesso!');
     console.log('   Arquivo:', resultado.filePath);
     console.log('   URL:', resultado.urlRelativa);
     console.log('   Nome:', resultado.fileName);
@@ -48,7 +48,7 @@ async function testarPDF() {
     process.exit(0);
 
   } catch (error) {
-    console.error('\n❌ Erro ao gerar PDF:');
+    console.error('\n[ERRO] Erro ao gerar PDF:');
     console.error('   Mensagem:', error.message);
     console.error('   Stack:', error.stack);
     process.exit(1);

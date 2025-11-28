@@ -3,7 +3,7 @@ const { Vistoria, StatusVistoria } = require('../models');
 
 async function checkVistoriaStatus() {
   try {
-    console.log('🔍 Verificando status das vistorias...\n');
+    console.log('[VERIFICANDO] Verificando status das vistorias...\n');
     
     // Buscar todos os status
     const statusList = await StatusVistoria.findAll({

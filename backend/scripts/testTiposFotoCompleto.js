@@ -17,7 +17,7 @@ async function testTiposFotoCompleto() {
     console.log(`   Total de tipos: ${tipos.length}`);
 
     if (tipos.length === 0) {
-      console.log('   ⚠️  Nenhum tipo encontrado');
+      console.log('   [AVISO] Nenhum tipo encontrado');
     } else {
       console.log('\n   Tipos encontrados:');
       tipos.forEach(tipo => {
@@ -53,9 +53,9 @@ async function testTiposFotoCompleto() {
 
     console.log(`   Tipos retornados: ${tiposDaRota.length}`);
     if (tiposDaRota.length > 0) {
-      console.log('   ✅ Rota funcionando corretamente');
+      console.log('   [OK] Rota funcionando corretamente');
     } else {
-      console.log('   ❌ Rota não retornou tipos');
+      console.log('   [ERRO] Rota não retornou tipos');
     }
 
     // 5. Verificar estrutura dos tipos
@@ -68,24 +68,24 @@ async function testTiposFotoCompleto() {
       console.log(`   - nome_exibicao: ${primeiroTipo.nome_exibicao}`);
       console.log(`   - descricao: ${primeiroTipo.descricao || 'N/A'}`);
       console.log(`   - obrigatorio: ${primeiroTipo.obrigatorio}`);
-      console.log('   ✅ Estrutura correta');
+      console.log('   [OK] Estrutura correta');
     }
 
     console.log('\n=== TESTE CONCLUÍDO ===');
-    console.log('\n✅ RESULTADO:');
+    console.log('\n[RESULTADO]:');
     if (tipos.length > 0) {
-      console.log(`   ✅ Sistema possui ${tipos.length} tipo(s) de foto configurado(s)`);
-      console.log('   ✅ Tipos podem ser retornados pela rota');
-      console.log('   ✅ Frontend pode carregar os tipos');
+      console.log(`   [OK] Sistema possui ${tipos.length} tipo(s) de foto configurado(s)`);
+      console.log('   [OK] Tipos podem ser retornados pela rota');
+      console.log('   [OK] Frontend pode carregar os tipos');
     } else {
-      console.log('   ⚠️  Nenhum tipo de foto encontrado');
-      console.log('   ⚠️  O backend criará automaticamente na próxima requisição');
+      console.log('   [AVISO] Nenhum tipo de foto encontrado');
+      console.log('   [AVISO] O backend criará automaticamente na próxima requisição');
     }
     console.log('');
 
     process.exit(0);
   } catch (error) {
-    console.error('❌ Erro no teste:', error);
+    console.error('[ERRO] Erro no teste:', error);
     process.exit(1);
   }
 }

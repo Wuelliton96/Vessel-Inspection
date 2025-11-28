@@ -15,29 +15,29 @@ async function testUploadFoto() {
     
     console.log('1. VERIFICAÇÃO DE DIRETÓRIOS:');
     console.log(`   Diretório uploads: ${uploadsDir}`);
-    console.log(`   Existe: ${fs.existsSync(uploadsDir) ? '✅ SIM' : '❌ NÃO'}`);
+    console.log(`   Existe: ${fs.existsSync(uploadsDir) ? '[OK] SIM' : '[ERRO] NAO'}`);
     
     console.log(`   Diretório fotos: ${fotosDir}`);
-    console.log(`   Existe: ${fs.existsSync(fotosDir) ? '✅ SIM' : '❌ NÃO'}`);
+    console.log(`   Existe: ${fs.existsSync(fotosDir) ? '[OK] SIM' : '[ERRO] NAO'}`);
 
     // Verificar permissões
     console.log('\n2. VERIFICAÇÃO DE PERMISSÕES:');
     try {
       if (fs.existsSync(uploadsDir)) {
         fs.accessSync(uploadsDir, fs.constants.W_OK);
-        console.log('   ✅ Permissão de escrita no diretório uploads: OK');
+        console.log('   [OK] Permissão de escrita no diretório uploads: OK');
       } else {
-        console.log('   ⚠️  Diretório uploads não existe');
+        console.log('   [AVISO] Diretório uploads não existe');
       }
       
       if (fs.existsSync(fotosDir)) {
         fs.accessSync(fotosDir, fs.constants.W_OK);
-        console.log('   ✅ Permissão de escrita no diretório fotos: OK');
+        console.log('   [OK] Permissão de escrita no diretório fotos: OK');
       } else {
-        console.log('   ⚠️  Diretório fotos não existe');
+        console.log('   [AVISO] Diretório fotos não existe');
       }
     } catch (err) {
-      console.log('   ❌ ERRO de permissão:', err.message);
+      console.log('   [ERRO] ERRO de permissão:', err.message);
     }
 
     // Criar diretórios se não existirem
@@ -45,19 +45,19 @@ async function testUploadFoto() {
     try {
       if (!fs.existsSync(uploadsDir)) {
         fs.mkdirSync(uploadsDir, { recursive: true });
-        console.log('   ✅ Diretório uploads criado');
+        console.log('   [OK] Diretório uploads criado');
       } else {
-        console.log('   ✅ Diretório uploads já existe');
+        console.log('   [OK] Diretório uploads já existe');
       }
       
       if (!fs.existsSync(fotosDir)) {
         fs.mkdirSync(fotosDir, { recursive: true });
-        console.log('   ✅ Diretório fotos criado');
+        console.log('   [OK] Diretório fotos criado');
       } else {
-        console.log('   ✅ Diretório fotos já existe');
+        console.log('   [OK] Diretório fotos já existe');
       }
     } catch (err) {
-      console.log('   ❌ ERRO ao criar diretórios:', err.message);
+      console.log('   [ERRO] ERRO ao criar diretórios:', err.message);
     }
 
     // Testar criação de diretório para uma vistoria específica
@@ -68,18 +68,18 @@ async function testUploadFoto() {
     try {
       if (!fs.existsSync(vistoriaDir)) {
         fs.mkdirSync(vistoriaDir, { recursive: true });
-        console.log(`   ✅ Diretório vistoria-${vistoriaId} criado: ${vistoriaDir}`);
+        console.log(`   [OK] Diretório vistoria-${vistoriaId} criado: ${vistoriaDir}`);
       } else {
-        console.log(`   ✅ Diretório vistoria-${vistoriaId} já existe: ${vistoriaDir}`);
+        console.log(`   [OK] Diretório vistoria-${vistoriaId} já existe: ${vistoriaDir}`);
       }
       
       // Testar escrita de arquivo
       const testFile = path.join(vistoriaDir, 'test.txt');
       fs.writeFileSync(testFile, 'teste');
       fs.unlinkSync(testFile);
-      console.log('   ✅ Teste de escrita/leitura: OK');
+      console.log('   [OK] Teste de escrita/leitura: OK');
     } catch (err) {
-      console.log('   ❌ ERRO ao criar diretório da vistoria:', err.message);
+      console.log('   [ERRO] ERRO ao criar diretório da vistoria:', err.message);
     }
 
     // Verificar variáveis de ambiente
@@ -88,17 +88,17 @@ async function testUploadFoto() {
     
     if (process.env.UPLOAD_STRATEGY === 's3') {
       console.log(`   AWS_S3_BUCKET: ${process.env.AWS_S3_BUCKET || 'NÃO CONFIGURADO'}`);
-      console.log(`   AWS_ACCESS_KEY_ID: ${process.env.AWS_ACCESS_KEY_ID ? '✅ CONFIGURADO' : '❌ NÃO CONFIGURADO'}`);
-      console.log(`   AWS_SECRET_ACCESS_KEY: ${process.env.AWS_SECRET_ACCESS_KEY ? '✅ CONFIGURADO' : '❌ NÃO CONFIGURADO'}`);
+      console.log(`   AWS_ACCESS_KEY_ID: ${process.env.AWS_ACCESS_KEY_ID ? '[OK] CONFIGURADO' : '[ERRO] NAO CONFIGURADO'}`);
+      console.log(`   AWS_SECRET_ACCESS_KEY: ${process.env.AWS_SECRET_ACCESS_KEY ? '[OK] CONFIGURADO' : '[ERRO] NAO CONFIGURADO'}`);
     }
 
     // Verificar espaço em disco
     console.log('\n6. ESPAÇO EM DISCO:');
     try {
       const stats = fs.statSync(uploadsDir);
-      console.log('   ✅ Informações do diretório obtidas');
+      console.log('   [OK] Informações do diretório obtidas');
     } catch (err) {
-      console.log('   ⚠️  Não foi possível obter informações do diretório');
+      console.log('   [AVISO] Não foi possível obter informações do diretório');
     }
 
     // Listar vistorias existentes
@@ -110,24 +110,24 @@ async function testUploadFoto() {
           .map(dirent => dirent.name);
         
         if (vistorias.length > 0) {
-          console.log(`   ✅ Encontradas ${vistorias.length} pasta(s) de vistoria:`);
+          console.log(`   [OK] Encontradas ${vistorias.length} pasta(s) de vistoria:`);
           vistorias.forEach(v => {
             const vDir = path.join(fotosDir, v);
             const files = fs.readdirSync(vDir).length;
             console.log(`      - ${v}: ${files} arquivo(s)`);
           });
         } else {
-          console.log('   ⚠️  Nenhuma pasta de vistoria encontrada');
+          console.log('   [AVISO] Nenhuma pasta de vistoria encontrada');
         }
       }
     } catch (err) {
-      console.log('   ❌ ERRO ao listar vistorias:', err.message);
+      console.log('   [ERRO] ERRO ao listar vistorias:', err.message);
     }
 
     console.log('\n=== TESTE CONCLUÍDO ===\n');
     process.exit(0);
   } catch (error) {
-    console.error('❌ Erro no teste:', error);
+    console.error('[ERRO] Erro no teste:', error);
     process.exit(1);
   }
 }

@@ -1603,7 +1603,7 @@ const VistoriadorVistoria: React.FC = () => {
         console.log(`  - Item: "${itemAtualizado.nome}"`);
         console.log(`  - Foto ID: ${itemAtualizado.foto.id}`);
       } else {
-        console.warn('⚠ Item do checklist pode não ter sido atualizado automaticamente');
+        console.warn('[AVISO] Item do checklist pode não ter sido atualizado automaticamente');
         console.warn('  A foto foi salva, mas o item pode precisar ser atualizado manualmente');
       }
       

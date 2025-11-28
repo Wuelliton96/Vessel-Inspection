@@ -11,7 +11,7 @@ async function testVistoriaVistoriador() {
     // Buscar um vistoriador
     const nivelVistoriador = await NivelAcesso.findOne({ where: { nome: 'VISTORIADOR' } });
     if (!nivelVistoriador) {
-      console.log('❌ Nível VISTORIADOR não encontrado');
+      console.log('[ERRO] Nível VISTORIADOR não encontrado');
       process.exit(1);
     }
 
@@ -21,11 +21,11 @@ async function testVistoriaVistoriador() {
     });
 
     if (!vistoriador) {
-      console.log('❌ Nenhum vistoriador encontrado');
+      console.log('[ERRO] Nenhum vistoriador encontrado');
       process.exit(1);
     }
 
-    console.log(`✅ Vistoriador encontrado: ${vistoriador.nome} (ID: ${vistoriador.id})\n`);
+    console.log(`[OK] Vistoriador encontrado: ${vistoriador.nome} (ID: ${vistoriador.id})\n`);
 
     // Buscar status
     const statusPendente = await StatusVistoria.findOne({ where: { nome: 'PENDENTE' } });
@@ -33,9 +33,9 @@ async function testVistoriaVistoriador() {
     const statusConcluida = await StatusVistoria.findOne({ where: { nome: 'CONCLUIDA' } });
 
     console.log('Status encontrados:');
-    console.log(`  ${statusPendente ? '✅' : '❌'} PENDENTE: ${statusPendente?.id || 'Não encontrado'}`);
-    console.log(`  ${statusEmAndamento ? '✅' : '⚠️'} EM_ANDAMENTO: ${statusEmAndamento?.id || 'Não encontrado'}`);
-    console.log(`  ${statusConcluida ? '✅' : '⚠️'} CONCLUIDA: ${statusConcluida?.id || 'Não encontrado'}\n`);
+    console.log(`  ${statusPendente ? '[OK]' : '[ERRO]'} PENDENTE: ${statusPendente?.id || 'Não encontrado'}`);
+    console.log(`  ${statusEmAndamento ? '[OK]' : '[AVISO]'} EM_ANDAMENTO: ${statusEmAndamento?.id || 'Não encontrado'}`);
+    console.log(`  ${statusConcluida ? '[OK]' : '[AVISO]'} CONCLUIDA: ${statusConcluida?.id || 'Não encontrado'}\n`);
 
     // Buscar todas as vistorias atribuídas a este vistoriador
     const todasVistorias = await Vistoria.findAll({
@@ -53,7 +53,7 @@ async function testVistoriaVistoriador() {
     console.log(`Total de vistorias atribuídas ao vistoriador: ${todasVistorias.length}\n`);
 
     if (todasVistorias.length === 0) {
-      console.log('⚠️  Nenhuma vistoria encontrada para este vistoriador');
+      console.log('[AVISO]  Nenhuma vistoria encontrada para este vistoriador');
       console.log('   Verifique se há vistorias criadas com este vistoriador_id\n');
     } else {
       console.log('Vistorias encontradas:');
@@ -70,7 +70,7 @@ async function testVistoriaVistoriador() {
         if (statusConcluida) statusIds.push(statusConcluida.id);
         
         const seriaRetornada = statusIds.includes(vistoria.status_id);
-        console.log(`   Seria retornada pela rota: ${seriaRetornada ? '✅ SIM' : '❌ NÃO'}`);
+        console.log(`   Seria retornada pela rota: ${seriaRetornada ? '[OK] SIM' : '[ERRO] NÃO'}`);
       });
     }
 
@@ -101,12 +101,12 @@ async function testVistoriaVistoriador() {
     console.log(`\nVistorias retornadas pela query da rota: ${vistoriasFiltradas.length}`);
 
     if (vistoriasFiltradas.length > 0) {
-      console.log('\n✅ Vistorias que seriam retornadas:');
+      console.log('\n[OK] Vistorias que seriam retornadas:');
       vistoriasFiltradas.forEach((vistoria, index) => {
         console.log(`   ${index + 1}. ID: ${vistoria.id} - ${vistoria.Embarcacao?.nome || 'N/A'} - Status: ${vistoria.StatusVistoria?.nome || 'N/A'}`);
       });
     } else {
-      console.log('\n⚠️  Nenhuma vistoria seria retornada pela rota');
+      console.log('\n[AVISO]  Nenhuma vistoria seria retornada pela rota');
       
       // Verificar se há vistorias com outros status
       const vistoriasOutrosStatus = todasVistorias.filter(v => !statusIds.includes(v.status_id));
@@ -126,20 +126,20 @@ async function testVistoriaVistoriador() {
     console.log(`Vistorias que seriam retornadas: ${vistoriasFiltradas.length}`);
 
     if (vistoriasPendentes.length > 0 && vistoriasFiltradas.length === 0) {
-      console.log('\n❌ PROBLEMA ENCONTRADO:');
+      console.log('\n[ERRO] PROBLEMA ENCONTRADO:');
       console.log('   Há vistorias PENDENTE que não estão sendo retornadas!');
       console.log('   A rota precisa incluir status PENDENTE na busca.');
     } else if (vistoriasPendentes.length > 0 && vistoriasFiltradas.length > 0) {
-      console.log('\n✅ OK: Vistorias PENDENTE estão sendo retornadas corretamente');
+      console.log('\n[OK] OK: Vistorias PENDENTE estão sendo retornadas corretamente');
     } else if (vistoriasPendentes.length === 0) {
-      console.log('\n⚠️  Não há vistorias PENDENTE para este vistoriador');
+      console.log('\n[AVISO]  Não há vistorias PENDENTE para este vistoriador');
       console.log('   Crie uma vistoria com status PENDENTE para este vistoriador para testar');
     }
 
     console.log('\n=== TESTE CONCLUÍDO ===\n');
     process.exit(0);
   } catch (error) {
-    console.error('❌ Erro no teste:', error);
+    console.error('[ERRO] Erro no teste:', error);
     process.exit(1);
   }
 }

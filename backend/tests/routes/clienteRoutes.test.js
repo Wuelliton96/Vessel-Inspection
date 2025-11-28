@@ -1,7 +1,7 @@
 const request = require('supertest');
 const { sequelize, Cliente } = require('../../models');
 const clienteRoutes = require('../../routes/clienteRoutes');
-const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
+const { setupCompleteTestEnvironment, createTestApp, generateTestCPF } = require('../helpers/testHelpers');
 
 const app = createTestApp({ path: '/api/clientes', router: clienteRoutes });
 
@@ -19,7 +19,7 @@ describe('Rotas de Clientes', () => {
 
   describe('GET /api/clientes', () => {
     it('deve listar todos os clientes', async () => {
-      await Cliente.create({ tipo_pessoa: 'FISICA', nome: 'João Silva', cpf: '12345678900' });
+      await Cliente.create({ tipo_pessoa: 'FISICA', nome: 'João Silva', cpf: generateTestCPF('cli00') });
       
       const response = await request(app)
         .get('/api/clientes')

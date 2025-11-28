@@ -42,11 +42,11 @@ function runCommand(command, args = [], options = {}) {
 
 // Função principal
 async function runTests() {
-  console.log('🚀 Iniciando testes do backend...\n');
+  console.log('[INICIANDO] Iniciando testes do backend...\n');
 
   try {
     // Verificar se o banco de dados de teste está disponível
-    console.log('📊 Verificando conexão com banco de dados de teste...');
+    console.log('[VERIFICANDO] Verificando conexão com banco de dados de teste...');
     
     // Definir variáveis de ambiente para teste
     process.env.NODE_ENV = 'test';
@@ -69,17 +69,17 @@ async function runTests() {
     }
 
     // Executar Jest
-    console.log('🧪 Executando testes...');
+    console.log('[EXECUTANDO] Executando testes...');
     await runCommand('npx', ['jest', ...jestArgs]);
 
-    console.log('\n✅ Todos os testes passaram com sucesso!');
+    console.log('\n[OK] Todos os testes passaram com sucesso!');
     
     if (config.coverage) {
-      console.log('\n📈 Relatório de cobertura gerado em: backend/coverage/index.html');
+      console.log('\n[COVERAGE] Relatório de cobertura gerado em: backend/coverage/index.html');
     }
 
   } catch (error) {
-    console.error('\n❌ Erro ao executar testes:', error.message);
+    console.error('\n[ERRO] Erro ao executar testes:', error.message);
     process.exit(1);
   }
 }

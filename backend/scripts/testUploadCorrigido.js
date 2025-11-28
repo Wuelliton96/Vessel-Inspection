@@ -15,29 +15,29 @@ async function testUploadCorrigido() {
 
     console.log('1. VERIFICAÇÃO DE DIRETÓRIOS:');
     console.log(`   Diretório temp: ${tempDir}`);
-    console.log(`   Existe: ${fs.existsSync(tempDir) ? '✅ SIM' : '❌ NÃO'}`);
+    console.log(`   Existe: ${fs.existsSync(tempDir) ? '[OK] SIM' : '[ERRO] NAO'}`);
     
     console.log(`   Diretório vistoria-1: ${vistoriaDir}`);
-    console.log(`   Existe: ${fs.existsSync(vistoriaDir) ? '✅ SIM' : '❌ NÃO'}`);
+    console.log(`   Existe: ${fs.existsSync(vistoriaDir) ? '[OK] SIM' : '[ERRO] NAO'}`);
 
     // Criar diretórios se necessário
     console.log('\n2. CRIAÇÃO DE DIRETÓRIOS:');
     try {
       if (!fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir, { recursive: true });
-        console.log('   ✅ Diretório temp criado');
+        console.log('   [OK] Diretório temp criado');
       } else {
-        console.log('   ✅ Diretório temp já existe');
+        console.log('   [OK] Diretório temp já existe');
       }
       
       if (!fs.existsSync(vistoriaDir)) {
         fs.mkdirSync(vistoriaDir, { recursive: true });
-        console.log('   ✅ Diretório vistoria-1 criado');
+        console.log('   [OK] Diretório vistoria-1 criado');
       } else {
-        console.log('   ✅ Diretório vistoria-1 já existe');
+        console.log('   [OK] Diretório vistoria-1 já existe');
       }
     } catch (err) {
-      console.log('   ❌ ERRO ao criar diretórios:', err.message);
+      console.log('   [ERRO] ERRO ao criar diretórios:', err.message);
     }
 
     // Simular movimento de arquivo
@@ -48,24 +48,24 @@ async function testUploadCorrigido() {
       
       // Criar arquivo de teste no temp
       fs.writeFileSync(testFile, 'teste de upload');
-      console.log('   ✅ Arquivo de teste criado em temp');
+      console.log('   [OK] Arquivo de teste criado em temp');
       
       // Mover arquivo
       if (fs.existsSync(testFile)) {
         fs.renameSync(testFile, targetFile);
-        console.log('   ✅ Arquivo movido de temp para vistoria-1');
+        console.log('   [OK] Arquivo movido de temp para vistoria-1');
         
         // Verificar se foi movido
         if (fs.existsSync(targetFile) && !fs.existsSync(testFile)) {
-          console.log('   ✅ Movimento confirmado: arquivo está em vistoria-1');
+          console.log('   [OK] Movimento confirmado: arquivo está em vistoria-1');
           fs.unlinkSync(targetFile);
-          console.log('   ✅ Arquivo de teste removido');
+          console.log('   [OK] Arquivo de teste removido');
         } else {
-          console.log('   ❌ ERRO: Movimento não funcionou corretamente');
+          console.log('   [ERRO] ERRO: Movimento não funcionou corretamente');
         }
       }
     } catch (err) {
-      console.log('   ❌ ERRO no teste de movimento:', err.message);
+      console.log('   [ERRO] ERRO no teste de movimento:', err.message);
     }
 
     // Verificar arquivos em vistoria-unknown
@@ -73,22 +73,22 @@ async function testUploadCorrigido() {
     const unknownDir = path.join(__dirname, '../uploads/fotos/vistoria-unknown');
     if (fs.existsSync(unknownDir)) {
       const files = fs.readdirSync(unknownDir);
-      console.log(`   ⚠️  Encontrados ${files.length} arquivo(s) em vistoria-unknown`);
-      console.log('   ⚠️  Estes arquivos foram salvos antes da correção');
-      console.log('   ⚠️  Eles podem ser movidos manualmente para a pasta correta se necessário');
+      console.log(`   [AVISO] Encontrados ${files.length} arquivo(s) em vistoria-unknown`);
+      console.log('   [AVISO] Estes arquivos foram salvos antes da correção');
+      console.log('   [AVISO] Eles podem ser movidos manualmente para a pasta correta se necessário');
     } else {
-      console.log('   ✅ Nenhum arquivo em vistoria-unknown');
+      console.log('   [OK] Nenhum arquivo em vistoria-unknown');
     }
 
     console.log('\n=== TESTE CONCLUÍDO ===');
-    console.log('\n✅ CORREÇÃO IMPLEMENTADA:');
+    console.log('\n[OK] CORREÇÃO IMPLEMENTADA:');
     console.log('   - Arquivos agora são salvos temporariamente em "temp"');
     console.log('   - Após parseamento do FormData, são movidos para "vistoria-{id}"');
     console.log('   - Isso garante que o vistoria_id seja usado corretamente\n');
     
     process.exit(0);
   } catch (error) {
-    console.error('❌ Erro no teste:', error);
+    console.error('[ERRO] Erro no teste:', error);
     process.exit(1);
   }
 }

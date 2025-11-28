@@ -11,7 +11,7 @@ async function testFotoCompleto() {
   
   try {
     await sequelize.authenticate();
-    console.log('✓ Conexão com banco estabelecida\n');
+    console.log('[OK] Conexão com banco estabelecida\n');
     
     // 1. Buscar uma vistoria com checklist
     console.log('1. Buscando vistoria com checklist...');
@@ -25,22 +25,22 @@ async function testFotoCompleto() {
     });
     
     if (!vistoria) {
-      console.error('✗ Nenhuma vistoria encontrada com checklist.');
+      console.error('[ERRO] Nenhuma vistoria encontrada com checklist.');
       process.exit(1);
     }
     
-    console.log(`✓ Vistoria encontrada: ID ${vistoria.id}`);
-    console.log(`✓ Itens de checklist pendentes: ${vistoria.checklistItens?.length || 0}\n`);
+    console.log(`[OK] Vistoria encontrada: ID ${vistoria.id}`);
+    console.log(`[OK] Itens de checklist pendentes: ${vistoria.checklistItens?.length || 0}\n`);
     
     // 2. Buscar um tipo de foto
     console.log('2. Buscando tipo de foto...');
     const tipoFoto = await TipoFotoChecklist.findOne();
     if (!tipoFoto) {
-      console.error('✗ Nenhum tipo de foto encontrado.');
+      console.error('[ERRO] Nenhum tipo de foto encontrado.');
       process.exit(1);
     }
     
-    console.log(`✓ Tipo de foto: ${tipoFoto.nome_exibicao} (ID: ${tipoFoto.id})\n`);
+    console.log(`[OK] Tipo de foto: ${tipoFoto.nome_exibicao} (ID: ${tipoFoto.id})\n`);
     
     // 3. Buscar item de checklist que pode ser vinculado
     console.log('3. Buscando item de checklist correspondente...');
@@ -91,11 +91,11 @@ async function testFotoCompleto() {
     }
     
     if (checklistItem) {
-      console.log(`✓ Item de checklist encontrado: "${checklistItem.nome}" (ID: ${checklistItem.id})`);
+      console.log(`[OK] Item de checklist encontrado: "${checklistItem.nome}" (ID: ${checklistItem.id})`);
       console.log(`  Status: ${checklistItem.status}`);
       console.log(`  Foto ID atual: ${checklistItem.foto_id || 'null'}\n`);
     } else {
-      console.log(`⚠ Nenhum item de checklist encontrado para "${nomeTipoFoto}"`);
+      console.log(`[AVISO] Nenhum item de checklist encontrado para "${nomeTipoFoto}"`);
       console.log(`  (Isso é normal se não houver correspondência)\n`);
     }
     
@@ -110,8 +110,8 @@ async function testFotoCompleto() {
       filename = `vistorias/${vistoria.id}/foto-${timestamp}-${randomNum}.jpg`;
       urlCompleta = `https://${bucket}.s3.${region}.amazonaws.com/${filename}`;
       
-      console.log(`✓ S3 Key: ${filename}`);
-      console.log(`✓ URL completa: ${urlCompleta}\n`);
+      console.log(`[OK] S3 Key: ${filename}`);
+      console.log(`[OK] URL completa: ${urlCompleta}\n`);
       
       // Fazer upload de teste no S3
       console.log('   Fazendo upload de teste no S3...');
@@ -132,18 +132,18 @@ async function testFotoCompleto() {
         });
         
         await s3Client.send(putCommand);
-        console.log('   ✓ Upload no S3 realizado com sucesso\n');
+        console.log('   [OK] Upload no S3 realizado com sucesso\n');
       } catch (error) {
-        console.error(`   ✗ Erro no upload S3: ${error.message}`);
-        console.log('   ⚠ Continuando teste do banco mesmo assim...\n');
+        console.error(`   [ERRO] Erro no upload S3: ${error.message}`);
+        console.log('   [AVISO] Continuando teste do banco mesmo assim...\n');
       }
     } else {
       // Local: apenas nome do arquivo
       filename = `foto-${timestamp}-${randomNum}.jpg`;
       urlCompleta = `/uploads/fotos/vistoria-${vistoria.id}/${filename}`;
       
-      console.log(`✓ Nome do arquivo: ${filename}`);
-      console.log(`✓ Caminho completo: ${urlCompleta}\n`);
+      console.log(`[OK] Nome do arquivo: ${filename}`);
+      console.log(`[OK] Caminho completo: ${urlCompleta}\n`);
     }
     
     // 5. Salvar foto no banco de dados
@@ -155,7 +155,7 @@ async function testFotoCompleto() {
       tipo_foto_id: tipoFoto.id
     });
     
-    console.log(`✓ Foto salva no banco: ID ${foto.id}`);
+    console.log(`[OK] Foto salva no banco: ID ${foto.id}`);
     console.log(`  url_arquivo: ${foto.url_arquivo}`);
     console.log(`  vistoria_id: ${foto.vistoria_id}`);
     console.log(`  tipo_foto_id: ${foto.tipo_foto_id}\n`);
@@ -170,7 +170,7 @@ async function testFotoCompleto() {
         concluido_em: new Date()
       });
       
-      console.log(`✓ Item "${checklistItem.nome}" atualizado`);
+      console.log(`[OK] Item "${checklistItem.nome}" atualizado`);
       console.log(`  Status: CONCLUIDO`);
       console.log(`  Foto ID: ${checklistItem.foto_id}`);
       
@@ -191,7 +191,7 @@ async function testFotoCompleto() {
     });
     
     if (fotoCompleta) {
-      console.log(`✓ Foto encontrada no banco: ID ${fotoCompleta.id}`);
+      console.log(`[OK] Foto encontrada no banco: ID ${fotoCompleta.id}`);
       console.log(`  url_arquivo: ${fotoCompleta.url_arquivo}`);
       console.log(`  Vistoria: ${fotoCompleta.Vistoria?.id || 'N/A'}`);
       console.log(`  Tipo Foto: ${fotoCompleta.TipoFotoChecklist?.nome_exibicao || 'N/A'}\n`);
@@ -207,12 +207,12 @@ async function testFotoCompleto() {
         });
         
         const getResult = await s3Client.send(getCommand);
-        console.log(`✓ Arquivo encontrado no S3`);
+        console.log(`[OK] Arquivo encontrado no S3`);
         console.log(`  ContentType: ${getResult.ContentType}`);
         console.log(`  ContentLength: ${getResult.ContentLength} bytes`);
         console.log(`  URL: ${urlCompleta}\n`);
       } catch (error) {
-        console.error(`✗ Arquivo não encontrado no S3: ${error.message}\n`);
+        console.error(`[ERRO] Arquivo não encontrado no S3: ${error.message}\n`);
       }
       
       // Listar objetos na pasta da vistoria
@@ -225,7 +225,7 @@ async function testFotoCompleto() {
         
         const listResult = await s3Client.send(listCommand);
         const objects = listResult.Contents || [];
-        console.log(`   ✓ ${objects.length} objeto(s) na pasta vistorias/${vistoria.id}/`);
+        console.log(`   [OK] ${objects.length} objeto(s) na pasta vistorias/${vistoria.id}/`);
         
         if (objects.length > 0) {
           objects.slice(0, 5).forEach((obj, index) => {
@@ -237,7 +237,7 @@ async function testFotoCompleto() {
         }
         console.log('');
       } catch (error) {
-        console.error(`   ✗ Erro ao listar objetos: ${error.message}\n`);
+        console.error(`   [ERRO] Erro ao listar objetos: ${error.message}\n`);
       }
     }
     
@@ -250,11 +250,11 @@ async function testFotoCompleto() {
         foto_id: null,
         concluido_em: null
       });
-      console.log('✓ Checklist revertido');
+      console.log('[OK] Checklist revertido');
     }
     
     await foto.destroy();
-    console.log('✓ Foto deletada do banco');
+    console.log('[OK] Foto deletada do banco');
     
     if (UPLOAD_STRATEGY === 's3' && bucket) {
       try {
@@ -265,35 +265,35 @@ async function testFotoCompleto() {
         });
         
         await s3Client.send(deleteCommand);
-        console.log('✓ Arquivo deletado do S3');
+        console.log('[OK] Arquivo deletado do S3');
       } catch (error) {
-        console.log(`⚠ Arquivo de teste no S3 pode ser removido manualmente: ${filename}`);
+        console.log(`[AVISO] Arquivo de teste no S3 pode ser removido manualmente: ${filename}`);
       }
     }
     
     console.log('\n========================================');
-    console.log('✓ TODOS OS TESTES CONCLUÍDOS COM SUCESSO!');
+    console.log('[OK] TODOS OS TESTES CONCLUÍDOS COM SUCESSO!');
     console.log('========================================\n');
     
     console.log('RESUMO:');
     console.log(`- Estratégia de upload: ${UPLOAD_STRATEGY.toUpperCase()}`);
-    console.log('- Foto salva no banco de dados ✓');
+    console.log('- Foto salva no banco de dados [OK]');
     if (UPLOAD_STRATEGY === 's3') {
-      console.log('- Foto enviada para S3 ✓');
-      console.log('- Pasta por vistoria criada ✓');
+      console.log('- Foto enviada para S3 [OK]');
+      console.log('- Pasta por vistoria criada [OK]');
     } else {
-      console.log('- Foto seria salva localmente ✓');
+      console.log('- Foto seria salva localmente [OK]');
     }
     if (checklistItem) {
-      console.log('- Checklist vinculado automaticamente ✓');
+      console.log('- Checklist vinculado automaticamente [OK]');
     } else {
       console.log('- Checklist: nenhum item correspondente encontrado');
     }
-    console.log('- Nome da imagem salvo na tabela fotos ✓');
-    console.log('- Vinculação com vistoria e tipo de foto funcionando ✓');
+    console.log('- Nome da imagem salvo na tabela fotos [OK]');
+    console.log('- Vinculação com vistoria e tipo de foto funcionando [OK]');
     
   } catch (error) {
-    console.error('\n✗ ERRO CRÍTICO:', error.message);
+    console.error('\n[ERRO] ERRO CRÍTICO:', error.message);
     if (error.stack) {
       console.error(error.stack);
     }

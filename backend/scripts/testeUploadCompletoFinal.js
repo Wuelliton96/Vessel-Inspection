@@ -23,15 +23,15 @@ async function testeUploadCompletoFinal() {
   
   try {
     await sequelize.authenticate();
-    console.log('✓ Banco conectado\n');
+    console.log('[OK] Banco conectado\n');
     
     // 1. Verificar backend
     console.log('1. Verificando backend...');
     try {
       await axios.get(`${API_BASE_URL}/health`, { timeout: 5000 });
-      console.log('✓ Backend está rodando\n');
+      console.log('[OK] Backend está rodando\n');
     } catch {
-      console.error('✗ Backend não está rodando!\n');
+      console.error('[ERRO] Backend não está rodando!\n');
       process.exit(1);
     }
     
@@ -47,7 +47,7 @@ async function testeUploadCompletoFinal() {
     });
     
     if (!vistoria) {
-      console.error('✗ Nenhuma vistoria encontrada\n');
+      console.error('[ERRO] Nenhuma vistoria encontrada\n');
       process.exit(1);
     }
     
@@ -55,20 +55,20 @@ async function testeUploadCompletoFinal() {
     
     const tipoFoto = await TipoFotoChecklist.findOne();
     if (!tipoFoto) {
-      console.error('✗ Nenhum tipo de foto encontrado\n');
+      console.error('[ERRO] Nenhum tipo de foto encontrado\n');
       process.exit(1);
     }
     
     const usuario = await Usuario.findOne({ where: { ativo: true } });
     if (!usuario) {
-      console.error('✗ Nenhum usuário encontrado\n');
+      console.error('[ERRO] Nenhum usuário encontrado\n');
       process.exit(1);
     }
     
-    console.log(`✓ Vistoria ID: ${vistoria.id}`);
-    console.log(`✓ Tipo Foto: ${tipoFoto.nome_exibicao} (ID: ${tipoFoto.id})`);
-    console.log(`✓ Usuário: ${usuario.nome} (CPF: ${usuario.cpf})`);
-    console.log(`✓ Itens pendentes: ${vistoria.checklistItens?.length || 0}\n`);
+    console.log(`[OK] Vistoria ID: ${vistoria.id}`);
+    console.log(`[OK] Tipo Foto: ${tipoFoto.nome_exibicao} (ID: ${tipoFoto.id})`);
+    console.log(`[OK] Usuário: ${usuario.nome} (CPF: ${usuario.cpf})`);
+    console.log(`[OK] Itens pendentes: ${vistoria.checklistItens?.length || 0}\n`);
     
     // 3. Login
     console.log('3. Fazendo login...');
@@ -87,18 +87,18 @@ async function testeUploadCompletoFinal() {
             senha: senha
           });
           token = response.data.token;
-          console.log(`✓ Login realizado com senha: ${senha}\n`);
+          console.log(`[OK] Login realizado com senha: ${senha}\n`);
           break;
         } catch (err) {
           // Continuar tentando
         }
       }
     } else {
-      console.log('✓ Usando token da variável de ambiente\n');
+      console.log('[OK] Usando token da variável de ambiente\n');
     }
     
     if (!token) {
-      console.error('✗ Login falhou. Tente:');
+      console.error('[ERRO] Login falhou. Tente:');
       console.error('  1. Definir TOKEN=seu_token node backend/scripts/testeUploadCompletoFinal.js');
       console.error('  2. Ou verificar se a senha do usuário está nas senhas comuns\n');
       process.exit(1);
@@ -128,7 +128,7 @@ async function testeUploadCompletoFinal() {
     ]);
     
     fs.writeFileSync(testImagePath, jpegBuffer);
-    console.log(`✓ Imagem criada: ${testImagePath} (${jpegBuffer.length} bytes)\n`);
+    console.log(`[OK] Imagem criada: ${testImagePath} (${jpegBuffer.length} bytes)\n`);
     
     // 5. Preparar FormData com vistoria_id como string
     console.log('5. Preparando FormData...');
@@ -174,7 +174,7 @@ async function testeUploadCompletoFinal() {
       fotoTesteId = response.data.id;
       s3KeyTeste = response.data.url_arquivo;
       
-      console.log('✓ Upload realizado com sucesso!');
+      console.log('[OK] Upload realizado com sucesso!');
       console.log(`  - Status: ${response.status}`);
       console.log(`  - Foto ID: ${response.data.id}`);
       console.log(`  - url_arquivo: ${response.data.url_arquivo}`);
@@ -187,9 +187,9 @@ async function testeUploadCompletoFinal() {
         if (keyParts.length >= 2 && keyParts[0] === 'vistorias') {
           const vistoriaIdNaKey = keyParts[1];
           if (vistoriaIdNaKey === vistoriaIdStr) {
-            console.log(`✓ Pasta correta: vistorias/${vistoriaIdNaKey}/\n`);
+            console.log(`[OK] Pasta correta: vistorias/${vistoriaIdNaKey}/\n`);
           } else {
-            console.error(`✗ Pasta incorreta! Esperado: vistorias/${vistoriaIdStr}/, Recebido: vistorias/${vistoriaIdNaKey}/\n`);
+            console.error(`[ERRO] Pasta incorreta! Esperado: vistorias/${vistoriaIdStr}/, Recebido: vistorias/${vistoriaIdNaKey}/\n`);
           }
         }
       }
@@ -197,7 +197,7 @@ async function testeUploadCompletoFinal() {
     } catch (error) {
       uploadSucesso = false;
       erroUpload = error;
-      console.error('✗ Erro no upload:');
+      console.error('[ERRO] Erro no upload:');
       console.error(`  - Status: ${error.response?.status || 'N/A'}`);
       console.error(`  - Mensagem: ${error.message}`);
       if (error.response?.data) {
@@ -215,7 +215,7 @@ async function testeUploadCompletoFinal() {
     if (fotoTesteId) {
       const fotoNoBanco = await Foto.findByPk(fotoTesteId);
       if (fotoNoBanco) {
-        console.log('✓ Foto encontrada no banco:');
+        console.log('[OK] Foto encontrada no banco:');
         console.log(`  - ID: ${fotoNoBanco.id}`);
         console.log(`  - url_arquivo: ${fotoNoBanco.url_arquivo}`);
         console.log(`  - vistoria_id: ${fotoNoBanco.vistoria_id}`);
@@ -224,14 +224,14 @@ async function testeUploadCompletoFinal() {
         
         // Verificar pasta no url_arquivo
         if (fotoNoBanco.url_arquivo.includes(`vistorias/${vistoria.id}/`)) {
-          console.log('✓ Pasta no banco está correta!\n');
+          console.log('[OK] Pasta no banco está correta!\n');
         } else if (fotoNoBanco.url_arquivo.includes('/unknown/')) {
-          console.error('✗ Pasta no banco está como "unknown"!\n');
+          console.error('[ERRO] Pasta no banco está como "unknown"!\n');
         } else {
           console.warn('⚠ Pasta no banco não segue o padrão esperado\n');
         }
       } else {
-        console.error('✗ Foto NÃO encontrada no banco!\n');
+        console.error('[ERRO] Foto NÃO encontrada no banco!\n');
       }
     }
     
@@ -245,7 +245,7 @@ async function testeUploadCompletoFinal() {
         });
         
         const result = await s3Client.send(getCommand);
-        console.log('✓ Arquivo encontrado no S3');
+        console.log('[OK] Arquivo encontrado no S3');
         console.log(`  - Key: ${s3KeyTeste}`);
         console.log(`  - Tamanho: ${result.ContentLength} bytes`);
         console.log(`  - ContentType: ${result.ContentType}\n`);
@@ -255,14 +255,14 @@ async function testeUploadCompletoFinal() {
         if (keyParts.length >= 2 && keyParts[0] === 'vistorias') {
           const vistoriaIdNaKey = keyParts[1];
           if (vistoriaIdNaKey === vistoriaIdStr) {
-            console.log(`✓ Pasta no S3 está correta: vistorias/${vistoriaIdNaKey}/\n`);
+            console.log(`[OK] Pasta no S3 está correta: vistorias/${vistoriaIdNaKey}/\n`);
           } else {
-            console.error(`✗ Pasta no S3 incorreta! Esperado: vistorias/${vistoriaIdStr}/, Recebido: vistorias/${vistoriaIdNaKey}/\n`);
+            console.error(`[ERRO] Pasta no S3 incorreta! Esperado: vistorias/${vistoriaIdStr}/, Recebido: vistorias/${vistoriaIdNaKey}/\n`);
           }
         }
         
       } catch (error) {
-        console.error(`✗ Arquivo NÃO encontrado no S3: ${error.message}`);
+        console.error(`[ERRO] Arquivo NÃO encontrado no S3: ${error.message}`);
         console.error(`  Key esperada: ${s3KeyTeste}\n`);
       }
     }
@@ -276,7 +276,7 @@ async function testeUploadCompletoFinal() {
       
       if (itemAtualizado) {
         itemChecklistTesteId = itemAtualizado.id;
-        console.log('✓ Item do checklist vinculado:');
+        console.log('[OK] Item do checklist vinculado:');
         console.log(`  - Item: "${itemAtualizado.nome}" (ID: ${itemAtualizado.id})`);
         console.log(`  - Status: ${itemAtualizado.status}`);
         console.log(`  - Foto ID: ${itemAtualizado.foto_id}\n`);
@@ -294,9 +294,9 @@ async function testeUploadCompletoFinal() {
       const fotoNoBanco = await Foto.findByPk(fotoTesteId);
       const pastaCorreta = fotoNoBanco && fotoNoBanco.url_arquivo.includes(`vistorias/${vistoria.id}/`);
       
-      console.log('✓ Upload: SUCESSO');
-      console.log(`✓ Banco de dados: ${fotoNoBanco ? 'FOTO SALVA' : 'FOTO NÃO SALVA'}`);
-      console.log(`✓ Pasta correta: ${pastaCorreta ? 'SIM' : 'NÃO'}`);
+      console.log('[OK] Upload: SUCESSO');
+      console.log(`[OK] Banco de dados: ${fotoNoBanco ? 'FOTO SALVA' : 'FOTO NÃO SALVA'}`);
+      console.log(`[OK] Pasta correta: ${pastaCorreta ? 'SIM' : 'NÃO'}`);
       
       if (UPLOAD_STRATEGY === 's3' && bucket) {
         try {
@@ -305,19 +305,19 @@ async function testeUploadCompletoFinal() {
             Key: s3KeyTeste
           });
           await s3Client.send(getCommand);
-          console.log('✓ S3: ARQUIVO ENCONTRADO');
+          console.log('[OK] S3: ARQUIVO ENCONTRADO');
         } catch {
-          console.log('✗ S3: ARQUIVO NÃO ENCONTRADO');
+          console.log('[ERRO] S3: ARQUIVO NÃO ENCONTRADO');
         }
       }
       
       const itemChecklist = await VistoriaChecklistItem.findOne({
         where: { foto_id: fotoTesteId }
       });
-      console.log(`✓ Checklist: ${itemChecklist ? 'VINCULADO' : 'NÃO VINCULADO'}`);
+      console.log(`[OK] Checklist: ${itemChecklist ? 'VINCULADO' : 'NÃO VINCULADO'}`);
       
     } else {
-      console.log('✗ Upload: FALHOU');
+      console.log('[ERRO] Upload: FALHOU');
       if (erroUpload) {
         console.log(`  Erro: ${erroUpload.message}`);
       }
@@ -336,12 +336,12 @@ async function testeUploadCompletoFinal() {
             { status: 'PENDENTE', foto_id: null, concluido_em: null },
             { where: { id: itemChecklistTesteId } }
           );
-          console.log('✓ Checklist revertido');
+          console.log('[OK] Checklist revertido');
         }
         
         // Deletar foto do banco
         await Foto.destroy({ where: { id: fotoTesteId } });
-        console.log(`✓ Foto ${fotoTesteId} deletada do banco`);
+        console.log(`[OK] Foto ${fotoTesteId} deletada do banco`);
         
         // Deletar do S3 se usando S3
         if (UPLOAD_STRATEGY === 's3' && bucket && s3KeyTeste) {
@@ -351,7 +351,7 @@ async function testeUploadCompletoFinal() {
               Key: s3KeyTeste
             });
             await s3Client.send(deleteCommand);
-            console.log(`✓ Arquivo deletado do S3: ${s3KeyTeste}`);
+            console.log(`[OK] Arquivo deletado do S3: ${s3KeyTeste}`);
           } catch (error) {
             console.warn(`⚠ Erro ao deletar do S3: ${error.message}`);
           }
@@ -362,37 +362,37 @@ async function testeUploadCompletoFinal() {
           const localPath = path.join(__dirname, '../uploads/fotos', `vistoria-${vistoria.id}`, s3KeyTeste);
           if (fs.existsSync(localPath)) {
             fs.unlinkSync(localPath);
-            console.log(`✓ Arquivo local deletado: ${localPath}`);
+            console.log(`[OK] Arquivo local deletado: ${localPath}`);
           }
         }
         
       } catch (cleanError) {
-        console.error('✗ Erro ao limpar:', cleanError.message);
+        console.error('[ERRO] Erro ao limpar:', cleanError.message);
       }
     }
     
     // Deletar arquivo de teste
     if (fs.existsSync(testImagePath)) {
       fs.unlinkSync(testImagePath);
-      console.log('✓ Arquivo de teste removido');
+      console.log('[OK] Arquivo de teste removido');
     }
     
-    console.log('\n✓ Limpeza concluída\n');
+    console.log('\n[OK] Limpeza concluída\n');
     
     if (uploadSucesso && fotoTesteId) {
       console.log('========================================');
-      console.log('✓ TESTE CONCLUÍDO COM SUCESSO!');
+      console.log('[OK] TESTE CONCLUÍDO COM SUCESSO!');
       console.log('========================================\n');
       process.exit(0);
     } else {
       console.log('========================================');
-      console.log('✗ TESTE FALHOU');
+      console.log('[ERRO] TESTE FALHOU');
       console.log('========================================\n');
       process.exit(1);
     }
     
   } catch (error) {
-    console.error('\n✗ ERRO CRÍTICO:', error.message);
+    console.error('\n[ERRO] ERRO CRÍTICO:', error.message);
     if (error.stack) {
       console.error(error.stack);
     }

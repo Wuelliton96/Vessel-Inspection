@@ -1,33 +1,29 @@
-const { Laudo, Vistoria, Usuario, Embarcacao, Local, StatusVistoria, NivelAcesso } = require('../../models');
+const { Laudo, Vistoria, Usuario, Embarcacao, Local, StatusVistoria, NivelAcesso, sequelize } = require('../../models');
+const { setupCompleteTestEnvironment, createTestEmbarcacao, createTestLocal, createTestStatusVistoria } = require('../helpers/testHelpers');
 
 describe('Modelo Laudo', () => {
   let vistoria;
+  let setup;
+  let updateVistoria;
 
   beforeEach(async () => {
-    const nivelAdmin = await NivelAcesso.create({
-      nome: 'ADMINISTRADOR',
-      descricao: 'Administrador do sistema'
+    setup = await setupCompleteTestEnvironment('laudo');
+    const usuario = setup.admin;
+
+    // Usar nomes únicos para evitar conflitos
+    const timestamp = Date.now();
+    const embarcacao = await createTestEmbarcacao({
+      nome: `Embarcação Teste ${timestamp}`,
+      nr_inscricao_barco: `EMB-LAUDO-${timestamp}`
     });
 
-    const usuario = await Usuario.create({
-      nome: 'Admin Teste',
-      email: 'admin@laudo.test',
-      senha_hash: 'hash123',
-      nivel_acesso_id: nivelAdmin.id
-    });
-
-    const embarcacao = await Embarcacao.create({
-      nome: 'Embarcação Teste',
-      nr_inscricao_barco: 'EMB-LAUDO-001'
-    });
-
-    const local = await Local.create({
+    const local = await createTestLocal({
       tipo: 'MARINA',
-      nome_local: 'Marina Teste'
+      nome_local: `Marina Teste ${timestamp}`
     });
 
-    const status = await StatusVistoria.create({
-      nome: 'CONCLUIDA',
+    const status = await createTestStatusVistoria({
+      nome: `CONCLUIDA_${timestamp}`,
       descricao: 'Vistoria concluída'
     });
 
@@ -97,17 +93,31 @@ describe('Modelo Laudo', () => {
     });
 
     it('deve garantir numero_laudo único', async () => {
+      const timestamp = Date.now();
+      const embarcacao2 = await createTestEmbarcacao({
+        nome: `Embarcação Numero ${timestamp}`,
+        nr_inscricao_barco: `EMB-NUM-${timestamp}`
+      });
+      const local2 = await createTestLocal({
+        tipo: 'MARINA',
+        nome_local: `Marina Numero ${timestamp}`
+      });
+      const status2 = await createTestStatusVistoria({
+        nome: `PENDENTE_NUM_${timestamp}`,
+        descricao: 'Pendente'
+      });
+      
+      const vistoria2 = await Vistoria.create({
+        embarcacao_id: embarcacao2.id,
+        local_id: local2.id,
+        vistoriador_id: setup.admin.id,
+        administrador_id: setup.admin.id,
+        status_id: status2.id
+      });
+
       await Laudo.create({
         vistoria_id: vistoria.id,
         numero_laudo: '251111E'
-      });
-
-      const vistoria2 = await Vistoria.create({
-        embarcacao_id: vistoria.embarcacao_id,
-        local_id: vistoria.local_id,
-        vistoriador_id: vistoria.vistoriador_id,
-        administrador_id: vistoria.administrador_id,
-        status_id: vistoria.status_id
       });
 
       await expect(Laudo.create({
@@ -299,8 +309,30 @@ describe('Modelo Laudo', () => {
     });
 
     it('não deve permitir alterar data_geracao', async () => {
+      // Criar uma vistoria específica para este teste
+      const timestamp = Date.now();
+      const embarcacao = await createTestEmbarcacao({
+        nome: `Embarcação Data ${timestamp}`,
+        nr_inscricao_barco: `EMB-DATA-${timestamp}`
+      });
+      const local = await createTestLocal({
+        tipo: 'MARINA',
+        nome_local: `Marina Data ${timestamp}`
+      });
+      const status = await createTestStatusVistoria({
+        nome: `PENDENTE_DATA_${timestamp}`,
+        descricao: 'Pendente'
+      });
+      const vistoriaData = await Vistoria.create({
+        embarcacao_id: embarcacao.id,
+        local_id: local.id,
+        vistoriador_id: setup.admin.id,
+        administrador_id: setup.admin.id,
+        status_id: status.id
+      });
+      
       const laudo = await Laudo.create({
-        vistoria_id: vistoria.id,
+        vistoria_id: vistoriaData.id,
         numero_laudo: '251111Q'
       });
 
@@ -422,6 +454,10 @@ describe('Modelo Laudo', () => {
 
       expect(laudo.updated_at.getTime()).toBeGreaterThan(updatedAtOriginal.getTime());
     });
+  });
+
+  afterAll(async () => {
+    await sequelize.close();
   });
 });
 

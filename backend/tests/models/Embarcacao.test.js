@@ -1,6 +1,19 @@
-const { Embarcacao } = require('../../models');
+const { Embarcacao, sequelize } = require('../../models');
 
 describe('Modelo Embarcacao', () => {
+  beforeEach(async () => {
+    // Limpar embarcações antes de cada teste (apenas as que não têm foreign keys)
+    try {
+      await Embarcacao.destroy({ where: {}, force: true });
+    } catch (error) {
+      // Ignorar erro se houver foreign key constraints
+    }
+  });
+
+  afterAll(async () => {
+    await sequelize.close();
+  });
+
   describe('Criação de embarcação', () => {
     it('deve criar uma embarcação com dados válidos', async () => {
       const embarcacaoData = {

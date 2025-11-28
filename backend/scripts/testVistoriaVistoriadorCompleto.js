@@ -23,7 +23,7 @@ async function testVistoriaVistoriadorCompleto() {
     console.log(`Total de vistorias no sistema: ${todasVistorias.length}\n`);
 
     if (todasVistorias.length === 0) {
-      console.log('⚠️  Nenhuma vistoria encontrada no sistema');
+      console.log('[AVISO]  Nenhuma vistoria encontrada no sistema');
       process.exit(0);
     }
 
@@ -87,17 +87,17 @@ async function testVistoriaVistoriadorCompleto() {
       console.log(`\nVistorias que seriam retornadas pela rota: ${vistoriasRetornadas.length}`);
       if (vistoriasRetornadas.length > 0) {
         vistoriasRetornadas.forEach(v => {
-          console.log(`  ✅ ID: ${v.id} - ${v.Embarcacao?.nome || 'N/A'} - Status: ${v.StatusVistoria?.nome || 'N/A'}`);
+          console.log(`  [OK] ID: ${v.id} - ${v.Embarcacao?.nome || 'N/A'} - Status: ${v.StatusVistoria?.nome || 'N/A'}`);
         });
       } else {
-        console.log('  ⚠️  Nenhuma vistoria seria retornada');
+        console.log('  [AVISO]  Nenhuma vistoria seria retornada');
         
         // Verificar quais status não estão sendo incluídos
         const statusNaoIncluidos = vistorias.filter(v => !statusIds.includes(v.status_id));
         if (statusNaoIncluidos.length > 0) {
           console.log('\n  Vistorias não retornadas (status não incluído):');
           statusNaoIncluidos.forEach(v => {
-            console.log(`    ❌ ID: ${v.id} - Status: ${v.StatusVistoria?.nome || 'N/A'} (ID: ${v.status_id})`);
+            console.log(`    [ERRO] ID: ${v.id} - Status: ${v.StatusVistoria?.nome || 'N/A'} (ID: ${v.status_id})`);
           });
         }
       }
@@ -105,12 +105,12 @@ async function testVistoriaVistoriadorCompleto() {
       // Verificar especificamente vistorias PENDENTE
       const vistoriasPendentes = vistorias.filter(v => v.status_id === statusPendente?.id);
       if (vistoriasPendentes.length > 0) {
-        console.log(`\n  ✅ Vistorias PENDENTE encontradas: ${vistoriasPendentes.length}`);
+        console.log(`\n  [OK] Vistorias PENDENTE encontradas: ${vistoriasPendentes.length}`);
         const pendentesRetornadas = vistoriasPendentes.filter(v => statusIds.includes(v.status_id));
         if (pendentesRetornadas.length === vistoriasPendentes.length) {
-          console.log('  ✅ Todas as vistorias PENDENTE seriam retornadas corretamente');
+          console.log('  [OK] Todas as vistorias PENDENTE seriam retornadas corretamente');
         } else {
-          console.log('  ❌ PROBLEMA: Nem todas as vistorias PENDENTE seriam retornadas!');
+          console.log('  [ERRO] PROBLEMA: Nem todas as vistorias PENDENTE seriam retornadas!');
         }
       }
     }
@@ -140,19 +140,19 @@ async function testVistoriaVistoriadorCompleto() {
 
       console.log(`\nResultado da rota: ${resultadoRota.length} vistoria(s)`);
       if (resultadoRota.length > 0) {
-        console.log('\n✅ Vistorias retornadas:');
+        console.log('\n[OK] Vistorias retornadas:');
         resultadoRota.forEach(v => {
           console.log(`  - ID: ${v.id} | ${v.Embarcacao?.nome || 'N/A'} | Status: ${v.StatusVistoria?.nome || 'N/A'}`);
         });
       } else {
-        console.log('\n⚠️  Nenhuma vistoria retornada');
+        console.log('\n[AVISO]  Nenhuma vistoria retornada');
       }
     }
 
     console.log('\n=== TESTE CONCLUÍDO ===\n');
     process.exit(0);
   } catch (error) {
-    console.error('❌ Erro no teste:', error);
+    console.error('[ERRO] Erro no teste:', error);
     process.exit(1);
   }
 }

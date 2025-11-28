@@ -1,7 +1,7 @@
 const request = require('supertest');
 const { sequelize } = require('../../models');
 const vistoriadorRoutes = require('../../routes/vistoriadorRoutes');
-const { setupCompleteTestEnvironment, createTestApp, createTestVistoriaCompleta } = require('../helpers/testHelpers');
+const { setupCompleteTestEnvironment, createTestApp, createTestVistoriaCompleta, createTestVistoriaPadrao } = require('../helpers/testHelpers');
 
 const app = createTestApp({ path: '/api/vistoriador', router: vistoriadorRoutes });
 

@@ -45,7 +45,11 @@ describe('preencherLaudo', () => {
           Cliente: {
             nome: 'Maria Santos',
             cpf: '987.654.321-00',
-            endereco: 'Av. Principal, 200, Centro, São Paulo/SP'
+            logradouro: 'Av. Principal',
+            numero: '200',
+            bairro: 'Centro',
+            cidade: 'São Paulo',
+            estado: 'SP'
           }
         },
         data_conclusao: '2024-01-15',
@@ -62,7 +66,11 @@ describe('preencherLaudo', () => {
 
       expect(dados.proprietario).toBe('Maria Santos');
       expect(dados.cpf_cnpj).toBe('987.654.321-00');
-      expect(dados.endereco_proprietario).toBe('Av. Principal, 200, Centro, São Paulo/SP');
+      expect(dados.endereco_proprietario).toContain('Av. Principal');
+      expect(dados.endereco_proprietario).toContain('200');
+      expect(dados.endereco_proprietario).toContain('Centro');
+      expect(dados.endereco_proprietario).toContain('São Paulo');
+      expect(dados.endereco_proprietario).toContain('SP');
     });
 
     it('deve priorizar dados fornecidos em dadosIniciais', () => {

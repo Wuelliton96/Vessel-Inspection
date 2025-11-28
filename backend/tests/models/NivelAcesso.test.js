@@ -1,10 +1,30 @@
-const { NivelAcesso } = require('../../models');
+const { NivelAcesso, sequelize } = require('../../models');
+const { Op } = require('sequelize');
 
 describe('Modelo NivelAcesso', () => {
+  beforeEach(async () => {
+    // Limpar níveis criados nos testes anteriores (exceto os padrões com id 1 e 2)
+    try {
+      await NivelAcesso.destroy({ 
+        where: { 
+          id: { [Op.gt]: 2 } 
+        }, 
+        force: true 
+      });
+    } catch (error) {
+      // Ignorar se não conseguir deletar (pode ter foreign keys)
+      // eslint-disable-next-line no-empty
+    }
+  });
+
+  afterAll(async () => {
+    await sequelize.close();
+  });
+
   describe('Criação de nível de acesso', () => {
     it('deve criar um nível de acesso com dados válidos', async () => {
       const nivelData = {
-        nome: 'ADMINISTRADOR',
+        nome: `ADMIN_TEST_${Date.now()}`,
         descricao: 'Nível de acesso para administradores do sistema'
       };
 
@@ -17,7 +37,7 @@ describe('Modelo NivelAcesso', () => {
 
     it('deve criar nível de acesso sem descrição', async () => {
       const nivelData = {
-        nome: 'VISTORIADOR'
+        nome: `VIST_TEST_${Date.now()}`
       };
 
       const nivel = await NivelAcesso.create(nivelData);
@@ -98,10 +118,11 @@ describe('Modelo NivelAcesso', () => {
 
   describe('Níveis de acesso padrão', () => {
     it('deve criar níveis de acesso padrão do sistema', async () => {
+      const timestamp = Date.now();
       const niveisPadrao = [
-        { nome: 'ADMINISTRADOR', descricao: 'Acesso total ao sistema' },
-        { nome: 'VISTORIADOR', descricao: 'Pode realizar vistorias' },
-        { nome: 'APROVADOR', descricao: 'Pode aprovar vistorias' }
+        { nome: `ADMIN_PADRAO_${timestamp}`, descricao: 'Acesso total ao sistema' },
+        { nome: `VIST_PADRAO_${timestamp}`, descricao: 'Pode realizar vistorias' },
+        { nome: `APROV_PADRAO_${timestamp}`, descricao: 'Pode aprovar vistorias' }
       ];
 
       for (const nivelData of niveisPadrao) {

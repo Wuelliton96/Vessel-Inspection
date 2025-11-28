@@ -9,7 +9,7 @@ const { Usuario, NivelAcesso } = require('../models');
 
 async function recuperarUsuario(email) {
   try {
-    console.log(`\n🔍 Procurando usuário: ${email}...\n`);
+    console.log(`\n[PROCURANDO] Procurando usuário: ${email}...\n`);
 
     const usuario = await Usuario.findOne({
       where: { email: email.toLowerCase() },
@@ -21,13 +21,13 @@ async function recuperarUsuario(email) {
     });
 
     if (!usuario) {
-      console.log('❌ Usuário não encontrado no sistema');
+      console.log('[ERRO] Usuário não encontrado no sistema');
       console.log('   Verifique se o email está correto\n');
       return;
     }
 
     if (!usuario.deleted_at) {
-      console.log('ℹ️  Este usuário NÃO está deletado');
+      console.log('[INFO] Este usuário NAO está deletado');
       console.log(`   Nome: ${usuario.nome}`);
       console.log(`   Email: ${usuario.email}`);
       console.log(`   Status: ${usuario.ativo ? 'ATIVO' : 'INATIVO'}`);
@@ -35,7 +35,7 @@ async function recuperarUsuario(email) {
       return;
     }
 
-    console.log('📋 Informações do usuário deletado:');
+    console.log('[INFO] Informações do usuário deletado:');
     console.log(`   ID: ${usuario.id}`);
     console.log(`   Nome: ${usuario.nome}`);
     console.log(`   Email: ${usuario.email}`);
@@ -46,7 +46,7 @@ async function recuperarUsuario(email) {
     // Restaurar usuário
     await usuario.restore();
 
-    console.log('✅ Usuário restaurado com sucesso!');
+    console.log('[OK] Usuário restaurado com sucesso!');
     console.log(`   ${usuario.nome} (${usuario.email}) está novamente ativo no sistema\n`);
     
   } catch (error) {

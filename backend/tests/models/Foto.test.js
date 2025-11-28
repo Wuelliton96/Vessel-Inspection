@@ -1,4 +1,4 @@
-const { Foto, Vistoria, TipoFotoChecklist, StatusVistoria } = require('../../models');
+const { Foto, Vistoria, TipoFotoChecklist, StatusVistoria, sequelize } = require('../../models');
 const { setupCompleteTestEnvironment, createTestEmbarcacao, createTestLocal, createTestStatusVistoria } = require('../helpers/testHelpers');
 
 describe('Modelo Foto', () => {
@@ -278,5 +278,9 @@ describe('Modelo Foto', () => {
         expect(foto.observacao).toBeTruthy();
       });
     });
+  });
+
+  afterAll(async () => {
+    await sequelize.close();
   });
 });

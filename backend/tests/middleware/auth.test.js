@@ -2,32 +2,33 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { requireAuth, requireAdmin, requireVistoriador, requireAuthAllowPasswordUpdate } = require('../../middleware/auth');
 const { Usuario, NivelAcesso, sequelize } = require('../../models');
+const { generateTestCPF } = require('../helpers/testHelpers');
 
 describe('Auth Middleware', () => {
   let mockReq, mockRes, mockNext;
   let testUser, testVistoriador;
 
   beforeAll(async () => {
-    await sequelize.sync({ force: true });
-    await NivelAcesso.create({ id: 1, nome: 'ADMINISTRADOR', descricao: 'Admin' });
-    await NivelAcesso.create({ id: 2, nome: 'VISTORIADOR', descricao: 'Vistoriador' });
+    // Usar setupTestEnvironment para garantir sincronização adequada
+    const { setupTestEnvironment } = require('../helpers/testHelpers');
+    const { nivelAdmin, nivelVistoriador } = await setupTestEnvironment();
     
     const senhaHash = await bcrypt.hash('Teste@123', 10);
     
     testUser = await Usuario.create({
-      cpf: '12345678916',
+      cpf: generateTestCPF('auth16'),
       nome: 'Test User',
       email: 'test@auth.middleware',
       senha_hash: senhaHash,
-      nivel_acesso_id: 1
+      nivel_acesso_id: nivelAdmin.id
     });
 
     testVistoriador = await Usuario.create({
-      cpf: '12345678917',
+      cpf: generateTestCPF('auth17'),
       nome: 'Test Vistoriador',
       email: 'vist@auth.middleware',
       senha_hash: senhaHash,
-      nivel_acesso_id: 2
+      nivel_acesso_id: nivelVistoriador.id
     });
   });
 

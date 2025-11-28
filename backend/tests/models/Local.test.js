@@ -1,6 +1,21 @@
-const { Local } = require('../../models');
+const { Local, sequelize } = require('../../models');
 
 describe('Modelo Local', () => {
+  beforeEach(async () => {
+    // Limpar locais antes de cada teste (apenas os que não têm foreign keys)
+    try {
+      // Tentar deletar, mas ignorar se houver foreign key constraints
+      await Local.destroy({ where: {}, force: true });
+    } catch (error) {
+      // Ignorar erro se houver foreign key constraints
+      // Isso pode acontecer se houver vistorias usando os locais
+    }
+  });
+
+  afterAll(async () => {
+    await sequelize.close();
+  });
+
   describe('Criação de local', () => {
     it('deve criar um local com dados válidos', async () => {
       const localData = {

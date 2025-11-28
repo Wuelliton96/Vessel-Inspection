@@ -734,12 +734,12 @@ const Fotos: React.FC = () => {
                               imgElement.naturalWidth > 0 &&
                               imgElement.offsetParent !== null) { // Verifica se está visível
                             // Imagem já está carregada e visível, usar o src dela (SEM nova requisição)
-                            console.log('[Fotos] ✅ Imagem já carregada e visível, usando do DOM:', imgElement.src);
+                            console.log('[Fotos] [OK] Imagem já carregada e visível, usando do DOM:', imgElement.src);
                             setImagemAmpliada(imgElement.src);
                           } else {
                             // Imagem não está carregada ainda ou não está visível
                             // Fazer requisição normal ao backend
-                            console.log('[Fotos] ⚠️ Imagem não está carregada ainda, fazendo requisição ao backend');
+                            console.log('[Fotos] [AVISO] Imagem não está carregada ainda, fazendo requisição ao backend');
                             const url = imagemUrls[item.foto.id] || buildImageUrl(API_CONFIG.BASE_URL, item.foto.id);
                             setImagemAmpliada(url);
                           }

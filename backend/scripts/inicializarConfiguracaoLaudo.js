@@ -14,9 +14,9 @@ async function inicializarConfiguracao() {
     console.log('Criando tabela de configurações...');
     try {
       await ConfiguracaoLaudo.sync({ alter: true });
-      console.log('✅ Tabela criada/verificada!');
+      console.log('[OK] Tabela criada/verificada!');
     } catch (syncError) {
-      console.log('⚠️  Aviso ao sincronizar (pode já existir):', syncError.message);
+      console.log('[AVISO] Aviso ao sincronizar (pode já existir):', syncError.message);
     }
 
     // Buscar primeiro admin disponível
@@ -42,7 +42,7 @@ async function inicializarConfiguracao() {
         empresa_prestadora: 'Tech Survey Vistorias',
         usuario_id: admin?.id || null
       });
-      console.log('✅ Configuração atualizada com sucesso!');
+      console.log('[OK] Configuração atualizada com sucesso!');
       console.log('   - Nome da Empresa: Tech Survey Vistorias');
       console.log('   - Logo: /images/logo.png');
       console.log('   - Empresa Prestadora: Tech Survey Vistorias');
@@ -56,16 +56,16 @@ async function inicializarConfiguracao() {
         padrao: true,
         usuario_id: admin?.id || null
       });
-      console.log('✅ Configuração criada com sucesso!');
+      console.log('[OK] Configuração criada com sucesso!');
       console.log('   - Nome da Empresa: Tech Survey Vistorias');
       console.log('   - Logo: /images/logo.png');
       console.log('   - Empresa Prestadora: Tech Survey Vistorias');
     }
 
-    console.log('\n✅ Inicialização concluída!');
+    console.log('\n[OK] Inicialização concluída!');
     process.exit(0);
   } catch (error) {
-    console.error('❌ Erro ao inicializar configuração:', error);
+    console.error('[ERRO] Erro ao inicializar configuração:', error);
     process.exit(1);
   }
 }

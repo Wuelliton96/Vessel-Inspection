@@ -15,11 +15,11 @@ async function runMigration() {
     
     // Executar a migration
     await sequelize.query(migrationSQL);
-    console.log('✓ Migration executada com sucesso!\n');
+    console.log('[OK] Migration executada com sucesso!\n');
     
     return true;
   } catch (error) {
-    console.error('✗ Erro ao executar migration:', error.message);
+    console.error('[ERRO] Erro ao executar migration:', error.message);
     if (error.original) {
       console.error('Detalhes:', error.original.message);
     }
@@ -39,11 +39,11 @@ async function checkTable() {
     `);
     
     if (tables.length === 0) {
-      console.log('✗ Tabela fotos NÃO existe!');
+      console.log('[ERRO] Tabela fotos NÃO existe!');
       return false;
     }
     
-    console.log('✓ Tabela fotos existe');
+    console.log('[OK] Tabela fotos existe');
     
     // Verificar estrutura das colunas
     const [columns] = await sequelize.query(`
@@ -102,7 +102,7 @@ async function checkTable() {
     
     return true;
   } catch (error) {
-    console.error('✗ Erro ao verificar tabela:', error.message);
+    console.error('[ERRO] Erro ao verificar tabela:', error.message);
     return false;
   }
 }
@@ -145,9 +145,9 @@ async function checkTiposFoto() {
         ON CONFLICT (codigo) DO NOTHING
       `);
       
-      console.log('✓ Tipos de foto criados');
+      console.log('[OK] Tipos de foto criados');
     } else {
-      console.log('✓ Tabela tipos_foto_checklist existe');
+      console.log('[OK] Tabela tipos_foto_checklist existe');
     }
     
     // Contar tipos
@@ -156,7 +156,7 @@ async function checkTiposFoto() {
     `);
     
     const totalTipos = parseInt(count[0].total) || 0;
-    console.log(`✓ Total de tipos de foto: ${totalTipos}`);
+    console.log(`[OK] Total de tipos de foto: ${totalTipos}`);
     
     // Se não há tipos, criar alguns básicos para teste
     if (totalTipos === 0) {
@@ -180,15 +180,15 @@ async function checkTiposFoto() {
         `);
         
         const novoTotal = parseInt(newCount[0].total) || 0;
-        console.log(`✓ Tipos de foto criados. Total agora: ${novoTotal}`);
+        console.log(`[OK] Tipos de foto criados. Total agora: ${novoTotal}`);
       } catch (insertError) {
-        console.error('✗ Erro ao criar tipos de foto:', insertError.message);
+        console.error('[ERRO] Erro ao criar tipos de foto:', insertError.message);
       }
     }
     
     return true;
   } catch (error) {
-    console.error('✗ Erro ao verificar tipos de foto:', error.message);
+    console.error('[ERRO] Erro ao verificar tipos de foto:', error.message);
     return false;
   }
 }
@@ -211,8 +211,8 @@ async function testRelationships() {
       return true;
     }
     
-    console.log(`✓ Vistoria encontrada: ID ${vistoria.id}`);
-    console.log(`✓ Tipo de foto encontrado: ID ${tipoFoto.id} - ${tipoFoto.nome_exibicao}`);
+    console.log(`[OK] Vistoria encontrada: ID ${vistoria.id}`);
+    console.log(`[OK] Tipo de foto encontrado: ID ${tipoFoto.id} - ${tipoFoto.nome_exibicao}`);
     
     // Testar inserção (sem salvar no banco, apenas validar)
     const fotoTest = Foto.build({
@@ -224,7 +224,7 @@ async function testRelationships() {
     
     // Validar modelo
     await fotoTest.validate();
-    console.log('✓ Modelo validado com sucesso');
+    console.log('[OK] Modelo validado com sucesso');
     
     // Verificar relacionamentos
     const vistoriaComFotos = await Vistoria.findByPk(vistoria.id, {
@@ -232,12 +232,12 @@ async function testRelationships() {
     });
     
     if (vistoriaComFotos) {
-      console.log(`✓ Relacionamento Vistoria.hasMany(Foto) funcionando`);
+      console.log(`[OK] Relacionamento Vistoria.hasMany(Foto) funcionando`);
     }
     
     return true;
   } catch (error) {
-    console.error('✗ Erro ao testar relacionamentos:', error.message);
+    console.error('[ERRO] Erro ao testar relacionamentos:', error.message);
     if (error.errors) {
       error.errors.forEach(err => {
         console.error(`  - ${err.path}: ${err.message}`);
@@ -268,7 +268,7 @@ async function testInsertDelete() {
       observacao: 'Foto de teste - será deletada em seguida'
     });
     
-    console.log(`✓ Foto criada com ID: ${fotoTest.id}`);
+    console.log(`[OK] Foto criada com ID: ${fotoTest.id}`);
     console.log(`  - url_arquivo: ${fotoTest.url_arquivo}`);
     console.log(`  - vistoria_id: ${fotoTest.vistoria_id}`);
     console.log(`  - tipo_foto_id: ${fotoTest.tipo_foto_id}`);
@@ -282,18 +282,18 @@ async function testInsertDelete() {
     });
     
     if (fotoEncontrada) {
-      console.log('✓ Foto encontrada com relacionamentos');
+      console.log('[OK] Foto encontrada com relacionamentos');
       console.log(`  - Vistoria: ${fotoEncontrada.Vistoria?.id || 'N/A'}`);
       console.log(`  - Tipo Foto: ${fotoEncontrada.TipoFotoChecklist?.nome_exibicao || 'N/A'}`);
     }
     
     // Deletar foto de teste
     await fotoTest.destroy();
-    console.log('✓ Foto de teste deletada');
+    console.log('[OK] Foto de teste deletada');
     
     return true;
   } catch (error) {
-    console.error('✗ Erro ao testar inserção/deleção:', error.message);
+    console.error('[ERRO] Erro ao testar inserção/deleção:', error.message);
     if (error.original) {
       console.error('Detalhes:', error.original.message);
     }
@@ -316,7 +316,7 @@ async function testChecklistLink() {
       return true;
     }
     
-    console.log(`✓ Item de checklist encontrado: ${checklistItem.nome} (ID: ${checklistItem.id})`);
+    console.log(`[OK] Item de checklist encontrado: ${checklistItem.nome} (ID: ${checklistItem.id})`);
     console.log(`  - Vistoria ID: ${checklistItem.vistoria_id}`);
     
     // Buscar tipo de foto correspondente
@@ -334,7 +334,7 @@ async function testChecklistLink() {
       observacao: 'Foto de teste para checklist'
     });
     
-    console.log(`✓ Foto criada: ID ${fotoTest.id}`);
+    console.log(`[OK] Foto criada: ID ${fotoTest.id}`);
     
     // Atualizar item do checklist
     await checklistItem.update({
@@ -343,7 +343,7 @@ async function testChecklistLink() {
       concluido_em: new Date()
     });
     
-    console.log('✓ Item do checklist atualizado com foto_id');
+    console.log('[OK] Item do checklist atualizado com foto_id');
     
     // Verificar link
     const itemAtualizado = await VistoriaChecklistItem.findByPk(checklistItem.id, {
@@ -351,7 +351,7 @@ async function testChecklistLink() {
     });
     
     if (itemAtualizado?.foto) {
-      console.log(`✓ Link confirmado: Checklist Item → Foto ID ${itemAtualizado.foto.id}`);
+      console.log(`[OK] Link confirmado: Checklist Item → Foto ID ${itemAtualizado.foto.id}`);
     }
     
     // Limpar: reverter item do checklist e deletar foto
@@ -362,11 +362,11 @@ async function testChecklistLink() {
     });
     
     await fotoTest.destroy();
-    console.log('✓ Teste limpo: checklist revertido e foto deletada');
+    console.log('[OK] Teste limpo: checklist revertido e foto deletada');
     
     return true;
   } catch (error) {
-    console.error('✗ Erro ao testar link com checklist:', error.message);
+    console.error('[ERRO] Erro ao testar link com checklist:', error.message);
     if (error.original) {
       console.error('Detalhes:', error.original.message);
     }
@@ -382,7 +382,7 @@ async function main() {
   try {
     // Testar conexão
     await sequelize.authenticate();
-    console.log('✓ Conexão com banco de dados estabelecida\n');
+    console.log('[OK] Conexão com banco de dados estabelecida\n');
     
     // Verificar/criar tipos de foto primeiro
     await checkTiposFoto();
@@ -409,12 +409,12 @@ async function main() {
     await testChecklistLink();
     
     console.log('\n========================================');
-    console.log('✓ TODOS OS TESTES CONCLUÍDOS COM SUCESSO!');
+    console.log('[OK] TODOS OS TESTES CONCLUÍDOS COM SUCESSO!');
     console.log('========================================\n');
     
   } catch (error) {
     console.error('\n========================================');
-    console.error('✗ ERRO GERAL:', error.message);
+    console.error('[ERRO] ERRO GERAL:', error.message);
     console.error('========================================\n');
     if (error.stack) {
       console.error(error.stack);

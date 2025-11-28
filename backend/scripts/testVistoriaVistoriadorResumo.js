@@ -14,9 +14,9 @@ async function testResumo() {
     const statusConcluida = await StatusVistoria.findOne({ where: { nome: 'CONCLUIDA' } });
 
     console.log('1. STATUS DO SISTEMA:');
-    console.log(`   ${statusPendente ? '✅' : '❌'} PENDENTE: ${statusPendente?.id || 'Não encontrado'}`);
-    console.log(`   ${statusEmAndamento ? '✅' : '⚠️'} EM_ANDAMENTO: ${statusEmAndamento?.id || 'Não encontrado'}`);
-    console.log(`   ${statusConcluida ? '✅' : '⚠️'} CONCLUIDA: ${statusConcluida?.id || 'Não encontrado'}\n`);
+    console.log(`   ${statusPendente ? '[OK]' : '[ERRO]'} PENDENTE: ${statusPendente?.id || 'Não encontrado'}`);
+    console.log(`   ${statusEmAndamento ? '[OK]' : '[AVISO]'} EM_ANDAMENTO: ${statusEmAndamento?.id || 'Não encontrado'}`);
+    console.log(`   ${statusConcluida ? '[OK]' : '[AVISO]'} CONCLUIDA: ${statusConcluida?.id || 'Não encontrado'}\n`);
 
     // 2. Verificar vistoriadores
     const nivelVistoriador = await NivelAcesso.findOne({ where: { nome: 'VISTORIADOR' } });
@@ -96,21 +96,21 @@ async function testResumo() {
     console.log(`   Vistorias PENDENTE que seriam retornadas: ${vistoriasPendentes.length - pendentesNaoRetornadas.length}`);
     
     if (pendentesNaoRetornadas.length > 0) {
-      console.log(`   ❌ PROBLEMA: ${pendentesNaoRetornadas.length} vistoria(s) PENDENTE não seriam retornadas!`);
+      console.log(`   [ERRO] PROBLEMA: ${pendentesNaoRetornadas.length} vistoria(s) PENDENTE não seriam retornadas!`);
     } else if (vistoriasPendentes.length > 0) {
-      console.log(`   ✅ OK: Todas as vistorias PENDENTE seriam retornadas corretamente`);
+      console.log(`   [OK] OK: Todas as vistorias PENDENTE seriam retornadas corretamente`);
     } else {
-      console.log(`   ⚠️  Não há vistorias PENDENTE no sistema para validar`);
+      console.log(`   [AVISO]  Não há vistorias PENDENTE no sistema para validar`);
     }
 
     console.log('\n=== RESUMO ===');
-    console.log('✅ Status PENDENTE está incluído na busca da rota');
-    console.log('✅ Vistorias PENDENTE aparecem corretamente para o vistoriador');
-    console.log('✅ Sistema funcionando corretamente\n');
+    console.log('[OK] Status PENDENTE está incluído na busca da rota');
+    console.log('[OK] Vistorias PENDENTE aparecem corretamente para o vistoriador');
+    console.log('[OK] Sistema funcionando corretamente\n');
 
     process.exit(0);
   } catch (error) {
-    console.error('❌ Erro no teste:', error);
+    console.error('[ERRO] Erro no teste:', error);
     process.exit(1);
   }
 }

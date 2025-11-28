@@ -10,6 +10,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage",
+    "sonar": "npm run test:coverage && sonar-scanner",
+    "sonar:local": "npm run test:coverage && sonar-scanner -Dsonar.host.url=http://localhost:9000",
     "test:models": "jest tests/models/",
     "test:routes": "jest tests/routes/",
     "test:middleware": "jest tests/middleware/",

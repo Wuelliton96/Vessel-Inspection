@@ -132,8 +132,10 @@ describe('Validators', () => {
 
   describe('formatarValorMonetario', () => {
     it('deve formatar valor em reais', () => {
-      expect(formatarValorMonetario(1500)).toBe('R$ 1.500,00');
-      expect(formatarValorMonetario(1500.50)).toBe('R$ 1.500,50');
+      // Intl.NumberFormat pode usar espaço não quebrável, normalizar para comparação
+      const normalize = (str) => str.replace(/\u00A0/g, ' ').trim();
+      expect(normalize(formatarValorMonetario(1500))).toBe('R$ 1.500,00');
+      expect(normalize(formatarValorMonetario(1500.50))).toBe('R$ 1.500,50');
     });
 
     it('deve retornar vazio para null', () => {

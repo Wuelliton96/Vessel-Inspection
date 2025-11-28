@@ -1,6 +1,19 @@
-const { TipoFotoChecklist } = require('../../models');
+const { TipoFotoChecklist, sequelize } = require('../../models');
 
 describe('Modelo TipoFotoChecklist', () => {
+  beforeEach(async () => {
+    // Limpar tipos antes de cada teste (apenas os que não têm foreign keys)
+    try {
+      await TipoFotoChecklist.destroy({ where: {}, force: true });
+    } catch (error) {
+      // Ignorar erro se houver foreign key constraints
+    }
+  });
+
+  afterAll(async () => {
+    await sequelize.close();
+  });
+
   describe('Criação de tipo de foto checklist', () => {
     it('deve criar um tipo de foto com dados válidos', async () => {
       const tipoData = {

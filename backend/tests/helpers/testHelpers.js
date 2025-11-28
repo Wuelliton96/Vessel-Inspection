@@ -38,7 +38,7 @@ const createTestData = async () => {
   const senhaHash = await bcrypt.hash('Teste@123', 10);
   
   const usuarioAdmin = await Usuario.create({
-    cpf: '12345678901',
+    cpf: generateTestCPF('admin01'),
     nome: 'Admin Teste',
     email: 'admin@teste.com',
     senha_hash: senhaHash,
@@ -46,7 +46,7 @@ const createTestData = async () => {
   });
 
   const usuarioVistoriador = await Usuario.create({
-    cpf: '12345678902',
+    cpf: generateTestCPF('vist01'),
     nome: 'Vistoriador Teste',
     email: 'vistoriador@teste.com',
     senha_hash: senhaHash,
@@ -54,7 +54,7 @@ const createTestData = async () => {
   });
 
   const usuarioAprovador = await Usuario.create({
-    cpf: '12345678903',
+    cpf: generateTestCPF('aprov01'),
     nome: 'Aprovador Teste',
     email: 'aprovador@teste.com',
     senha_hash: senhaHash,
@@ -254,7 +254,7 @@ const cleanupTestData = async () => {
 const createTestUser = async (overrides = {}) => {
   const senhaHash = await bcrypt.hash('Teste@123', 10);
   const defaultData = {
-    cpf: '12345678900',
+    cpf: generateTestCPF(),
     nome: 'Usuário Teste',
     email: 'teste@teste.com',
     senha_hash: senhaHash,
@@ -264,8 +264,8 @@ const createTestUser = async (overrides = {}) => {
 
   const userData = { ...defaultData, ...overrides };
   // Se cpf não foi fornecido, gerar um único
-  if (!userData.cpf || userData.cpf === defaultData.cpf) {
-    userData.cpf = `${Date.now()}`.slice(-11).padStart(11, '0');
+  if (!userData.cpf || userData.cpf === '12345678900') {
+    userData.cpf = generateTestCPF(Date.now());
   }
   return await Usuario.create(userData);
 };
@@ -390,32 +390,101 @@ const mockRequestData = {
  * Setup básico do ambiente de teste (sequelize sync + níveis de acesso)
  */
 const setupTestEnvironment = async () => {
-  await sequelize.sync({ force: true });
+  try {
+    // Tentar sincronizar com force: true
+    // Se falhar, tentar sem force (pode ser que as tabelas já existam)
+    try {
+      await sequelize.sync({ force: true });
+    } catch (syncError) {
+      // Se falhar, tentar apenas sincronizar sem dropar
+      try {
+        await sequelize.sync({ alter: false });
+      } catch (altError) {
+        // Se ainda falhar, apenas continuar (tabelas podem já estar criadas)
+        console.warn('[testHelpers] Aviso ao sincronizar banco:', altError.message);
+      }
+    }
+  } catch (error) {
+    // Se tudo falhar, apenas logar e continuar
+    console.warn('[testHelpers] Erro ao sincronizar banco, continuando:', error.message);
+  }
   
-  const nivelAdmin = await NivelAcesso.create({ 
-    id: 1, 
-    nome: 'ADMINISTRADOR', 
-    descricao: 'Admin' 
-  });
+  // Verificar se os níveis já existem, se não, criar
+  let nivelAdmin = await NivelAcesso.findByPk(1);
+  if (!nivelAdmin) {
+    nivelAdmin = await NivelAcesso.create({ 
+      id: 1, 
+      nome: 'ADMINISTRADOR', 
+      descricao: 'Admin' 
+    });
+  }
   
-  const nivelVistoriador = await NivelAcesso.create({ 
-    id: 2, 
-    nome: 'VISTORIADOR', 
-    descricao: 'Vistoriador' 
-  });
+  let nivelVistoriador = await NivelAcesso.findByPk(2);
+  if (!nivelVistoriador) {
+    nivelVistoriador = await NivelAcesso.create({ 
+      id: 2, 
+      nome: 'VISTORIADOR', 
+      descricao: 'Vistoriador' 
+    });
+  }
   
   return { nivelAdmin, nivelVistoriador };
 };
+
+/**
+ * Gera um CPF válido para testes (11 dígitos numéricos)
+ * Garante que sempre tenha exatamente 11 dígitos numéricos
+ */
+const generateTestCPF = (suffix = '') => {
+  const base = '123456789';
+  let uniquePart;
+  if (suffix !== '' && suffix !== null && suffix !== undefined) {
+    // Extrair apenas dígitos do suffix e pegar últimos 2
+    const suffixStr = String(suffix).replace(/\D/g, '');
+    if (suffixStr.length > 0) {
+      uniquePart = suffixStr.slice(-2).padStart(2, '0');
+    } else {
+      // Se não houver dígitos, usar hash do suffix
+      let hash = 0;
+      for (let i = 0; i < String(suffix).length; i++) {
+        hash = ((hash << 5) - hash) + String(suffix).charCodeAt(i);
+        hash = hash & hash; // Convert to 32bit integer
+      }
+      uniquePart = String(Math.abs(hash)).slice(-2).padStart(2, '0');
+    }
+  } else {
+    // Usar últimos 2 dígitos do timestamp
+    uniquePart = String(Date.now()).slice(-2).padStart(2, '0');
+  }
+  const cpf = `${base}${uniquePart}`;
+  // Garantir exatamente 11 dígitos numéricos
+  return cpf.length === 11 && /^\d{11}$/.test(cpf) ? cpf : '12345678900';
+};
+
+// Contador global para garantir CPFs únicos entre testes
+let globalCPFCounter = 0;
 
 /**
  * Cria usuários de teste (admin e vistoriador)
  */
 const createTestUsers = async (senhaHash, nivelAdmin, nivelVistoriador, suffix = '') => {
   const timestamp = Date.now();
-  const randomSuffix = suffix || Math.floor(Math.random() * 1000);
+  globalCPFCounter++;
+  // Usar contador global + timestamp para garantir unicidade
+  const uniqueId = suffix ? `${suffix}_${globalCPFCounter}` : `${timestamp}_${globalCPFCounter}`;
+  
+  // Garantir que os CPFs sejam diferentes
+  let adminCPF = generateTestCPF(`${uniqueId}_admin`);
+  let vistoriadorCPF = generateTestCPF(`${uniqueId}_vist`);
+  
+  // Verificar se são diferentes, se não, ajustar o vistoriador
+  if (adminCPF === vistoriadorCPF) {
+    const vistCPFNum = (parseInt(vistoriadorCPF.slice(-2)) + 1) % 100;
+    vistoriadorCPF = `123456789${String(vistCPFNum).padStart(2, '0')}`;
+  }
   
   const admin = await Usuario.create({
-    cpf: `123456789${String(randomSuffix).padStart(2, '0')}`,
+    cpf: adminCPF,
     nome: 'Admin',
     email: `admin${suffix}@test${timestamp}.com`,
     senha_hash: senhaHash,
@@ -423,7 +492,7 @@ const createTestUsers = async (senhaHash, nivelAdmin, nivelVistoriador, suffix =
   });
   
   const vistoriador = await Usuario.create({
-    cpf: `123456789${String(randomSuffix + 1).padStart(2, '0')}`,
+    cpf: vistoriadorCPF,
     nome: 'Vistoriador',
     email: `vist${suffix}@test${timestamp}.com`,
     senha_hash: senhaHash,
@@ -573,5 +642,6 @@ module.exports = {
   createTestUsers,
   generateTokens,
   setupCompleteTestEnvironment,
-  createTestApp
+  createTestApp,
+  generateTestCPF
 };

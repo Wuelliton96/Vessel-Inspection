@@ -8,56 +8,52 @@ const {
   NivelAcesso 
 } = require('../../models');
 
+const { setupTestEnvironment, generateTestCPF } = require('../helpers/testHelpers');
+
 describe('Modelo Vistoria', () => {
   let vistoriador, administrador, embarcacao, local, statusPendente;
 
   beforeEach(async () => {
-    // Criar nível de acesso
-    const nivelVistoriador = await NivelAcesso.create({
-      nome: 'VISTORIADOR',
-      descricao: 'Nível para vistoriadores'
-    });
-
-    const nivelAdmin = await NivelAcesso.create({
-      nome: 'ADMINISTRADOR',
-      descricao: 'Nível para administradores'
-    });
+    // Usar setupTestEnvironment para evitar duplicação
+    const { nivelAdmin, nivelVistoriador } = await setupTestEnvironment();
 
     // Criar usuários
     const senhaHash = await bcrypt.hash('Teste@123', 10);
     
+    const timestamp = Date.now();
     vistoriador = await Usuario.create({
-      cpf: '12345678911',
+      cpf: generateTestCPF(`vist_${timestamp}`),
       nome: 'Vistoriador Teste',
-      email: 'vistoriador@teste.com',
+      email: `vistoriador${timestamp}@teste.com`,
       senha_hash: senhaHash,
       nivel_acesso_id: nivelVistoriador.id
     });
 
     administrador = await Usuario.create({
-      cpf: '12345678912',
+      cpf: generateTestCPF(`admin_${timestamp}`),
       nome: 'Admin Teste',
-      email: 'admin@teste.com',
+      email: `admin${timestamp}@teste.com`,
       senha_hash: senhaHash,
       nivel_acesso_id: nivelAdmin.id
     });
 
-    // Criar embarcação
+    // Criar embarcação com nome único
     embarcacao = await Embarcacao.create({
-      nome: 'Barco Vistoria',
-      nr_inscricao_barco: 'VIST001'
+      nome: `Barco Vistoria ${timestamp}`,
+      nr_inscricao_barco: `VIST${timestamp}`
     });
 
-    // Criar local
+    // Criar local com nome único
     local = await Local.create({
       tipo: 'MARINA',
-      nome_local: 'Marina Teste',
-      cep: '12345-678'
+      nome_local: `Marina Teste ${timestamp}`,
+      cep: `12345-${timestamp.toString().slice(-3)}`
     });
 
-    // Criar status
+    // Criar status com nome único
+    const statusTimestamp = Date.now();
     statusPendente = await StatusVistoria.create({
-      nome: 'PENDENTE',
+      nome: `PENDENTE_${statusTimestamp}`,
       descricao: 'Vistoria pendente'
     });
   });
@@ -200,7 +196,8 @@ describe('Modelo Vistoria', () => {
 
       expect(vistoriaComStatus).toBeDefined();
       expect(vistoriaComStatus.StatusVistoria).toBeDefined();
-      expect(vistoriaComStatus.StatusVistoria.nome).toBe('PENDENTE');
+      expect(vistoriaComStatus.StatusVistoria).toBeDefined();
+      expect(vistoriaComStatus.StatusVistoria.nome).toContain('PENDENTE');
     });
   });
 

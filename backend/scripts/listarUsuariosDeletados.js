@@ -10,7 +10,7 @@ const { Op } = require('sequelize');
 
 async function listarUsuariosDeletados() {
   try {
-    console.log('\n🔍 Buscando usuários deletados...\n');
+    console.log('\n[PROCURANDO] Buscando usuários deletados...\n');
 
     const deletados = await Usuario.findAll({
       paranoid: false,
@@ -25,11 +25,11 @@ async function listarUsuariosDeletados() {
     });
 
     if (deletados.length === 0) {
-      console.log('✅ Nenhum usuário deletado encontrado\n');
+      console.log('[OK] Nenhum usuário deletado encontrado\n');
       return;
     }
 
-    console.log(`📋 Total de usuários deletados: ${deletados.length}\n`);
+    console.log(`[INFO] Total de usuários deletados: ${deletados.length}\n`);
     console.log('━'.repeat(80));
 
     deletados.forEach((usuario, index) => {
@@ -47,7 +47,7 @@ async function listarUsuariosDeletados() {
     });
 
     console.log('\n' + '━'.repeat(80));
-    console.log('\n💡 Para recuperar um usuário, use:');
+    console.log('\n[INFO] Para recuperar um usuário, use:');
     console.log('   node backend/scripts/recuperarUsuario.js email@usuario.com\n');
     
   } catch (error) {

@@ -14,8 +14,6 @@ describe('Rotas de Laudos', () => {
   let laudoCriado;
 
   beforeAll(async () => {
-    await sequelize.sync({ force: true });
-
     const setup = await setupCompleteTestEnvironment('laudo');
     admin = setup.admin;
     vistoriador = setup.vistoriador;

@@ -1,6 +1,10 @@
 // Configuração global para os testes
 process.env.NODE_ENV = 'test';
 
+// Carregar variáveis de ambiente do arquivo .env
+const path = require('node:path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+
 // PROTEÇÃO CRÍTICA: Garantir que TEST_DATABASE_URL está configurado
 // Isso previne que testes apaguem dados de produção
 if (!process.env.TEST_DATABASE_URL && !process.env.DATABASE_URL) {
@@ -23,7 +27,7 @@ if (!process.env.TEST_DATABASE_URL && process.env.DATABASE_URL) {
 jest.setTimeout(30000);
 
 // Mock do console para reduzir ruído nos testes
-global.console = {
+globalThis.console = {
   ...console,
   log: jest.fn(),
   debug: jest.fn(),

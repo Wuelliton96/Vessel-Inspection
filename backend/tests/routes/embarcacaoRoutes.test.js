@@ -1,7 +1,7 @@
 const request = require('supertest');
 const { sequelize, Embarcacao, Seguradora, Cliente } = require('../../models');
 const embarcacaoRoutes = require('../../routes/embarcacaoRoutes');
-const { setupCompleteTestEnvironment, createTestApp } = require('../helpers/testHelpers');
+const { setupCompleteTestEnvironment, createTestApp, generateTestCPF } = require('../helpers/testHelpers');
 
 const app = createTestApp({ path: '/api/embarcacoes', router: embarcacaoRoutes });
 
@@ -39,10 +39,11 @@ describe('Rotas de Embarcações', () => {
     });
 
     it('deve filtrar por CPF do proprietário', async () => {
-      await Embarcacao.create({ nome: 'Barco CPF', nr_inscricao_barco: 'B002', proprietario_cpf: '12345678900' });
+      const testCPF = generateTestCPF('emb00');
+      await Embarcacao.create({ nome: 'Barco CPF', nr_inscricao_barco: 'B002', proprietario_cpf: testCPF });
       
       const response = await request(app)
-        .get('/api/embarcacoes?proprietario_cpf=12345678900')
+        .get(`/api/embarcacoes?proprietario_cpf=${testCPF}`)
         .set('Authorization', `Bearer ${vistoriadorToken}`);
 
       expect(response.status).toBe(200);

@@ -12,7 +12,7 @@ async function testVistoriaVistoriadorEndToEnd() {
     // 1. Buscar um vistoriador
     const nivelVistoriador = await NivelAcesso.findOne({ where: { nome: 'VISTORIADOR' } });
     if (!nivelVistoriador) {
-      console.log('❌ Nível VISTORIADOR não encontrado');
+      console.log('[ERRO] Nível VISTORIADOR não encontrado');
       process.exit(1);
     }
 
@@ -22,11 +22,11 @@ async function testVistoriaVistoriadorEndToEnd() {
     });
 
     if (!vistoriador) {
-      console.log('❌ Nenhum vistoriador encontrado');
+      console.log('[ERRO] Nenhum vistoriador encontrado');
       process.exit(1);
     }
 
-    console.log(`✅ Vistoriador encontrado: ${vistoriador.nome} (ID: ${vistoriador.id})\n`);
+    console.log(`[OK] Vistoriador encontrado: ${vistoriador.nome} (ID: ${vistoriador.id})\n`);
 
     // 2. Buscar uma embarcação e local existentes
     const embarcacao = await Embarcacao.findOne();
@@ -34,16 +34,16 @@ async function testVistoriaVistoriadorEndToEnd() {
     const statusPendente = await StatusVistoria.findOne({ where: { nome: 'PENDENTE' } });
 
     if (!embarcacao || !local || !statusPendente) {
-      console.log('❌ Dados necessários não encontrados:');
-      console.log(`   Embarcação: ${embarcacao ? '✅' : '❌'}`);
-      console.log(`   Local: ${local ? '✅' : '❌'}`);
-      console.log(`   Status PENDENTE: ${statusPendente ? '✅' : '❌'}`);
+      console.log('[ERRO] Dados necessários não encontrados:');
+      console.log(`   Embarcação: ${embarcacao ? '[OK]' : '[ERRO]'}`);
+      console.log(`   Local: ${local ? '[OK]' : '[ERRO]'}`);
+      console.log(`   Status PENDENTE: ${statusPendente ? '[OK]' : '[ERRO]'}`);
       process.exit(1);
     }
 
-    console.log(`✅ Embarcação: ${embarcacao.nome} (ID: ${embarcacao.id})`);
-    console.log(`✅ Local: ${local.nome_local || local.logradouro || 'ID ' + local.id} (ID: ${local.id})`);
-    console.log(`✅ Status PENDENTE: ID ${statusPendente.id}\n`);
+    console.log(`[OK] Embarcação: ${embarcacao.nome} (ID: ${embarcacao.id})`);
+    console.log(`[OK] Local: ${local.nome_local || local.logradouro || 'ID ' + local.id} (ID: ${local.id})`);
+    console.log(`[OK] Status PENDENTE: ID ${statusPendente.id}\n`);
 
     // 3. Verificar vistorias existentes antes
     const vistoriasAntes = await Vistoria.findAll({
@@ -89,7 +89,7 @@ async function testVistoriaVistoriadorEndToEnd() {
       status_id: statusPendente.id
     });
 
-    console.log(`✅ Vistoria criada: ID ${novaVistoria.id}`);
+    console.log(`[OK] Vistoria criada: ID ${novaVistoria.id}`);
     console.log(`   Vistoriador: ${vistoriador.nome} (ID: ${vistoriador.id})`);
     console.log(`   Status: PENDENTE (ID: ${statusPendente.id})\n`);
 
@@ -115,37 +115,37 @@ async function testVistoriaVistoriadorEndToEnd() {
     const vistoriaEncontrada = vistoriasDepoisQuery.find(v => v.id === novaVistoria.id);
 
     if (vistoriaEncontrada) {
-      console.log('\n✅ SUCESSO: A vistoria PENDENTE está sendo retornada pela rota!');
+      console.log('\n[OK] SUCESSO: A vistoria PENDENTE está sendo retornada pela rota!');
       console.log(`   ID: ${vistoriaEncontrada.id}`);
       console.log(`   Embarcação: ${vistoriaEncontrada.Embarcacao?.nome || 'N/A'}`);
       console.log(`   Status: ${vistoriaEncontrada.StatusVistoria?.nome || 'N/A'}`);
       console.log(`   Vistoriador: ${vistoriaEncontrada.vistoriador?.nome || 'N/A'}`);
     } else {
-      console.log('\n❌ ERRO: A vistoria PENDENTE NÃO está sendo retornada pela rota!');
+      console.log('\n[ERRO] ERRO: A vistoria PENDENTE NÃO está sendo retornada pela rota!');
       console.log('   Verifique se o status PENDENTE está incluído na busca.');
     }
 
     // 7. Limpar - deletar a vistoria de teste
     console.log('\n=== LIMPEZA ===');
     await novaVistoria.destroy();
-    console.log('✅ Vistoria de teste removida\n');
+    console.log('[OK] Vistoria de teste removida\n');
 
     // 8. Resumo final
     console.log('=== RESUMO DO TESTE ===');
-    console.log(`✅ Vistoriador: ${vistoriador.nome} (ID: ${vistoriador.id})`);
-    console.log(`✅ Status incluídos na busca: ${statusIds.join(', ')}`);
-    console.log(`✅ Vistoria PENDENTE criada e encontrada: ${vistoriaEncontrada ? 'SIM' : 'NÃO'}`);
+    console.log(`[OK] Vistoriador: ${vistoriador.nome} (ID: ${vistoriador.id})`);
+    console.log(`[OK] Status incluídos na busca: ${statusIds.join(', ')}`);
+    console.log(`[OK] Vistoria PENDENTE criada e encontrada: ${vistoriaEncontrada ? 'SIM' : 'NÃO'}`);
     
     if (vistoriaEncontrada) {
-      console.log('\n✅ TESTE PASSOU: Vistorias PENDENTE aparecem corretamente para o vistoriador');
+      console.log('\n[OK] TESTE PASSOU: Vistorias PENDENTE aparecem corretamente para o vistoriador');
     } else {
-      console.log('\n❌ TESTE FALHOU: Vistorias PENDENTE não aparecem para o vistoriador');
+      console.log('\n[ERRO] TESTE FALHOU: Vistorias PENDENTE não aparecem para o vistoriador');
     }
 
     console.log('\n=== TESTE CONCLUÍDO ===\n');
     process.exit(vistoriaEncontrada ? 0 : 1);
   } catch (error) {
-    console.error('❌ Erro no teste:', error);
+    console.error('[ERRO] Erro no teste:', error);
     process.exit(1);
   }
 }

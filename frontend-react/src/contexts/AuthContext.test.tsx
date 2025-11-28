@@ -29,22 +29,56 @@ const localStorageMock = (() => {
   };
 })();
 
-Object.defineProperty(window, 'localStorage', {
+Object.defineProperty(globalThis, 'localStorage', {
   value: localStorageMock,
 });
 
 describe('AuthContext', () => {
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <AuthProvider>{children}</AuthProvider>
+  );
+
+  const createMockResponse = (overrides = {}) => ({
+    token: 'mock-token',
+    usuario: {
+      id: 1,
+      nome: 'Test User',
+      email: 'test@example.com',
+      nivelAcessoId: 1,
+      ativo: true,
+      createdAt: '2023-01-01',
+      updatedAt: '2023-01-01',
+      ...overrides.usuario,
+    },
+    ...overrides,
+  });
+
+  const renderAuthHook = () => renderHook(() => useAuth(), { wrapper });
+
+  const setupLoginMock = (mockResponse = createMockResponse()) => {
+    (authService.login as jest.Mock).mockResolvedValue(mockResponse);
+    return mockResponse;
+  };
+
+  const performLogin = async (result: ReturnType<typeof renderAuthHook>['result'], email = 'test@example.com', password = 'password') => {
+    await act(async () => {
+      await result.current.login(email, password);
+    });
+  };
+
+  const expectUnauthenticatedState = (result: ReturnType<typeof renderAuthHook>['result']) => {
+    expect(result.current.isAuthenticated).toBe(false);
+    expect(result.current.usuario).toBeNull();
+    expect(result.current.token).toBeNull();
+  };
+
   beforeEach(() => {
     localStorage.clear();
     jest.clearAllMocks();
   });
 
-  const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <AuthProvider>{children}</AuthProvider>
-  );
-
   test('provides authentication context', () => {
-    const { result } = renderHook(() => useAuth(), { wrapper });
+    const { result } = renderAuthHook();
     
     expect(result.current).toHaveProperty('usuario');
     expect(result.current).toHaveProperty('token');
@@ -54,34 +88,15 @@ describe('AuthContext', () => {
   });
 
   test('initial state is not authenticated', () => {
-    const { result } = renderHook(() => useAuth(), { wrapper });
-    
-    expect(result.current.isAuthenticated).toBe(false);
-    expect(result.current.usuario).toBeNull();
-    expect(result.current.token).toBeNull();
+    const { result } = renderAuthHook();
+    expectUnauthenticatedState(result);
   });
 
   test('login sets user and token', async () => {
-    const mockResponse = {
-      token: 'mock-token',
-      usuario: {
-        id: 1,
-        nome: 'Test User',
-        email: 'test@example.com',
-        nivelAcessoId: 1,
-        ativo: true,
-        createdAt: '2023-01-01',
-        updatedAt: '2023-01-01',
-      },
-    };
+    const mockResponse = setupLoginMock();
+    const { result } = renderAuthHook();
 
-    (authService.login as jest.Mock).mockResolvedValue(mockResponse);
-
-    const { result } = renderHook(() => useAuth(), { wrapper });
-
-    await act(async () => {
-      await result.current.login('test@example.com', 'password');
-    });
+    await performLogin(result);
 
     await waitFor(() => {
       expect(result.current.isAuthenticated).toBe(true);
@@ -91,40 +106,19 @@ describe('AuthContext', () => {
   });
 
   test('logout clears user and token', async () => {
-    const mockResponse = {
-      token: 'mock-token',
-      usuario: {
-        id: 1,
-        nome: 'Test User',
-        email: 'test@example.com',
-        nivelAcessoId: 1,
-        ativo: true,
-        createdAt: '2023-01-01',
-        updatedAt: '2023-01-01',
-      },
-    };
+    setupLoginMock();
+    const { result } = renderAuthHook();
 
-    (authService.login as jest.Mock).mockResolvedValue(mockResponse);
+    await performLogin(result);
 
-    const { result } = renderHook(() => useAuth(), { wrapper });
-
-    // Login primeiro
-    await act(async () => {
-      await result.current.login('test@example.com', 'password');
-    });
-
-    // Depois logout
     act(() => {
       result.current.logout();
     });
 
-    expect(result.current.isAuthenticated).toBe(false);
-    expect(result.current.usuario).toBeNull();
-    expect(result.current.token).toBeNull();
+    expectUnauthenticatedState(result);
   });
 
   test('throws error when useAuth is used outside provider', () => {
-    // Suprimir console.error durante este teste
     const originalError = console.error;
     console.error = jest.fn();
 

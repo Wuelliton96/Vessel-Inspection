@@ -35,9 +35,10 @@ describe('Rotas de Fotos - Testes de Produção', () => {
     app.use('/api/fotos', fotoRoutes);
 
     // Criar dados de teste
+    const { generateTestCPF } = require('../helpers/testHelpers');
     const nivelAcesso = await NivelAcesso.findOne({ where: { nome: 'ADMINISTRADOR' } });
     const usuario = await Usuario.create({
-      cpf: '12345678901',
+      cpf: generateTestCPF('foto01'),
       nome: 'Teste User',
       email: 'teste@teste.com',
       senha_hash: 'hash',

@@ -1,6 +1,6 @@
 const { Sequelize } = require('sequelize');
-const path = require('path');
-const fs = require('fs');
+const path = require('node:path');
+const fs = require('node:fs');
 const logger = require('../utils/logger');
 
 const ENV_PATH = path.resolve(__dirname, '..', '.env');
@@ -68,9 +68,17 @@ const isProductionLike = databaseUrl && (
   databaseUrl.includes('planetscale.com')
 );
 
+// Detecta se é uma URL local (localhost, 127.0.0.1, etc) - nunca usar SSL em localhost
+const isLocalhost = databaseUrl && (
+  databaseUrl.includes('localhost') ||
+  databaseUrl.includes('127.0.0.1') ||
+  databaseUrl.includes('::1')
+);
+
 // Se DB_SSL estiver true OU a URL exigir SSL OU for uma URL de produção, configura SSL
 // com rejeição de certificado desabilitada para aceitar certificados auto-assinados
-const useSSL = DB_SSL || urlRequiresSSL || isProductionLike;
+// MAS: nunca usar SSL em localhost, mesmo que DB_SSL esteja true
+const useSSL = !isLocalhost && (DB_SSL || urlRequiresSSL || isProductionLike);
 
 // Remove parâmetros SSL da URL para evitar conflito com dialectOptions
 // O Sequelize deve usar apenas a configuração via dialectOptions
@@ -131,6 +139,7 @@ if (process.env.NODE_ENV !== 'production') {
   logger.debug('[config/database] DB_SSL =', DB_SSL);
   logger.debug('[config/database] URL requires SSL =', urlRequiresSSL);
   logger.debug('[config/database] Is production-like URL =', isProductionLike);
+  logger.debug('[config/database] Is localhost =', isLocalhost);
   logger.debug('[config/database] Using SSL (with rejectUnauthorized: false) =', useSSL);
 }
 

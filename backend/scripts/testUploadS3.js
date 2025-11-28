@@ -10,7 +10,7 @@ async function testS3Upload() {
   
   try {
     if (!bucket) {
-      console.error('✗ AWS_S3_BUCKET não configurado no .env');
+      console.error('[ERRO] AWS_S3_BUCKET não configurado no .env');
       process.exit(1);
     }
     
@@ -25,9 +25,9 @@ async function testS3Upload() {
         MaxKeys: 1
       });
       await s3Client.send(listCommand);
-      console.log('✓ Bucket acessível\n');
+      console.log('[OK] Bucket acessível\n');
     } catch (error) {
-      console.error('✗ Erro ao acessar bucket:', error.message);
+      console.error('[ERRO] Erro ao acessar bucket:', error.message);
       process.exit(1);
     }
     
@@ -42,8 +42,8 @@ async function testS3Upload() {
     // Criar um buffer simples simulando uma imagem JPEG
     const imageBuffer = Buffer.from('FFD8FFE000104A46494600010101006000600000FFDB004300', 'hex');
     
-    console.log(`✓ Imagem de teste criada: ${filename}`);
-    console.log(`✓ S3 Key: ${s3Key}\n`);
+    console.log(`[OK] Imagem de teste criada: ${filename}`);
+    console.log(`[OK] S3 Key: ${s3Key}\n`);
     
     // 3. Fazer upload para o S3
     console.log('3. Fazendo upload para o S3...');
@@ -61,10 +61,10 @@ async function testS3Upload() {
       });
       
       const uploadResult = await s3Client.send(putCommand);
-      console.log('✓ Upload realizado com sucesso');
+      console.log('[OK] Upload realizado com sucesso');
       console.log(`  ETag: ${uploadResult.ETag}\n`);
     } catch (error) {
-      console.error('✗ Erro ao fazer upload:', error.message);
+      console.error('[ERRO] Erro ao fazer upload:', error.message);
       if (error.Code) {
         console.error(`  Código de erro AWS: ${error.Code}`);
       }
@@ -80,13 +80,13 @@ async function testS3Upload() {
       });
       
       const getResult = await s3Client.send(getCommand);
-      console.log('✓ Arquivo encontrado no S3');
+      console.log('[OK] Arquivo encontrado no S3');
       console.log(`  ContentType: ${getResult.ContentType}`);
       console.log(`  ContentLength: ${getResult.ContentLength} bytes`);
       console.log(`  Metadata:`, getResult.Metadata);
       console.log(`  URL: https://${bucket}.s3.${region}.amazonaws.com/${s3Key}\n`);
     } catch (error) {
-      console.error('✗ Erro ao buscar arquivo:', error.message);
+      console.error('[ERRO] Erro ao buscar arquivo:', error.message);
       process.exit(1);
     }
     
@@ -100,7 +100,7 @@ async function testS3Upload() {
       
       const listResult = await s3Client.send(listCommand);
       const objects = listResult.Contents || [];
-      console.log(`✓ ${objects.length} objeto(s) encontrado(s) na pasta vistorias/${vistoriaId}/`);
+      console.log(`[OK] ${objects.length} objeto(s) encontrado(s) na pasta vistorias/${vistoriaId}/`);
       
       if (objects.length > 0) {
         objects.forEach((obj, index) => {
@@ -109,7 +109,7 @@ async function testS3Upload() {
       }
       console.log('');
     } catch (error) {
-      console.error('✗ Erro ao listar objetos:', error.message);
+      console.error('[ERRO] Erro ao listar objetos:', error.message);
     }
     
     // 6. Testar estrutura de pastas (verificar outras vistorias)
@@ -125,7 +125,7 @@ async function testS3Upload() {
       const prefixes = listResult.CommonPrefixes || [];
       
       if (prefixes.length > 0) {
-        console.log(`✓ ${prefixes.length} pasta(s) de vistoria encontrada(s):`);
+        console.log(`[OK] ${prefixes.length} pasta(s) de vistoria encontrada(s):`);
         prefixes.forEach((prefix, index) => {
           console.log(`  ${index + 1}. ${prefix.Prefix}`);
         });
@@ -134,14 +134,14 @@ async function testS3Upload() {
       }
       console.log('');
     } catch (error) {
-      console.error('✗ Erro ao verificar estrutura:', error.message);
+      console.error('[ERRO] Erro ao verificar estrutura:', error.message);
     }
     
     // 7. Verificar se a key seria salva corretamente no banco
     console.log('7. Verificando formato da key para salvar no banco...');
-    console.log(`✓ Key a salvar no banco: ${s3Key}`);
-    console.log(`✓ Esta key será salva na coluna url_arquivo da tabela fotos`);
-    console.log(`✓ URL completa para exibição: https://${bucket}.s3.${region}.amazonaws.com/${s3Key}\n`);
+    console.log(`[OK] Key a salvar no banco: ${s3Key}`);
+    console.log(`[OK] Esta key será salva na coluna url_arquivo da tabela fotos`);
+    console.log(`[OK] URL completa para exibição: https://${bucket}.s3.${region}.amazonaws.com/${s3Key}\n`);
     
     // 8. Limpar arquivo de teste (opcional)
     console.log('8. Limpando arquivo de teste...');
@@ -153,14 +153,14 @@ async function testS3Upload() {
       });
       
       await s3Client.send(deleteCommand);
-      console.log('✓ Arquivo de teste removido\n');
+      console.log('[OK] Arquivo de teste removido\n');
     } catch (error) {
       console.error('⚠ Erro ao remover arquivo de teste (não crítico):', error.message);
       console.log('⚠ Arquivo de teste pode ser removido manualmente\n');
     }
     
     console.log('========================================');
-    console.log('✓ TODOS OS TESTES CONCLUÍDOS COM SUCESSO!');
+    console.log('[OK] TODOS OS TESTES CONCLUÍDOS COM SUCESSO!');
     console.log('========================================\n');
     
     console.log('RESUMO:');
@@ -171,7 +171,7 @@ async function testS3Upload() {
     console.log('- Key formatada corretamente para salvar no banco');
     
   } catch (error) {
-    console.error('\n✗ ERRO CRÍTICO:', error.message);
+    console.error('\n[ERRO] ERRO CRÍTICO:', error.message);
     if (error.stack) {
       console.error(error.stack);
     }
