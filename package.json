@@ -7,7 +7,6 @@
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend-react && npm run dev",
     "dev:frontend-vue": "cd frontend && npm run dev",
-    "install:all": "npm install && cd backend && npm install && cd ../frontend-react && npm install",
     "build": "cd frontend-react && npm run build",
     "test": "cd backend && npm test",
     "test:coverage": "cd backend && npm run test:coverage",
@@ -15,7 +14,12 @@
     "test:frontend": "cd frontend-react && node scripts/testFrontendCompleto.js",
     "test:frontend:build": "cd frontend-react && npm run build",
     "test:all": "npm run test:backend && npm run test:frontend",
-    "test:all:build": "npm run test:backend && npm run test:frontend && npm run test:frontend:build"
+    "test:all:build": "npm run test:backend && npm run test:frontend && npm run test:frontend:build",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend-react && npm install",
+    "test:coverage:backend": "cd backend && npm run test:coverage",
+    "test:coverage:frontend": "cd frontend-react && npm run test:coverage",
+    "test:coverage:all": "npm run test:coverage:backend && npm run test:coverage:frontend"
+  
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

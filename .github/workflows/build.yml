@@ -1,18 +1,33 @@
 name: Build
+
 on:
   push:
     branches:
       - master
   pull_request:
     types: [opened, synchronize, reopened]
+
 jobs:
   sonarqube:
     name: SonarQube
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+          fetch-depth: 0  # melhora relevância da análise
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies (root + backend + frontend)
+        run: npm run install:all
+
+      - name: Run tests with coverage (backend + frontend)
+        run: npm run test:coverage:all
+
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v6
         env:
