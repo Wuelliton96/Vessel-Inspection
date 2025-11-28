@@ -218,6 +218,39 @@ jobs:
           echo "Configurações do SonarCloud:"
           grep -E "^sonar\.(projectKey|organization|projectName|sources)" sonar-project.properties || true
 
+      - name: Upload coverage to Codacy
+        if: always()
+        run: |
+          COMMIT_SHA=$(git rev-parse HEAD)
+          
+          # Upload backend coverage
+          if [ -f backend/coverage/lcov.info ]; then
+            echo "Uploading backend coverage to Codacy..."
+            bash <(curl -Ls https://coverage.codacy.com/get.sh) report \
+              -r backend/coverage/lcov.info \
+              -t $COMMIT_SHA \
+              -c $COMMIT_SHA || echo "Backend coverage upload failed, continuing..."
+          else
+            echo "Backend coverage file not found, skipping..."
+          fi
+          
+          # Upload frontend coverage
+          if [ -f frontend-react/coverage/lcov.info ]; then
+            echo "Uploading frontend coverage to Codacy..."
+            bash <(curl -Ls https://coverage.codacy.com/get.sh) report \
+              -r frontend-react/coverage/lcov.info \
+              -t $COMMIT_SHA \
+              -c $COMMIT_SHA || echo "Frontend coverage upload failed, continuing..."
+          else
+            echo "Frontend coverage file not found, skipping..."
+          fi
+        continue-on-error: true
+        env:
+          CODACY_API_TOKEN: ${{ secrets.CODACY_API_TOKEN }}
+          CODACY_ORGANIZATION_PROVIDER: gh
+          CODACY_USERNAME: Wuelliton96
+          CODACY_PROJECT_NAME: Vessel-Inspection
+
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2
         env:
