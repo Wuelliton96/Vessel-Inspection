@@ -23,3 +23,10 @@ node_modules/
 INTRUCOES.TXT
 pdf/
 migrations/
+
+#Ignore vscode AI rules
+.github\instructions\codacy.instructions.md
+
+
+#Ignore cursor AI rules
+.cursor\rules\codacy.mdc
