@@ -1,174 +1,55 @@
-name: CI/CD
+# .github/workflows/codacy-coverage.yml
+name: Tests + Coverage (Codacy)
 
 on:
   push:
-    branches: ["master", "main"]
+    branches: [ "main", "master" ]
   pull_request:
-    branches: ["master", "main"]
-  workflow_dispatch:
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
-  test-and-analyze:
+  test-and-coverage:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Shallow clones should be disabled for better analysis
 
-      - name: Setup Node.js
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: |
-            backend/package-lock.json
-            frontend-react/package-lock.json
 
-      - name: Setup Java (for Sonar scanner)
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
+      # Instalar dependências
       - name: Install backend deps
-        working-directory: backend
-        run: npm ci
-
-      - name: Run backend tests with coverage
-        working-directory: backend
-        run: npm run test:ci
-        continue-on-error: true
+        run: |
+          cd backend
+          npm ci
 
       - name: Install frontend deps
-        working-directory: frontend-react
-        run: npm ci
-
-      - name: Run frontend tests with coverage
-        working-directory: frontend-react
-        run: npm run test:ci
-        continue-on-error: true
-
-      - name: Check combined coverage (warning only)
-        shell: bash
-        continue-on-error: true
         run: |
-          node - <<'NODE'
-          const fs = require('fs');
-          const path = require('path');
-          
-          function parseLcov(filePath) {
-            if (!fs.existsSync(filePath)) {
-              console.log(`Coverage file not found: ${filePath} - skipping`);
-              return { total: 0, covered: 0 };
-            }
-            const content = fs.readFileSync(filePath, 'utf8');
-            let total = 0, covered = 0;
-            for (const line of content.split('\n')) {
-              if (line.startsWith('DA:')) {
-                const parts = line.split(',');
-                if (parts.length >= 2) {
-                  const hits = Number(parts[1]);
-                  total += 1;
-                  if (hits > 0) covered += 1;
-                }
-              }
-            }
-            return { total, covered };
-          }
-          
-          const backendCoverage = parseLcov('backend/coverage/lcov.info');
-          const frontendCoverage = parseLcov('frontend-react/coverage/lcov.info');
-          
-          const total = backendCoverage.total + frontendCoverage.total;
-          const covered = backendCoverage.covered + frontendCoverage.covered;
-          const pct = total > 0 ? (covered / total) * 100 : 0;
-          
-          console.log(`Backend coverage: ${backendCoverage.total > 0 ? ((backendCoverage.covered / backendCoverage.total) * 100).toFixed(2) : 0}% (${backendCoverage.covered}/${backendCoverage.total})`);
-          console.log(`Frontend coverage: ${frontendCoverage.total > 0 ? ((frontendCoverage.covered / frontendCoverage.total) * 100).toFixed(2) : 0}% (${frontendCoverage.covered}/${frontendCoverage.total})`);
-          console.log(`Combined coverage: ${pct.toFixed(2)}% (${covered}/${total})`);
-          
-          if (total === 0) {
-            console.log('No coverage data found - skipping coverage check');
-            process.exit(0);
-          }
-          
-          const targetCoverage = 80;
-          if (pct < targetCoverage) {
-            console.warn(`WARNING: Combined coverage ${pct.toFixed(2)}% is below ${targetCoverage}% threshold (target: ${targetCoverage}%)`);
-            console.warn('This is a warning only - the build will continue. Please work on increasing test coverage.');
-            process.exit(0);
-          }
-          
-          console.log(`Combined coverage ${pct.toFixed(2)}% meets ${targetCoverage}% threshold`);
-          NODE
+          cd frontend
+          npm ci
 
-      - name: Upload coverage to Codacy
-        if: always()
+      # Rodar testes + coverage
+      - name: Test backend with coverage
         run: |
-          COMMIT_SHA=$(git rev-parse HEAD)
-          
-          # Upload backend coverage
-          if [ -f backend/coverage/lcov.info ]; then
-            echo "Uploading backend coverage to Codacy..."
-            bash <(curl -Ls https://coverage.codacy.com/get.sh) report \
-              -r backend/coverage/lcov.info \
-              -t $COMMIT_SHA \
-              -c $COMMIT_SHA || echo "Backend coverage upload failed, continuing..."
-          else
-            echo "Backend coverage file not found, skipping..."
-          fi
-          
-          # Upload frontend coverage
-          if [ -f frontend-react/coverage/lcov.info ]; then
-            echo "Uploading frontend coverage to Codacy..."
-            bash <(curl -Ls https://coverage.codacy.com/get.sh) report \
-              -r frontend-react/coverage/lcov.info \
-              -t $COMMIT_SHA \
-              -c $COMMIT_SHA || echo "Frontend coverage upload failed, continuing..."
-          else
-            echo "Frontend coverage file not found, skipping..."
-          fi
-        continue-on-error: true
+          cd backend
+          npm test -- --coverage
+
+      - name: Test frontend with coverage
+        run: |
+          cd frontend
+          npm test -- --coverage
+
+      # Enviar coverage para o Codacy
+      - name: Send coverage to Codacy
         env:
           CODACY_API_TOKEN: ${{ secrets.CODACY_API_TOKEN }}
           CODACY_ORGANIZATION_PROVIDER: gh
           CODACY_USERNAME: Wuelliton96
           CODACY_PROJECT_NAME: Vessel-Inspection
-
-      - name: SonarCloud Scan (All)
-        uses: SonarSource/sonarcloud-github-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: .
-          args: >
-            -Dsonar.projectVersion=${{ github.run_number }}
-            -Dsonar.projectKey=Wuelliton96_Vessel-Inspection
-            -Dsonar.organization=wuelliton96
-            -Dsonar.projectName=Vessel-Inspection
-            -Dsonar.sources=backend,frontend-react/src
-            -Dsonar.tests=backend/tests,frontend-react/src
-            -Dsonar.test.inclusions=backend/tests/**/*.test.js,backend/tests/**/*.spec.js,frontend-react/src/**/*.test.ts,frontend-react/src/**/*.test.tsx,frontend-react/src/**/*.spec.ts,frontend-react/src/**/*.spec.tsx
-            -Dsonar.javascript.lcov.reportPaths=backend/coverage/lcov.info,frontend-react/coverage/lcov.info
-            -Dsonar.typescript.tsconfigPaths=frontend-react/tsconfig.json
-            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/coverage/**,**/*.d.ts,**/logs/**,**/uploads/**,**/migrations/**,**/scripts/**,backend/server.js,frontend-react/src/reportWebVitals.ts,frontend-react/src/setupTests.ts,frontend-react/src/index.tsx,frontend-react/src/react-app-env.d.ts,backend/jest.config.js,frontend-react/jest.config.js
-            -Dsonar.test.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/coverage/**
-            -Dsonar.coverage.exclusions=**/node_modules/**,**/tests/**,**/coverage/**,**/logs/**,**/uploads/**,**/migrations/**,backend/server.js,frontend-react/src/reportWebVitals.ts,frontend-react/src/setupTests.ts,frontend-react/src/index.tsx,frontend-react/src/react-app-env.d.ts,backend/jest.config.js,frontend-react/jest.config.js
-            -Dsonar.cpd.exclusions=**/*.test.js,**/*.test.ts,**/*.test.tsx,**/__tests__/**,**/scripts/**,**/migrations/**
-
-  deploy:
-    needs: test-and-analyze
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Deploy placeholder
-        run: echo "Deploy step - configure your deployment here"
+        run: |
+          bash <(curl -Ls https://coverage.codacy.com/get.sh) report \
+            -l Javascript \
+            -r backend/coverage/lcov.info \
+            -r frontend/coverage/lcov.info
