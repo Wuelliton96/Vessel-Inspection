@@ -113,6 +113,18 @@ jobs:
           projectBaseDir: .
           args: >
             -Dsonar.projectVersion=${{ github.run_number }}
+            -Dsonar.projectKey=Wuelliton96_Vessel-Inspection
+            -Dsonar.organization=wuelliton96
+            -Dsonar.projectName=Vessel-Inspection
+            -Dsonar.sources=backend,frontend-react/src
+            -Dsonar.tests=backend/tests,frontend-react/src
+            -Dsonar.test.inclusions=backend/tests/**/*.test.js,backend/tests/**/*.spec.js,frontend-react/src/**/*.test.ts,frontend-react/src/**/*.test.tsx,frontend-react/src/**/*.spec.ts,frontend-react/src/**/*.spec.tsx
+            -Dsonar.javascript.lcov.reportPaths=backend/coverage/lcov.info,frontend-react/coverage/lcov.info
+            -Dsonar.typescript.tsconfigPaths=frontend-react/tsconfig.json
+            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/coverage/**,**/*.d.ts,**/logs/**,**/uploads/**,**/migrations/**,**/scripts/**,backend/server.js,frontend-react/src/reportWebVitals.ts,frontend-react/src/setupTests.ts,frontend-react/src/index.tsx,frontend-react/src/react-app-env.d.ts,backend/jest.config.js,frontend-react/jest.config.js
+            -Dsonar.test.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/coverage/**
+            -Dsonar.coverage.exclusions=**/node_modules/**,**/tests/**,**/coverage/**,**/logs/**,**/uploads/**,**/migrations/**,backend/server.js,frontend-react/src/reportWebVitals.ts,frontend-react/src/setupTests.ts,frontend-react/src/index.tsx,frontend-react/src/react-app-env.d.ts,backend/jest.config.js,frontend-react/jest.config.js
+            -Dsonar.cpd.exclusions=**/*.test.js,**/*.test.ts,**/*.test.tsx,**/__tests__/**,**/scripts/**,**/migrations/**
 
   deploy:
     needs: test-and-analyze
