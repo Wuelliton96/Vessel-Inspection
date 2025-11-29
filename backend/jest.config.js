@@ -15,7 +15,6 @@ module.exports = {
     '!**/migrations/**',
     '!**/scripts/**',
     '!jest.config.js',
-    '!server.js',
     '!newrelic.js'
   ],
   coverageDirectory: 'coverage',
@@ -29,7 +28,6 @@ module.exports = {
     '/migrations/',
     '/scripts/',
     'jest.config.js',
-    'server.js',
     'newrelic.js'
   ],
   verbose: true,
@@ -37,5 +35,7 @@ module.exports = {
   forceExit: true,
   clearMocks: true,
   resetMocks: true,
-  restoreMocks: true
+  restoreMocks: true,
+  // Executar testes em série para evitar problemas de sincronização do banco
+  maxWorkers: 1
 };
