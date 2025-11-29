@@ -57,12 +57,13 @@ describe('Models Index - Associações Completas', () => {
 
     embarcacao = await Embarcacao.create({
       nome: 'Boat Test',
-      tipo: 'LANCHA',
+      nr_inscricao_barco: `MODELTEST${Date.now()}`,
+      tipo_embarcacao: 'LANCHA',
       cliente_id: cliente.id
     });
 
     local = await Local.create({
-      nome: 'Local Test',
+      nome_local: 'Local Test',
       tipo: 'MARINA'
     });
 
@@ -109,9 +110,12 @@ describe('Models Index - Associações Completas', () => {
         status_id: status.id
       });
 
-      const tipoFoto = await TipoFotoChecklist.findOne();
+      let tipoFoto = await TipoFotoChecklist.findOne();
       if (!tipoFoto) {
-        await TipoFotoChecklist.create({ nome: 'GERAL' });
+        tipoFoto = await TipoFotoChecklist.create({ 
+          codigo: `GERAL${Date.now()}`,
+          nome_exibicao: 'Foto Geral'
+        });
       }
 
       await Foto.create({
@@ -139,7 +143,7 @@ describe('Models Index - Associações Completas', () => {
       expect(embarcacaoComCliente.Cliente.id).toBe(cliente.id);
     });
 
-    it('deve carregar vistorias da embarcação', async () => {
+    it('deve buscar vistorias da embarcação', async () => {
       const vistoria = await Vistoria.create({
         embarcacao_id: embarcacao.id,
         local_id: local.id,
@@ -147,12 +151,16 @@ describe('Models Index - Associações Completas', () => {
         status_id: status.id
       });
 
-      const embarcacaoComVistorias = await Embarcacao.findByPk(embarcacao.id, {
-        include: [{ model: Vistoria, as: 'Vistorias' }]
+      // A associação é Vistoria.belongsTo(Embarcacao), não hasMany
+      // Então buscamos as vistorias pelo embarcacao_id
+      const vistorias = await Vistoria.findAll({
+        where: { embarcacao_id: embarcacao.id },
+        include: [{ model: Embarcacao, as: 'Embarcacao' }]
       });
 
-      expect(embarcacaoComVistorias.Vistorias).toBeDefined();
-      expect(embarcacaoComVistorias.Vistorias.length).toBeGreaterThan(0);
+      expect(vistorias).toBeDefined();
+      expect(vistorias.length).toBeGreaterThan(0);
+      expect(vistorias[0].Embarcacao.id).toBe(embarcacao.id);
     });
   });
 
@@ -177,7 +185,8 @@ describe('Models Index - Associações Completas', () => {
       });
 
       const laudo = await Laudo.create({
-        vistoria_id: vistoria.id
+        vistoria_id: vistoria.id,
+        numero_laudo: `LAUDO-MODEL-${Date.now()}`
       });
 
       const laudoComVistoria = await Laudo.findByPk(laudo.id, {
@@ -195,7 +204,9 @@ describe('Models Index - Associações Completas', () => {
         vistoriador_id: testVistoriador.id,
         status: 'PENDENTE',
         valor_total: 1000,
-        periodo_tipo: 'MENSAL'
+        periodo_tipo: 'MENSAL',
+        data_inicio: new Date(),
+        data_fim: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 dias
       });
 
       const loteComVistoriador = await LotePagamento.findByPk(lote.id, {

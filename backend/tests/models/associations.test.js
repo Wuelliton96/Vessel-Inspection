@@ -79,11 +79,12 @@ describe('Model Associations', () => {
     it('deve criar vistoria com vistoriador', async () => {
       const embarcacao = await Embarcacao.create({
         nome: 'Test Boat',
-        tipo: 'LANCHA'
+        nr_inscricao_barco: `ASSOC1${Date.now()}`,
+        tipo_embarcacao: 'LANCHA'
       });
 
       const local = await Local.create({
-        nome: 'Test Local',
+        nome_local: 'Test Local',
         tipo: 'MARINA'
       });
 
@@ -113,12 +114,13 @@ describe('Model Associations', () => {
     it('deve carregar Embarcacao ao buscar Vistoria', async () => {
       const embarcacao = await Embarcacao.create({
         nome: 'Test Boat 2',
-        tipo: 'IATE'
+        nr_inscricao_barco: `ASSOC2${Date.now()}`,
+        tipo_embarcacao: 'IATE'
       });
 
       const local = await Local.create({
-        nome: 'Test Local 2',
-        tipo: 'PORTO'
+        nome_local: 'Test Local 2',
+        tipo: 'RESIDENCIA'
       });
 
       const status = await StatusVistoria.findOne();
@@ -143,11 +145,12 @@ describe('Model Associations', () => {
     it('deve criar foto associada a vistoria', async () => {
       const embarcacao = await Embarcacao.create({
         nome: 'Test Boat 3',
-        tipo: 'LANCHA'
+        nr_inscricao_barco: `ASSOC3${Date.now()}`,
+        tipo_embarcacao: 'LANCHA'
       });
 
       const local = await Local.create({
-        nome: 'Test Local 3',
+        nome_local: 'Test Local 3',
         tipo: 'MARINA'
       });
 
@@ -159,9 +162,12 @@ describe('Model Associations', () => {
         status_id: status.id
       });
 
-      const tipoFoto = await TipoFotoChecklist.findOne();
+      let tipoFoto = await TipoFotoChecklist.findOne();
       if (!tipoFoto) {
-        await TipoFotoChecklist.create({ nome: 'GERAL' });
+        tipoFoto = await TipoFotoChecklist.create({ 
+          codigo: `GERAL${Date.now()}`,
+          nome_exibicao: 'Foto Geral'
+        });
       }
 
       const foto = await Foto.create({
@@ -184,12 +190,13 @@ describe('Model Associations', () => {
     it('deve criar laudo associado a vistoria', async () => {
       const embarcacao = await Embarcacao.create({
         nome: 'Test Boat 4',
-        tipo: 'IATE'
+        nr_inscricao_barco: `ASSOC4${Date.now()}`,
+        tipo_embarcacao: 'IATE'
       });
 
       const local = await Local.create({
-        nome: 'Test Local 4',
-        tipo: 'PORTO'
+        nome_local: 'Test Local 4',
+        tipo: 'RESIDENCIA'
       });
 
       const status = await StatusVistoria.findOne();
@@ -201,7 +208,8 @@ describe('Model Associations', () => {
       });
 
       const laudo = await Laudo.create({
-        vistoria_id: vistoria.id
+        vistoria_id: vistoria.id,
+        numero_laudo: `LAUDO-ASSOC-${Date.now()}`
       });
 
       const laudoComVistoria = await Laudo.findByPk(laudo.id, {

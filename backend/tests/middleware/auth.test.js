@@ -1,171 +1,296 @@
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
+const { sequelize, Usuario, NivelAcesso } = require('../../models');
 const { requireAuth, requireAdmin, requireVistoriador, requireAuthAllowPasswordUpdate } = require('../../middleware/auth');
-const { Usuario, NivelAcesso, sequelize } = require('../../models');
-const { generateTestCPF } = require('../helpers/testHelpers');
+const { setupCompleteTestEnvironment, generateTestCPF } = require('../helpers/testHelpers');
 
-describe('Auth Middleware - Testes Adicionais', () => {
-  let mockReq, mockRes, mockNext;
-  let testUser, testVistoriador, testCliente;
-
+describe('Middleware de Autenticação', () => {
+  let admin, vistoriador, nivelAdmin, nivelVistoriador;
+  let adminToken, vistoriadorToken;
+  
   beforeAll(async () => {
-    const { setupTestEnvironment } = require('../helpers/testHelpers');
-    const { nivelAdmin, nivelVistoriador, nivelCliente } = await setupTestEnvironment();
-    
-    const senhaHash = await bcrypt.hash('Teste@123', 10);
-    
-    testUser = await Usuario.create({
-      cpf: generateTestCPF('auth20'),
-      nome: 'Test Admin',
-      email: 'admin@auth.test',
-      senha_hash: senhaHash,
-      nivel_acesso_id: nivelAdmin.id
-    });
-
-    testVistoriador = await Usuario.create({
-      cpf: generateTestCPF('auth21'),
-      nome: 'Test Vistoriador',
-      email: 'vist@auth.test',
-      senha_hash: senhaHash,
-      nivel_acesso_id: nivelVistoriador.id
-    });
-
-    if (nivelCliente) {
-      testCliente = await Usuario.create({
-        cpf: generateTestCPF('auth22'),
-        nome: 'Test Cliente',
-        email: 'cliente@auth.test',
-        senha_hash: senhaHash,
-        nivel_acesso_id: nivelCliente.id
-      });
-    }
+    const setup = await setupCompleteTestEnvironment('authMiddleware');
+    admin = setup.admin;
+    vistoriador = setup.vistoriador;
+    nivelAdmin = setup.nivelAdmin;
+    nivelVistoriador = setup.nivelVistoriador;
+    adminToken = setup.adminToken;
+    vistoriadorToken = setup.vistoriadorToken;
   });
-
+  
   afterAll(async () => {
     await sequelize.close();
   });
-
-  beforeEach(() => {
-    mockReq = {
-      headers: {},
-      header: jest.fn()
+  
+  function createMockReqRes(token = null, user = null) {
+    const req = {
+      header: jest.fn((name) => {
+        if (name === 'Authorization' && token) {
+          return `Bearer ${token}`;
+        }
+        return null;
+      }),
+      user: user
     };
-    mockRes = {
+    
+    const res = {
       status: jest.fn().mockReturnThis(),
-      json: jest.fn(),
+      json: jest.fn().mockReturnThis(),
       headersSent: false
     };
-    mockNext = jest.fn();
-  });
-
-  describe('requireAuth - Casos Adicionais', () => {
-    it('deve tratar erro quando headersSent é true', async () => {
-      mockRes.headersSent = true;
-      const token = jwt.sign(
-        { userId: testUser.id },
-        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-      );
-
-      mockReq.header.mockReturnValue(`Bearer ${token}`);
-
-      await requireAuth(mockReq, mockRes, mockNext);
-
-      expect(mockRes.json).not.toHaveBeenCalled();
+    
+    const next = jest.fn();
+    
+    return { req, res, next };
+  }
+  
+  describe('requireAuth', () => {
+    it('deve permitir acesso com token válido', async () => {
+      const { req, res, next } = createMockReqRes(adminToken);
+      
+      await requireAuth(req, res, next);
+      
+      expect(next).toHaveBeenCalled();
+      expect(req.user).toBeDefined();
+      expect(req.user.id).toBe(admin.id);
     });
-
-    it('deve tratar token sem Bearer prefix', async () => {
-      const token = jwt.sign(
-        { userId: testUser.id },
-        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-      );
-
-      mockReq.header.mockReturnValue(token);
-
-      await requireAuth(mockReq, mockRes, mockNext);
-
-      expect(mockRes.status).toHaveBeenCalledWith(401);
+    
+    it('deve retornar 401 sem token', async () => {
+      const { req, res, next } = createMockReqRes();
+      
+      await requireAuth(req, res, next);
+      
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        error: expect.stringContaining('Token')
+      }));
+      expect(next).not.toHaveBeenCalled();
     });
-
-    it('deve tratar token expirado', async () => {
-      const token = jwt.sign(
-        { userId: testUser.id },
-        process.env.JWT_SECRET || 'sua-chave-secreta-jwt',
-        { expiresIn: '-1h' }
-      );
-
-      mockReq.header.mockReturnValue(`Bearer ${token}`);
-
-      await requireAuth(mockReq, mockRes, mockNext);
-
-      expect(mockRes.status).toHaveBeenCalledWith(401);
+    
+    it('deve retornar 401 com token inválido', async () => {
+      const { req, res, next } = createMockReqRes('token-invalido');
+      
+      await requireAuth(req, res, next);
+      
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(next).not.toHaveBeenCalled();
     });
-  });
-
-  describe('requireVistoriador - Casos Adicionais', () => {
-    it('deve retornar 403 para cliente', async () => {
-      if (!testCliente) return;
-
-      const token = jwt.sign(
-        { userId: testCliente.id },
-        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
-      );
-
-      mockReq.header.mockReturnValue(`Bearer ${token}`);
-      await requireAuth(mockReq, mockRes, mockNext);
-
-      await requireVistoriador(mockReq, mockRes, mockNext);
-
-      expect(mockRes.status).toHaveBeenCalledWith(403);
-    });
-
-    it('deve tratar erro quando NivelAcesso não existe', async () => {
-      mockReq.user = { id: 1, NivelAcesso: null };
-
-      await requireVistoriador(mockReq, mockRes, mockNext);
-
-      expect(mockRes.status).toHaveBeenCalledWith(401);
-    });
-  });
-
-  describe('requireAdmin - Casos Adicionais', () => {
-    it('deve tratar erro quando NivelAcesso não existe', async () => {
-      mockReq.user = { id: 1, NivelAcesso: null };
-
-      await requireAdmin(mockReq, mockRes, mockNext);
-
-      expect(mockRes.status).toHaveBeenCalledWith(401);
-    });
-
-    it('deve tratar erro quando headersSent é true', async () => {
-      mockRes.headersSent = true;
-      mockReq.user = { id: 1, NivelAcesso: { id: 2 } };
-
-      await requireAdmin(mockReq, mockRes, mockNext);
-
-      expect(mockRes.json).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('requireAuthAllowPasswordUpdate - Casos Adicionais', () => {
-    it('deve passar mesmo com token inválido inicialmente', async () => {
-      mockReq.header.mockReturnValue(null);
-
-      await requireAuthAllowPasswordUpdate(mockReq, mockRes, mockNext);
-
-      expect(mockRes.status).toHaveBeenCalledWith(401);
-    });
-
-    it('deve tratar erro quando usuário não existe', async () => {
-      const token = jwt.sign(
+    
+    it('deve retornar 401 para usuário inexistente', async () => {
+      const tokenUsuarioInexistente = jwt.sign(
         { userId: 99999 },
-        process.env.JWT_SECRET || 'sua-chave-secreta-jwt'
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt',
+        { expiresIn: '1h' }
       );
-
-      mockReq.header.mockReturnValue(`Bearer ${token}`);
-
-      await requireAuthAllowPasswordUpdate(mockReq, mockRes, mockNext);
-
-      expect(mockRes.status).toHaveBeenCalledWith(401);
+      
+      const { req, res, next } = createMockReqRes(tokenUsuarioInexistente);
+      
+      await requireAuth(req, res, next);
+      
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        error: expect.stringContaining('não encontrado')
+      }));
+    });
+    
+    it('deve retornar 403 se deve atualizar senha', async () => {
+      // Criar usuário que precisa atualizar senha
+      const userDeveAtualizar = await Usuario.create({
+        cpf: generateTestCPF('pwdupd'),
+        nome: 'Usuario Atualizar Senha',
+        email: `pwdupd${Date.now()}@test.com`,
+        senha_hash: 'hash',
+        nivel_acesso_id: nivelVistoriador.id,
+        deve_atualizar_senha: true
+      });
+      
+      const token = jwt.sign(
+        { userId: userDeveAtualizar.id },
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt',
+        { expiresIn: '1h' }
+      );
+      
+      const { req, res, next } = createMockReqRes(token);
+      
+      await requireAuth(req, res, next);
+      
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        code: 'PASSWORD_UPDATE_REQUIRED'
+      }));
+    });
+    
+    it('deve definir userInfo com dados do token', async () => {
+      const { req, res, next } = createMockReqRes(adminToken);
+      
+      await requireAuth(req, res, next);
+      
+      expect(req.userInfo).toBeDefined();
+      expect(req.userInfo.userId).toBe(admin.id);
+    });
+  });
+  
+  describe('requireAdmin', () => {
+    it('deve permitir acesso para admin', async () => {
+      const req = {
+        user: {
+          NivelAcesso: { id: 1 }
+        }
+      };
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+      const next = jest.fn();
+      
+      await requireAdmin(req, res, next);
+      
+      expect(next).toHaveBeenCalled();
+    });
+    
+    it('deve negar acesso para não-admin', async () => {
+      const req = {
+        user: {
+          NivelAcesso: { id: 2 }
+        }
+      };
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+      const next = jest.fn();
+      
+      await requireAdmin(req, res, next);
+      
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(next).not.toHaveBeenCalled();
+    });
+    
+    it('deve retornar 401 sem usuário autenticado', async () => {
+      const req = { user: null };
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+      const next = jest.fn();
+      
+      await requireAdmin(req, res, next);
+      
+      expect(res.status).toHaveBeenCalledWith(401);
+    });
+    
+    it('deve retornar 401 sem NivelAcesso', async () => {
+      const req = { user: {} };
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+      const next = jest.fn();
+      
+      await requireAdmin(req, res, next);
+      
+      expect(res.status).toHaveBeenCalledWith(401);
+    });
+  });
+  
+  describe('requireVistoriador', () => {
+    it('deve permitir acesso para admin (nível 1)', async () => {
+      const req = {
+        user: {
+          NivelAcesso: { id: 1 }
+        }
+      };
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+      const next = jest.fn();
+      
+      await requireVistoriador(req, res, next);
+      
+      expect(next).toHaveBeenCalled();
+    });
+    
+    it('deve permitir acesso para vistoriador (nível 2)', async () => {
+      const req = {
+        user: {
+          NivelAcesso: { id: 2 }
+        }
+      };
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+      const next = jest.fn();
+      
+      await requireVistoriador(req, res, next);
+      
+      expect(next).toHaveBeenCalled();
+    });
+    
+    it('deve negar acesso para outros níveis', async () => {
+      const req = {
+        user: {
+          NivelAcesso: { id: 3 }
+        }
+      };
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+      const next = jest.fn();
+      
+      await requireVistoriador(req, res, next);
+      
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(next).not.toHaveBeenCalled();
+    });
+    
+    it('deve retornar 401 sem usuário', async () => {
+      const req = { user: null };
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+      const next = jest.fn();
+      
+      await requireVistoriador(req, res, next);
+      
+      expect(res.status).toHaveBeenCalledWith(401);
+    });
+  });
+  
+  describe('requireAuthAllowPasswordUpdate', () => {
+    it('deve permitir acesso mesmo se deve atualizar senha', async () => {
+      const userDeveAtualizar = await Usuario.create({
+        cpf: generateTestCPF('pwdupd2'),
+        nome: 'Usuario Atualizar 2',
+        email: `pwdupd2${Date.now()}@test.com`,
+        senha_hash: 'hash',
+        nivel_acesso_id: nivelVistoriador.id,
+        deve_atualizar_senha: true
+      });
+      
+      const token = jwt.sign(
+        { userId: userDeveAtualizar.id },
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt',
+        { expiresIn: '1h' }
+      );
+      
+      const { req, res, next } = createMockReqRes(token);
+      
+      await requireAuthAllowPasswordUpdate(req, res, next);
+      
+      expect(next).toHaveBeenCalled();
+      expect(req.user).toBeDefined();
+    });
+    
+    it('deve retornar 401 sem token', async () => {
+      const { req, res, next } = createMockReqRes();
+      
+      await requireAuthAllowPasswordUpdate(req, res, next);
+      
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(next).not.toHaveBeenCalled();
     });
   });
 });

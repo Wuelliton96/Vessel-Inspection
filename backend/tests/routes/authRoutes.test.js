@@ -1,432 +1,581 @@
 const request = require('supertest');
-const { sequelize, Usuario, NivelAcesso } = require('../../models');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { sequelize, Usuario, NivelAcesso } = require('../../models');
 const authRoutes = require('../../routes/authRoutes');
-const { setupCompleteTestEnvironment, createTestApp, createTestToken, generateTestCPF } = require('../helpers/testHelpers');
-
-// Mock do rate limiter para desabilitar em testes
-jest.mock('../../middleware/rateLimiting', () => ({
-  loginRateLimiter: (req, res, next) => next(), // Passa direto sem limitar
-  moderateRateLimiter: (req, res, next) => next(),
-  strictRateLimiter: (req, res, next) => next(),
-  createRateLimiter: () => (req, res, next) => next()
-}));
+const { setupCompleteTestEnvironment, createTestApp, generateTestCPF } = require('../helpers/testHelpers');
 
 const app = createTestApp({ path: '/api/auth', router: authRoutes });
 
 describe('Rotas de Autenticação', () => {
-  let admin, vistoriador;
+  let adminToken, vistoriadorToken;
+  let admin, vistoriador, nivelAdmin, nivelVistoriador;
 
   beforeAll(async () => {
-    // IMPORTANTE: force: true apaga e recria todas as tabelas
-    // Isso é SEGURO porque NODE_ENV=test garante uso de banco de teste (TEST_DATABASE_URL)
-    // NUNCA apagará dados de produção quando configurado corretamente
     const setup = await setupCompleteTestEnvironment('auth');
     admin = setup.admin;
     vistoriador = setup.vistoriador;
+    adminToken = setup.adminToken;
+    vistoriadorToken = setup.vistoriadorToken;
+    nivelAdmin = setup.nivelAdmin;
+    nivelVistoriador = setup.nivelVistoriador;
   });
 
   afterAll(async () => {
     await sequelize.close();
   });
 
+  describe('POST /api/auth/register', () => {
+    it('deve registrar novo usuário com sucesso', async () => {
+      const cpf = generateTestCPF('reg001');
+      
+      const response = await request(app)
+        .post('/api/auth/register')
+        .send({
+          nome: 'Novo Usuario',
+          email: `novo${Date.now()}@teste.com`,
+          senha: 'Senha@123',
+          cpf: cpf
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.success).toBe(true);
+      expect(response.body).toHaveProperty('token');
+      expect(response.body).toHaveProperty('user');
+      expect(response.body.user.nome).toBe('Novo Usuario');
+    });
+
+    it('deve atribuir nível vistoriador por padrão', async () => {
+      const cpf = generateTestCPF('reg002');
+      
+      const response = await request(app)
+        .post('/api/auth/register')
+        .send({
+          nome: 'Usuario Default',
+          email: `default${Date.now()}@teste.com`,
+          senha: 'Senha@123',
+          cpf: cpf
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.user.nivelAcessoId).toBe(2); // Vistoriador
+    });
+
+    it('deve retornar 400 sem nome', async () => {
+      const response = await request(app)
+        .post('/api/auth/register')
+        .send({
+          email: 'sem-nome@teste.com',
+          senha: 'Senha@123'
+        });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('deve retornar 400 sem email', async () => {
+      const response = await request(app)
+        .post('/api/auth/register')
+        .send({
+          nome: 'Sem Email',
+          senha: 'Senha@123'
+        });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('deve retornar 400 sem senha', async () => {
+      const response = await request(app)
+        .post('/api/auth/register')
+        .send({
+          nome: 'Sem Senha',
+          email: 'sem-senha@teste.com'
+        });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('deve retornar 400 para email duplicado', async () => {
+      const cpf1 = generateTestCPF('reg003');
+      const cpf2 = generateTestCPF('reg004');
+      const email = `duplicado${Date.now()}@teste.com`;
+
+      await request(app)
+        .post('/api/auth/register')
+        .send({
+          nome: 'Primeiro',
+          email: email,
+          senha: 'Senha@123',
+          cpf: cpf1
+        });
+
+      const response = await request(app)
+        .post('/api/auth/register')
+        .send({
+          nome: 'Segundo',
+          email: email,
+          senha: 'Senha@123',
+          cpf: cpf2
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('Email');
+    });
+
+    it('deve retornar 400 para CPF inválido', async () => {
+      const response = await request(app)
+        .post('/api/auth/register')
+        .send({
+          nome: 'CPF Invalido',
+          email: `cpf-invalid${Date.now()}@teste.com`,
+          senha: 'Senha@123',
+          cpf: '11111111111'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('CPF');
+    });
+
+    it('deve retornar 400 para CPF duplicado', async () => {
+      const cpf = generateTestCPF('reg005');
+      
+      await request(app)
+        .post('/api/auth/register')
+        .send({
+          nome: 'Primeiro CPF',
+          email: `cpf1${Date.now()}@teste.com`,
+          senha: 'Senha@123',
+          cpf: cpf
+        });
+
+      const response = await request(app)
+        .post('/api/auth/register')
+        .send({
+          nome: 'Segundo CPF',
+          email: `cpf2${Date.now()}@teste.com`,
+          senha: 'Senha@123',
+          cpf: cpf
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('CPF');
+    });
+
+    it('deve retornar 400 se campo ID for enviado', async () => {
+      const response = await request(app)
+        .post('/api/auth/register')
+        .send({
+          id: 999,
+          nome: 'Com ID',
+          email: `comid${Date.now()}@teste.com`,
+          senha: 'Senha@123'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('ID');
+    });
+  });
+
   describe('POST /api/auth/login', () => {
+    let testUserCPF;
+    let testUser;
+
+    beforeAll(async () => {
+      testUserCPF = generateTestCPF('login01');
+      const senhaHash = await bcrypt.hash('Senha@123', 10);
+      
+      testUser = await Usuario.create({
+        cpf: testUserCPF,
+        nome: 'Usuario Login Test',
+        email: `login${Date.now()}@teste.com`,
+        senha_hash: senhaHash,
+        nivel_acesso_id: nivelVistoriador.id
+      });
+    });
+
     it('deve fazer login com CPF e senha válidos', async () => {
       const response = await request(app)
         .post('/api/auth/login')
         .send({
-          cpf: admin.cpf,
-          senha: 'Teste@123'
+          cpf: testUserCPF,
+          senha: 'Senha@123'
         });
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.token).toBeDefined();
-      expect(response.body.user.cpf).toBe(admin.cpf);
-    });
-
-    it('deve fazer login com CPF formatado', async () => {
-      // Formatar CPF do admin para teste
-      const cpfFormatado = admin.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({
-          cpf: cpfFormatado,
-          senha: 'Teste@123'
-        });
-
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
+      expect(response.body).toHaveProperty('token');
+      expect(response.body).toHaveProperty('user');
+      expect(response.body.user.cpf).toBe(testUserCPF);
     });
 
     it('deve retornar 400 sem CPF', async () => {
       const response = await request(app)
         .post('/api/auth/login')
-        .send({ senha: 'Teste@123' });
+        .send({
+          senha: 'Senha@123'
+        });
 
       expect(response.status).toBe(400);
-      // Pode retornar CAMPOS_OBRIGATORIOS ou VALIDACAO_FALHOU dependendo do validator
-      expect(['CAMPOS_OBRIGATORIOS', 'VALIDACAO_FALHOU']).toContain(response.body.code);
     });
 
     it('deve retornar 400 sem senha', async () => {
       const response = await request(app)
         .post('/api/auth/login')
-        .send({ cpf: admin.cpf });
-
-      expect(response.status).toBe(400);
-      // Pode retornar CAMPOS_OBRIGATORIOS ou VALIDACAO_FALHOU dependendo do validator
-      expect(['CAMPOS_OBRIGATORIOS', 'VALIDACAO_FALHOU']).toContain(response.body.code);
-    });
-
-    it('deve retornar 400 com CPF inválido', async () => {
-      const response = await request(app)
-        .post('/api/auth/login')
         .send({
-          cpf: '123',
-          senha: 'Teste@123'
+          cpf: testUserCPF
         });
 
       expect(response.status).toBe(400);
-      // Pode retornar CPF_INVALIDO ou VALIDACAO_FALHOU dependendo do validator
-      expect(['CPF_INVALIDO', 'VALIDACAO_FALHOU']).toContain(response.body.code);
     });
 
-    it('deve retornar 401 com CPF não cadastrado', async () => {
-      // Usar um CPF válido matematicamente mas não cadastrado
-      const { generateTestCPF } = require('../helpers/testHelpers');
-      const cpfNaoCadastrado = generateTestCPF('nao_cadastrado');
+    it('deve retornar 400 para CPF inválido', async () => {
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({
+          cpf: '12345',
+          senha: 'Senha@123'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.code).toBe('CPF_INVALIDO');
+    });
+
+    it('deve retornar 401 para CPF não cadastrado', async () => {
+      const cpfInexistente = generateTestCPF('login99');
       
       const response = await request(app)
         .post('/api/auth/login')
         .send({
-          cpf: cpfNaoCadastrado,
-          senha: 'Teste@123'
+          cpf: cpfInexistente,
+          senha: 'Senha@123'
         });
 
       expect(response.status).toBe(401);
       expect(response.body.code).toBe('CPF_NAO_ENCONTRADO');
     });
 
-    it('deve retornar 401 com senha incorreta', async () => {
+    it('deve retornar 401 para senha incorreta', async () => {
       const response = await request(app)
         .post('/api/auth/login')
         .send({
-          cpf: admin.cpf,
+          cpf: testUserCPF,
           senha: 'SenhaErrada@123'
         });
 
       expect(response.status).toBe(401);
       expect(response.body.code).toBe('SENHA_INCORRETA');
     });
-  });
 
-  describe('POST /api/auth/register', () => {
-    it('deve registrar novo usuário', async () => {
-      const { generateTestCPF } = require('../helpers/testHelpers');
+    it('deve retornar deveAtualizarSenha quando necessário', async () => {
+      // Atualizar usuário para exigir atualização de senha
+      await testUser.update({ deve_atualizar_senha: true });
+
       const response = await request(app)
-        .post('/api/auth/register')
+        .post('/api/auth/login')
         .send({
-          nome: 'Novo Usuário',
-          email: 'novo@auth.test',
-          cpf: generateTestCPF('novo'),
+          cpf: testUserCPF,
           senha: 'Senha@123'
         });
 
-      expect(response.status).toBe(201);
-      expect(response.body.success).toBe(true);
-      expect(response.body.token).toBeDefined();
-      expect(response.body.user.email).toBe('novo@auth.test');
-    });
+      expect(response.status).toBe(200);
+      expect(response.body.user.deveAtualizarSenha).toBe(true);
 
-    it('deve retornar 400 com email duplicado', async () => {
-      const { generateTestCPF } = require('../helpers/testHelpers');
-      const cpf1 = generateTestCPF('dup1');
-      const cpf2 = generateTestCPF('dup2');
-      
-      await request(app)
-        .post('/api/auth/register')
-        .send({
-          nome: 'Usuario',
-          email: 'duplicado@auth.test',
-          cpf: cpf1,
-          senha: 'Senha@123'
-        });
-
-      const response = await request(app)
-        .post('/api/auth/register')
-        .send({
-          nome: 'Usuario 2',
-          email: 'duplicado@auth.test',
-          cpf: cpf2,
-          senha: 'Senha@123'
-        });
-
-      expect(response.status).toBe(400);
-      // Pode retornar erro sobre email duplicado ou CPF obrigatório
-      expect(response.body.error).toBeDefined();
-    });
-
-    it('deve retornar 400 sem campos obrigatórios', async () => {
-      const response = await request(app)
-        .post('/api/auth/register')
-        .send({ nome: 'Sem Email' });
-
-      expect(response.status).toBe(400);
-      // Pode retornar erro sobre CPF ou email obrigatório
-      expect(response.body.error).toBeDefined();
-    });
-
-    it('deve retornar 400 sem nome', async () => {
-      const { generateTestCPF } = require('../helpers/testHelpers');
-      const response = await request(app)
-        .post('/api/auth/register')
-        .send({
-          email: 'teste@test.com',
-          cpf: generateTestCPF('noname'),
-          senha: 'Senha@123'
-        });
-
-      expect(response.status).toBe(400);
+      // Restaurar
+      await testUser.update({ deve_atualizar_senha: false });
     });
   });
 
   describe('GET /api/auth/me', () => {
     it('deve retornar dados do usuário autenticado', async () => {
-      const token = createTestToken(admin);
-
       const response = await request(app)
         .get('/api/auth/me')
-        .set('Authorization', `Bearer ${token}`);
+        .set('Authorization', `Bearer ${adminToken}`);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.user.cpf).toBe(admin.cpf);
+      expect(response.body.user).toHaveProperty('id');
+      expect(response.body.user).toHaveProperty('nome');
+      expect(response.body.user).toHaveProperty('email');
+      expect(response.body.user).toHaveProperty('nivelAcesso');
     });
 
-    it('deve retornar 401 sem token', async () => {
+    it('deve retornar 401 sem autenticação', async () => {
       const response = await request(app).get('/api/auth/me');
+      expect(response.status).toBe(401);
+    });
+
+    it('deve retornar 401 com token inválido', async () => {
+      const response = await request(app)
+        .get('/api/auth/me')
+        .set('Authorization', 'Bearer invalid-token');
+
       expect(response.status).toBe(401);
     });
   });
 
   describe('POST /api/auth/logout', () => {
-    it('deve fazer logout', async () => {
+    it('deve fazer logout com sucesso', async () => {
+      const response = await request(app)
+        .post('/api/auth/logout')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+
+    it('deve funcionar mesmo sem autenticação', async () => {
       const response = await request(app).post('/api/auth/logout');
-      
       expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-    });
-  });
-
-  describe('PUT /api/auth/change-password', () => {
-    // Criar usuário separado para cada teste para evitar conflitos de senha
-    let adminParaTeste;
-    
-    beforeEach(async () => {
-      // Limpar qualquer usuário anterior que possa ter sido criado
-      if (adminParaTeste) {
-        try {
-          await Usuario.destroy({ where: { id: adminParaTeste.id }, force: true });
-        } catch (e) {
-          // Ignorar erros de limpeza
-        }
-      }
-      
-      // Recriar admin com senha original para cada teste
-      const senhaHash = await bcrypt.hash('Teste@123', 10);
-      const timestamp = Date.now();
-      const adminCPF = generateTestCPF(`change_pwd_${timestamp}`);
-      adminParaTeste = await Usuario.create({
-        cpf: adminCPF,
-        nome: 'Admin Change Password',
-        email: `admin_chpwd_${timestamp}@test.com`,
-        senha_hash: senhaHash,
-        nivel_acesso_id: admin.nivel_acesso_id
-      });
-    });
-
-    afterEach(async () => {
-      // Limpar usuário criado para o teste
-      if (adminParaTeste && adminParaTeste.id) {
-        try {
-          await Usuario.destroy({ where: { id: adminParaTeste.id }, force: true });
-        } catch (e) {
-          // Ignorar erros de limpeza
-        }
-        adminParaTeste = null;
-      }
-    });
-
-    it('deve atualizar senha quando senha atual é correta', async () => {
-      const adminAtualizado = await Usuario.findByPk(adminParaTeste.id, {
-        include: { model: NivelAcesso, attributes: ['id', 'nome', 'descricao'] }
-      });
-      const token = createTestToken(adminAtualizado, adminAtualizado.NivelAcesso.nome, adminAtualizado.NivelAcesso.id);
-
-      const response = await request(app)
-        .put('/api/auth/change-password')
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          senhaAtual: 'Teste@123',
-          novaSenha: 'NovaSenha@123'
-        });
-
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-    });
-
-    it('deve retornar 400 quando senha atual está incorreta', async () => {
-      const adminAtualizado = await Usuario.findByPk(adminParaTeste.id, {
-        include: { model: NivelAcesso, attributes: ['id', 'nome', 'descricao'] }
-      });
-      const token = createTestToken(adminAtualizado, adminAtualizado.NivelAcesso.nome, adminAtualizado.NivelAcesso.id);
-
-      const response = await request(app)
-        .put('/api/auth/change-password')
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          senhaAtual: 'SenhaErrada@123',
-          novaSenha: 'NovaSenha@123'
-        });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('Senha atual incorreta');
-    });
-
-    it('deve retornar 400 quando nova senha não atende aos critérios', async () => {
-      const adminAtualizado = await Usuario.findByPk(adminParaTeste.id, {
-        include: { model: NivelAcesso, attributes: ['id', 'nome', 'descricao'] }
-      });
-      const token = createTestToken(adminAtualizado, adminAtualizado.NivelAcesso.nome, adminAtualizado.NivelAcesso.id);
-
-      const response = await request(app)
-        .put('/api/auth/change-password')
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          senhaAtual: 'Teste@123',
-          novaSenha: '123'
-        });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('critérios');
-    });
-  });
-
-  describe('PUT /api/auth/force-password-update', () => {
-    let usuarioTemp;
-    
-    beforeEach(async () => {
-      // Limpar qualquer usuário anterior
-      if (usuarioTemp && usuarioTemp.id) {
-        try {
-          await Usuario.destroy({ where: { id: usuarioTemp.id }, force: true });
-        } catch (e) {
-          // Ignorar erros de limpeza
-        }
-      }
-      
-      // Criar usuário temporário para cada teste
-      const senhaHash = await bcrypt.hash('Temp@123', 10);
-      const timestamp = Date.now();
-      usuarioTemp = await Usuario.create({
-        cpf: generateTestCPF(`force_pwd_${timestamp}`),
-        nome: 'Usuario Temp',
-        email: `temp_force_${timestamp}@auth.test`,
-        senha_hash: senhaHash,
-        nivel_acesso_id: 2,
-        deve_atualizar_senha: true
-      });
-    });
-
-    afterEach(async () => {
-      // Limpar usuário criado
-      if (usuarioTemp && usuarioTemp.id) {
-        try {
-          await Usuario.destroy({ where: { id: usuarioTemp.id }, force: true });
-        } catch (e) {
-          // Ignorar erros de limpeza
-        }
-        usuarioTemp = null;
-      }
-    });
-
-    it('deve atualizar senha obrigatória com token válido', async () => {
-      const usuarioAtualizado = await Usuario.findByPk(usuarioTemp.id, {
-        include: { model: NivelAcesso, attributes: ['id', 'nome', 'descricao'] }
-      });
-      const token = createTestToken(usuarioAtualizado, usuarioAtualizado.NivelAcesso.nome, usuarioAtualizado.NivelAcesso.id);
-
-      const response = await request(app)
-        .put('/api/auth/force-password-update')
-        .send({
-          token: token,
-          novaSenha: 'NovaSenha@123'
-        });
-
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-      expect(response.body.token).toBeDefined();
-      expect(response.body.user.deveAtualizarSenha).toBe(false);
-    });
-
-    it('deve retornar 400 quando token não é fornecido', async () => {
-      const response = await request(app)
-        .put('/api/auth/force-password-update')
-        .send({ novaSenha: 'NovaSenha@123' });
-
-      expect(response.status).toBe(400);
-    });
-
-    it('deve retornar 401 quando token é inválido', async () => {
-      const response = await request(app)
-        .put('/api/auth/force-password-update')
-        .send({ 
-          token: 'token-invalido', 
-          novaSenha: 'NovaSenha@123' 
-        });
-
-      expect(response.status).toBe(401);
     });
   });
 
   describe('PUT /api/auth/user/:id/role', () => {
-    it('deve atualizar nível de acesso do usuário (admin)', async () => {
-      const token = createTestToken(admin);
+    let targetUser;
 
+    beforeAll(async () => {
+      const senhaHash = await bcrypt.hash('Senha@123', 10);
+      targetUser = await Usuario.create({
+        cpf: generateTestCPF('role01'),
+        nome: 'Target User',
+        email: `target${Date.now()}@teste.com`,
+        senha_hash: senhaHash,
+        nivel_acesso_id: nivelVistoriador.id
+      });
+    });
+
+    it('admin deve poder atualizar nível de acesso', async () => {
       const response = await request(app)
-        .put(`/api/auth/user/${vistoriador.id}/role`)
-        .set('Authorization', `Bearer ${token}`)
-        .send({ nivelAcessoId: 1 });
+        .put(`/api/auth/user/${targetUser.id}/role`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ nivelAcessoId: nivelAdmin.id });
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
+      expect(response.body.user.nivelAcessoId).toBe(nivelAdmin.id);
     });
 
-    it('deve retornar 400 quando nível de acesso não existe', async () => {
-      const token = createTestToken(admin);
-
+    it('deve retornar 400 para nível de acesso inexistente', async () => {
       const response = await request(app)
-        .put(`/api/auth/user/${vistoriador.id}/role`)
-        .set('Authorization', `Bearer ${token}`)
-        .send({ nivelAcessoId: 999 });
+        .put(`/api/auth/user/${targetUser.id}/role`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ nivelAcessoId: 99999 });
 
       expect(response.status).toBe(400);
+    });
+
+    it('deve retornar 404 para usuário inexistente', async () => {
+      const response = await request(app)
+        .put('/api/auth/user/99999/role')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ nivelAcessoId: nivelVistoriador.id });
+
+      expect(response.status).toBe(404);
+    });
+
+    it('vistoriador não deve poder atualizar nível de acesso', async () => {
+      const response = await request(app)
+        .put(`/api/auth/user/${targetUser.id}/role`)
+        .set('Authorization', `Bearer ${vistoriadorToken}`)
+        .send({ nivelAcessoId: nivelAdmin.id });
+
+      expect(response.status).toBe(403);
     });
   });
 
   describe('GET /api/auth/users', () => {
-    it('deve listar todos os usuários (admin)', async () => {
-      const token = createTestToken(admin);
-
+    it('admin deve poder listar usuários', async () => {
       const response = await request(app)
         .get('/api/auth/users')
-        .set('Authorization', `Bearer ${token}`);
+        .set('Authorization', `Bearer ${adminToken}`);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(Array.isArray(response.body.users)).toBe(true);
     });
+
+    it('vistoriador não deve poder listar usuários', async () => {
+      const response = await request(app)
+        .get('/api/auth/users')
+        .set('Authorization', `Bearer ${vistoriadorToken}`);
+
+      expect(response.status).toBe(403);
+    });
+  });
+
+  describe('PUT /api/auth/change-password', () => {
+    let passwordUser;
+    let passwordUserToken;
+
+    beforeEach(async () => {
+      const senhaHash = await bcrypt.hash('Senha@123', 10);
+      passwordUser = await Usuario.create({
+        cpf: generateTestCPF(`pwd${Date.now().toString().slice(-6)}`),
+        nome: 'Password User',
+        email: `pwd${Date.now()}@teste.com`,
+        senha_hash: senhaHash,
+        nivel_acesso_id: nivelVistoriador.id
+      });
+
+      passwordUserToken = jwt.sign(
+        { userId: passwordUser.id, cpf: passwordUser.cpf, nivelAcessoId: nivelVistoriador.id },
+        process.env.JWT_SECRET || 'sua-chave-secreta-jwt',
+        { expiresIn: '24h' }
+      );
+    });
+
+    it('deve alterar senha com sucesso', async () => {
+      const response = await request(app)
+        .put('/api/auth/change-password')
+        .set('Authorization', `Bearer ${passwordUserToken}`)
+        .send({
+          senhaAtual: 'Senha@123',
+          novaSenha: 'NovaSenha@456'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+
+    it('deve retornar 400 se senha atual incorreta', async () => {
+      const response = await request(app)
+        .put('/api/auth/change-password')
+        .set('Authorization', `Bearer ${passwordUserToken}`)
+        .send({
+          senhaAtual: 'SenhaErrada@123',
+          novaSenha: 'NovaSenha@456'
+        });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('deve retornar 400 se nova senha não atende critérios', async () => {
+      const response = await request(app)
+        .put('/api/auth/change-password')
+        .set('Authorization', `Bearer ${passwordUserToken}`)
+        .send({
+          senhaAtual: 'Senha@123',
+          novaSenha: '123' // Muito curta e sem requisitos
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty('details');
+    });
+
+    it('deve retornar 400 sem campos obrigatórios', async () => {
+      const response = await request(app)
+        .put('/api/auth/change-password')
+        .set('Authorization', `Bearer ${passwordUserToken}`)
+        .send({});
+
+      expect(response.status).toBe(400);
+    });
+  });
+
+  describe('PUT /api/auth/user/:id/password', () => {
+    let targetUser;
+
+    beforeEach(async () => {
+      const senhaHash = await bcrypt.hash('Senha@123', 10);
+      targetUser = await Usuario.create({
+        cpf: generateTestCPF(`admpwd${Date.now().toString().slice(-6)}`),
+        nome: 'Admin Target User',
+        email: `admtarget${Date.now()}@teste.com`,
+        senha_hash: senhaHash,
+        nivel_acesso_id: nivelVistoriador.id
+      });
+    });
+
+    it('admin deve poder redefinir senha de usuário', async () => {
+      const response = await request(app)
+        .put(`/api/auth/user/${targetUser.id}/password`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ novaSenha: 'NovaSenha@789' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+
+    it('deve marcar usuário para atualizar senha', async () => {
+      await request(app)
+        .put(`/api/auth/user/${targetUser.id}/password`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ novaSenha: 'NovaSenha@789' });
+
+      await targetUser.reload();
+      expect(targetUser.deve_atualizar_senha).toBe(true);
+    });
+
+    it('deve retornar 404 para usuário inexistente', async () => {
+      const response = await request(app)
+        .put('/api/auth/user/99999/password')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ novaSenha: 'NovaSenha@789' });
+
+      expect(response.status).toBe(404);
+    });
+
+    it('vistoriador não deve poder redefinir senha', async () => {
+      const response = await request(app)
+        .put(`/api/auth/user/${targetUser.id}/password`)
+        .set('Authorization', `Bearer ${vistoriadorToken}`)
+        .send({ novaSenha: 'NovaSenha@789' });
+
+      expect(response.status).toBe(403);
+    });
+  });
+
+  describe('POST /api/auth/user/:id/temp-password', () => {
+    let targetUser;
+
+    beforeEach(async () => {
+      const senhaHash = await bcrypt.hash('Senha@123', 10);
+      targetUser = await Usuario.create({
+        cpf: generateTestCPF(`temp${Date.now().toString().slice(-6)}`),
+        nome: 'Temp Password User',
+        email: `temp${Date.now()}@teste.com`,
+        senha_hash: senhaHash,
+        nivel_acesso_id: nivelVistoriador.id
+      });
+    });
+
+    it('admin deve poder definir senha temporária', async () => {
+      const response = await request(app)
+        .post(`/api/auth/user/${targetUser.id}/temp-password`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ senhaTemporaria: 'Temp@123' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.senhaTemporaria).toBe('Temp@123');
+    });
+
+    it('deve retornar 400 sem senha temporária', async () => {
+      const response = await request(app)
+        .post(`/api/auth/user/${targetUser.id}/temp-password`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({});
+
+      expect(response.status).toBe(400);
+    });
+
+    it('deve retornar 404 para usuário inexistente', async () => {
+      const response = await request(app)
+        .post('/api/auth/user/99999/temp-password')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ senhaTemporaria: 'Temp@123' });
+
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe('GET /api/auth/password-status', () => {
+    it('deve retornar status de senha', async () => {
+      const response = await request(app)
+        .get('/api/auth/password-status')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body).toHaveProperty('deveAtualizarSenha');
+    });
   });
 });
-

@@ -4,10 +4,12 @@ const { setupCompleteTestEnvironment, createTestEmbarcacao, createTestLocal, cre
 describe('Modelo Laudo', () => {
   let vistoria;
   let setup;
-  let updateVistoria;
+
+  beforeAll(async () => {
+    setup = await setupCompleteTestEnvironment('laudo');
+  });
 
   beforeEach(async () => {
-    setup = await setupCompleteTestEnvironment('laudo');
     const usuario = setup.admin;
 
     // Usar nomes únicos para evitar conflitos
@@ -22,10 +24,14 @@ describe('Modelo Laudo', () => {
       nome_local: `Marina Teste ${timestamp}`
     });
 
-    const status = await createTestStatusVistoria({
-      nome: `CONCLUIDA_${timestamp}`,
-      descricao: 'Vistoria concluída'
-    });
+    // Buscar ou criar status
+    let status = await StatusVistoria.findOne({ where: { nome: 'CONCLUIDA' } });
+    if (!status) {
+      status = await StatusVistoria.create({
+        nome: 'CONCLUIDA',
+        descricao: 'Vistoria concluída'
+      });
+    }
 
     vistoria = await Vistoria.create({
       embarcacao_id: embarcacao.id,
