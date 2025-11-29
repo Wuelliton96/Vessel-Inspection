@@ -310,12 +310,12 @@ const deleteFile = async (fileUrlOrKey) => {
       console.log(`Arquivo deletado do S3: ${key}`);
     } else {
       // Deletar arquivo local
-      // fileUrl pode ser apenas o nome do arquivo ou caminho completo
+      // fileUrlOrKey pode ser apenas o nome do arquivo ou caminho completo
       // Se for apenas nome, precisa construir o caminho com vistoria_id
       let filePath;
-      if (fileUrl.startsWith('/uploads/')) {
+      if (fileUrlOrKey.startsWith('/uploads/')) {
         // Caminho completo (formato antigo ou migração)
-        filePath = path.join(__dirname, '..', fileUrl);
+        filePath = path.join(__dirname, '..', fileUrlOrKey);
       } else {
         // Apenas nome do arquivo - precisa vistoria_id para construir caminho
         // Como não temos vistoria_id aqui, tentar encontrar o arquivo
@@ -327,7 +327,7 @@ const deleteFile = async (fileUrlOrKey) => {
           
           let arquivoEncontrado = false;
           for (const vistoriaDir of vistoriaDirs) {
-            const caminhoCompleto = path.join(fotosDir, vistoriaDir.name, fileUrl);
+            const caminhoCompleto = path.join(fotosDir, vistoriaDir.name, fileUrlOrKey);
             if (fs.existsSync(caminhoCompleto)) {
               filePath = caminhoCompleto;
               arquivoEncontrado = true;
@@ -336,7 +336,7 @@ const deleteFile = async (fileUrlOrKey) => {
           }
           
           if (!arquivoEncontrado) {
-            console.log(`Arquivo nao encontrado: ${fileUrl}`);
+            console.log(`Arquivo nao encontrado: ${fileUrlOrKey}`);
             return;
           }
         } else {
