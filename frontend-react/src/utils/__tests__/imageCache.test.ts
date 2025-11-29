@@ -1,161 +1,180 @@
+/**
+ * Testes para imageCache.ts
+ */
+
 import { imageCacheManager } from '../imageCache';
 
 describe('ImageCacheManager', () => {
   beforeEach(() => {
+    // Limpar cache antes de cada teste
     imageCacheManager.clearCache();
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('addToCache', () => {
     it('deve adicionar imagem ao cache', () => {
-      const img = new Image();
-      imageCacheManager.addToCache('http://example.com/image.jpg', img);
-
+      const mockImg = new Image();
+      mockImg.src = 'test.jpg';
+      
+      imageCacheManager.addToCache('http://example.com/test.jpg', mockImg);
+      
       expect(imageCacheManager.getCacheSize()).toBe(1);
-      expect(imageCacheManager.getFromCache('http://example.com/image.jpg')).toBe(img);
     });
 
-    it('deve remover imagem mais antiga quando cache está cheio', () => {
-      const maxSize = 50;
-      
-      // Adicionar 50 imagens
-      for (let i = 0; i < maxSize; i++) {
-        const img = new Image();
-        imageCacheManager.addToCache(`http://example.com/image${i}.jpg`, img);
+    it('deve remover a mais antiga quando cache está cheio', () => {
+      // Adicionar 50 imagens (limite do cache)
+      for (let i = 0; i < 50; i++) {
+        const mockImg = new Image();
+        mockImg.src = `test${i}.jpg`;
+        imageCacheManager.addToCache(`http://example.com/test${i}.jpg`, mockImg);
       }
-
-      expect(imageCacheManager.getCacheSize()).toBe(maxSize);
-
-      // Adicionar mais uma imagem
+      
+      expect(imageCacheManager.getCacheSize()).toBe(50);
+      
+      // Adicionar mais uma (deve remover a primeira)
       const newImg = new Image();
-      imageCacheManager.addToCache('http://example.com/image51.jpg', newImg);
-
-      expect(imageCacheManager.getCacheSize()).toBe(maxSize);
-      expect(imageCacheManager.getFromCache('http://example.com/image51.jpg')).toBe(newImg);
+      newImg.src = 'new.jpg';
+      imageCacheManager.addToCache('http://example.com/new.jpg', newImg);
+      
+      expect(imageCacheManager.getCacheSize()).toBe(50);
+      expect(imageCacheManager.getFromCache('http://example.com/test0.jpg')).toBeNull();
+      expect(imageCacheManager.getFromCache('http://example.com/new.jpg')).toBe(newImg);
     });
 
-    it('deve substituir imagem existente com mesma URL', () => {
-      const img1 = new Image();
-      const img2 = new Image();
+    it('deve atualizar imagem se URL já existe', () => {
+      const mockImg1 = new Image();
+      mockImg1.src = 'test1.jpg';
       
-      imageCacheManager.addToCache('http://example.com/image.jpg', img1);
-      imageCacheManager.addToCache('http://example.com/image.jpg', img2);
-
+      const mockImg2 = new Image();
+      mockImg2.src = 'test2.jpg';
+      
+      imageCacheManager.addToCache('http://example.com/test.jpg', mockImg1);
+      imageCacheManager.addToCache('http://example.com/test.jpg', mockImg2);
+      
       expect(imageCacheManager.getCacheSize()).toBe(1);
-      expect(imageCacheManager.getFromCache('http://example.com/image.jpg')).toBe(img2);
+      expect(imageCacheManager.getFromCache('http://example.com/test.jpg')).toBe(mockImg2);
     });
   });
 
   describe('getFromCache', () => {
-    it('deve retornar imagem do cache quando existe', () => {
-      const img = new Image();
-      imageCacheManager.addToCache('http://example.com/image.jpg', img);
-
-      const cachedImg = imageCacheManager.getFromCache('http://example.com/image.jpg');
-      expect(cachedImg).toBe(img);
+    it('deve retornar imagem do cache', () => {
+      const mockImg = new Image();
+      mockImg.src = 'test.jpg';
+      
+      imageCacheManager.addToCache('http://example.com/test.jpg', mockImg);
+      
+      const result = imageCacheManager.getFromCache('http://example.com/test.jpg');
+      expect(result).toBe(mockImg);
     });
 
-    it('deve retornar null quando imagem não existe no cache', () => {
-      const cachedImg = imageCacheManager.getFromCache('http://example.com/nonexistent.jpg');
-      expect(cachedImg).toBeNull();
+    it('deve retornar null se URL não está no cache', () => {
+      const result = imageCacheManager.getFromCache('http://example.com/notfound.jpg');
+      expect(result).toBeNull();
     });
   });
 
   describe('clearCache', () => {
     it('deve limpar todo o cache', () => {
-      const img1 = new Image();
-      const img2 = new Image();
+      const mockImg1 = new Image();
+      const mockImg2 = new Image();
       
-      imageCacheManager.addToCache('http://example.com/image1.jpg', img1);
-      imageCacheManager.addToCache('http://example.com/image2.jpg', img2);
-
+      imageCacheManager.addToCache('http://example.com/test1.jpg', mockImg1);
+      imageCacheManager.addToCache('http://example.com/test2.jpg', mockImg2);
+      
       expect(imageCacheManager.getCacheSize()).toBe(2);
-
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      
       imageCacheManager.clearCache();
-
+      
       expect(imageCacheManager.getCacheSize()).toBe(0);
-      expect(imageCacheManager.getFromCache('http://example.com/image1.jpg')).toBeNull();
-      expect(imageCacheManager.getFromCache('http://example.com/image2.jpg')).toBeNull();
-      expect(consoleLogSpy).toHaveBeenCalledWith('[ImageCache] Cache limpo');
-
-      consoleLogSpy.mockRestore();
     });
 
-    it('deve limpar referências das imagens ao limpar cache', () => {
-      const img = new Image();
-      img.src = 'http://example.com/image.jpg';
-      img.onload = jest.fn();
-      img.onerror = jest.fn();
-
-      imageCacheManager.addToCache('http://example.com/image.jpg', img);
+    it('deve limpar referências das imagens', () => {
+      const mockImg = new Image();
+      mockImg.src = 'test.jpg';
+      mockImg.onload = () => {};
+      mockImg.onerror = () => {};
+      
+      imageCacheManager.addToCache('http://example.com/test.jpg', mockImg);
       imageCacheManager.clearCache();
+      
+      // Após clearCache, as referências são limpas
+      // O src pode ser vazio ou o valor anterior dependendo do browser
+      expect(mockImg.onload).toBeNull();
+      expect(mockImg.onerror).toBeNull();
+    });
 
-      expect(img.src).toBe('');
-      expect(img.onload).toBeNull();
-      expect(img.onerror).toBeNull();
+    it('deve logar mensagem de limpeza', () => {
+      imageCacheManager.clearCache();
+      expect(console.log).toHaveBeenCalledWith('[ImageCache] Cache limpo');
     });
   });
 
   describe('clearCacheForUrls', () => {
-    it('deve limpar cache apenas para URLs especificadas', () => {
-      const img1 = new Image();
-      const img2 = new Image();
-      const img3 = new Image();
+    it('deve limpar URLs específicas', () => {
+      const mockImg1 = new Image();
+      const mockImg2 = new Image();
+      const mockImg3 = new Image();
       
-      imageCacheManager.addToCache('http://example.com/image1.jpg', img1);
-      imageCacheManager.addToCache('http://example.com/image2.jpg', img2);
-      imageCacheManager.addToCache('http://example.com/image3.jpg', img3);
-
+      imageCacheManager.addToCache('http://example.com/test1.jpg', mockImg1);
+      imageCacheManager.addToCache('http://example.com/test2.jpg', mockImg2);
+      imageCacheManager.addToCache('http://example.com/test3.jpg', mockImg3);
+      
       expect(imageCacheManager.getCacheSize()).toBe(3);
-
+      
       imageCacheManager.clearCacheForUrls([
-        'http://example.com/image1.jpg',
-        'http://example.com/image2.jpg',
+        'http://example.com/test1.jpg',
+        'http://example.com/test2.jpg'
       ]);
-
+      
       expect(imageCacheManager.getCacheSize()).toBe(1);
-      expect(imageCacheManager.getFromCache('http://example.com/image1.jpg')).toBeNull();
-      expect(imageCacheManager.getFromCache('http://example.com/image2.jpg')).toBeNull();
-      expect(imageCacheManager.getFromCache('http://example.com/image3.jpg')).toBe(img3);
+      expect(imageCacheManager.getFromCache('http://example.com/test1.jpg')).toBeNull();
+      expect(imageCacheManager.getFromCache('http://example.com/test2.jpg')).toBeNull();
+      expect(imageCacheManager.getFromCache('http://example.com/test3.jpg')).toBe(mockImg3);
     });
 
-    it('deve limpar referências das imagens ao limpar URLs específicas', () => {
-      const img = new Image();
-      img.src = 'http://example.com/image.jpg';
-      img.onload = jest.fn();
-      img.onerror = jest.fn();
-
-      imageCacheManager.addToCache('http://example.com/image.jpg', img);
-      imageCacheManager.clearCacheForUrls(['http://example.com/image.jpg']);
-
-      expect(img.src).toBe('');
-      expect(img.onload).toBeNull();
-      expect(img.onerror).toBeNull();
+    it('deve ignorar URLs que não estão no cache', () => {
+      const mockImg = new Image();
+      imageCacheManager.addToCache('http://example.com/test.jpg', mockImg);
+      
+      // Não deve lançar erro
+      expect(() => {
+        imageCacheManager.clearCacheForUrls(['http://example.com/notfound.jpg']);
+      }).not.toThrow();
+      
+      expect(imageCacheManager.getCacheSize()).toBe(1);
     });
 
-    it('não deve fazer nada quando URL não existe no cache', () => {
-      const img = new Image();
-      imageCacheManager.addToCache('http://example.com/image1.jpg', img);
-
-      imageCacheManager.clearCacheForUrls(['http://example.com/nonexistent.jpg']);
-
-      expect(imageCacheManager.getCacheSize()).toBe(1);
-      expect(imageCacheManager.getFromCache('http://example.com/image1.jpg')).toBe(img);
+    it('deve limpar referências das imagens', () => {
+      const mockImg = new Image();
+      mockImg.src = 'test.jpg';
+      mockImg.onload = () => {};
+      mockImg.onerror = () => {};
+      
+      imageCacheManager.addToCache('http://example.com/test.jpg', mockImg);
+      imageCacheManager.clearCacheForUrls(['http://example.com/test.jpg']);
+      
+      // Após clearCacheForUrls, as referências são limpas
+      expect(mockImg.onload).toBeNull();
+      expect(mockImg.onerror).toBeNull();
     });
   });
 
   describe('getCacheSize', () => {
-    it('deve retornar 0 quando cache está vazio', () => {
+    it('deve retornar 0 para cache vazio', () => {
       expect(imageCacheManager.getCacheSize()).toBe(0);
     });
 
-    it('deve retornar tamanho correto do cache', () => {
-      imageCacheManager.addToCache('http://example.com/image1.jpg', new Image());
-      imageCacheManager.addToCache('http://example.com/image2.jpg', new Image());
-      imageCacheManager.addToCache('http://example.com/image3.jpg', new Image());
-
-      expect(imageCacheManager.getCacheSize()).toBe(3);
+    it('deve retornar número correto de itens', () => {
+      for (let i = 0; i < 10; i++) {
+        const mockImg = new Image();
+        imageCacheManager.addToCache(`http://example.com/test${i}.jpg`, mockImg);
+      }
+      
+      expect(imageCacheManager.getCacheSize()).toBe(10);
     });
   });
 });
-

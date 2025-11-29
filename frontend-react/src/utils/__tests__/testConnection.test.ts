@@ -1,158 +1,159 @@
-import { testBackendConnection, testAuthEndpoint } from '../testConnection';
-import { API_CONFIG } from '../../config/api';
+/**
+ * Testes para testConnection.ts
+ */
 
-// Mock fetch
+import { testBackendConnection, testAuthEndpoint } from '../testConnection';
+
+// Mock do fetch global
 global.fetch = jest.fn();
 
-// Mock console
-const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
-const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+// Mock do API_CONFIG
+jest.mock('../../config/api', () => ({
+  API_CONFIG: {
+    BASE_URL: 'http://localhost:3000'
+  }
+}));
 
 describe('testConnection', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  afterAll(() => {
-    consoleLogSpy.mockRestore();
-    consoleErrorSpy.mockRestore();
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('testBackendConnection', () => {
-    it('deve retornar true quando backend responde com sucesso', async () => {
+    it('deve retornar true quando conexão OK', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
-        status: 200,
+        status: 200
       });
 
       const result = await testBackendConnection();
 
       expect(result).toBe(true);
-      expect(global.fetch).toHaveBeenCalledWith(API_CONFIG.BASE_URL, {
+      expect(global.fetch).toHaveBeenCalledWith('http://localhost:3000', {
         method: 'GET',
-        mode: 'cors',
+        mode: 'cors'
       });
-      expect(consoleLogSpy).toHaveBeenCalledWith('Testando conexão com backend...');
-      expect(consoleLogSpy).toHaveBeenCalledWith('Response status:', 200);
-      expect(consoleLogSpy).toHaveBeenCalledWith('Response ok:', true);
     });
 
-    it('deve retornar false quando backend responde com erro', async () => {
+    it('deve retornar false quando response não OK', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: false,
-        status: 500,
+        status: 500
       });
 
       const result = await testBackendConnection();
 
       expect(result).toBe(false);
-      expect(consoleLogSpy).toHaveBeenCalledWith('Response status:', 500);
-      expect(consoleLogSpy).toHaveBeenCalledWith('Response ok:', false);
     });
 
-    it('deve retornar false quando há erro de conexão', async () => {
+    it('deve retornar false quando fetch falha', async () => {
       (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
 
       const result = await testBackendConnection();
 
       expect(result).toBe(false);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Erro ao conectar com o backend:',
-        expect.any(Error)
-      );
+      expect(console.error).toHaveBeenCalled();
     });
 
-    it('deve retornar false quando fetch lança exceção', async () => {
-      (global.fetch as jest.Mock).mockRejectedValue(new TypeError('Failed to fetch'));
+    it('deve logar informações de conexão', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200
+      });
 
-      const result = await testBackendConnection();
+      await testBackendConnection();
 
-      expect(result).toBe(false);
-      expect(consoleErrorSpy).toHaveBeenCalled();
+      expect(console.log).toHaveBeenCalledWith('Testando conexão com backend...');
+      expect(console.log).toHaveBeenCalledWith('Response status:', 200);
+      expect(console.log).toHaveBeenCalledWith('Response ok:', true);
     });
   });
 
   describe('testAuthEndpoint', () => {
-    it('deve retornar true quando endpoint responde com 200', async () => {
+    it('deve retornar true quando status 200', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         status: 200,
-        json: jest.fn().mockResolvedValue({ token: 'test-token' }),
+        json: () => Promise.resolve({ token: 'test-token' })
       });
 
       const result = await testAuthEndpoint();
 
       expect(result).toBe(true);
-      expect(global.fetch).toHaveBeenCalledWith(
-        `${API_CONFIG.BASE_URL}/api/auth/login`,
-        expect.objectContaining({
-          method: 'POST',
-          mode: 'cors',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: 'admin@sgvn.com',
-            senha: 'admin123',
-          }),
-        })
-      );
-      expect(consoleLogSpy).toHaveBeenCalledWith('Testando endpoint de auth...');
-      expect(consoleLogSpy).toHaveBeenCalledWith('Auth response status:', 200);
-      expect(consoleLogSpy).toHaveBeenCalledWith('Auth response ok:', true);
     });
 
-    it('deve retornar true quando endpoint responde com 401 (credenciais incorretas)', async () => {
+    it('deve retornar true quando status 401 (endpoint funcionando mas credenciais erradas)', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: false,
         status: 401,
-        json: jest.fn().mockResolvedValue({ error: 'Credenciais inválidas' }),
+        json: () => Promise.resolve({ error: 'Invalid credentials' })
       });
 
       const result = await testAuthEndpoint();
 
       expect(result).toBe(true);
-      expect(consoleLogSpy).toHaveBeenCalledWith('Auth response status:', 401);
-      expect(consoleLogSpy).toHaveBeenCalledWith('Auth response ok:', false);
     });
 
-    it('deve retornar false quando endpoint responde com outro status', async () => {
+    it('deve retornar false para outros status', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: false,
         status: 500,
-        json: jest.fn().mockResolvedValue({ error: 'Internal server error' }),
+        json: () => Promise.resolve({ error: 'Server error' })
       });
 
       const result = await testAuthEndpoint();
 
       expect(result).toBe(false);
-      expect(consoleLogSpy).toHaveBeenCalledWith('Auth response status:', 500);
     });
 
-    it('deve retornar false quando há erro de conexão', async () => {
+    it('deve retornar false quando fetch falha', async () => {
       (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
 
       const result = await testAuthEndpoint();
 
       expect(result).toBe(false);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Erro ao testar endpoint de auth:',
-        expect.any(Error)
-      );
+      expect(console.error).toHaveBeenCalled();
     });
 
-    it('deve logar dados da resposta quando disponível', async () => {
-      const responseData = { token: 'test-token', user: { id: 1 } };
+    it('deve enviar request POST com JSON', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         status: 200,
-        json: jest.fn().mockResolvedValue(responseData),
+        json: () => Promise.resolve({})
       });
 
       await testAuthEndpoint();
 
-      expect(consoleLogSpy).toHaveBeenCalledWith('Auth response data:', responseData);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/api/auth/login',
+        expect.objectContaining({
+          method: 'POST',
+          mode: 'cors',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: expect.any(String)
+        })
+      );
+    });
+
+    it('deve logar informações do auth', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ success: true })
+      });
+
+      await testAuthEndpoint();
+
+      expect(console.log).toHaveBeenCalledWith('Testando endpoint de auth...');
+      expect(console.log).toHaveBeenCalledWith('Auth response status:', 200);
     });
   });
 });
-

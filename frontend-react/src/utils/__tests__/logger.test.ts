@@ -1,63 +1,112 @@
-import { logger } from '../logger';
+/**
+ * Testes para logger.ts
+ */
 
 describe('logger', () => {
   const originalEnv = process.env.NODE_ENV;
-  const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
-  const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-  const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
-  const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
-  const consoleDebugSpy = jest.spyOn(console, 'debug').mockImplementation();
-
+  
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.resetModules();
   });
-
+  
   afterAll(() => {
     process.env.NODE_ENV = originalEnv;
-    consoleLogSpy.mockRestore();
-    consoleErrorSpy.mockRestore();
-    consoleWarnSpy.mockRestore();
-    consoleInfoSpy.mockRestore();
-    consoleDebugSpy.mockRestore();
   });
 
-  describe('em desenvolvimento', () => {
+  describe('em ambiente de desenvolvimento', () => {
     beforeEach(() => {
       process.env.NODE_ENV = 'development';
-      jest.resetModules();
+      jest.spyOn(console, 'log').mockImplementation(() => {});
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+      jest.spyOn(console, 'info').mockImplementation(() => {});
+      jest.spyOn(console, 'debug').mockImplementation(() => {});
     });
 
-    it('deve logar em desenvolvimento', () => {
-      const { logger: devLogger } = require('../logger');
-      devLogger.log('test');
-      expect(consoleLogSpy).toHaveBeenCalledWith('test');
+    afterEach(() => {
+      jest.restoreAllMocks();
     });
 
-    it('deve logar erros em desenvolvimento', () => {
-      const { logger: devLogger } = require('../logger');
-      devLogger.error('error');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('error');
+    it('deve chamar console.log em desenvolvimento', () => {
+      const { logger } = require('../logger');
+      logger.log('test message');
+      expect(console.log).toHaveBeenCalledWith('test message');
+    });
+
+    it('deve chamar console.error em desenvolvimento', () => {
+      const { logger } = require('../logger');
+      logger.error('error message');
+      expect(console.error).toHaveBeenCalledWith('error message');
+    });
+
+    it('deve chamar console.warn em desenvolvimento', () => {
+      const { logger } = require('../logger');
+      logger.warn('warn message');
+      expect(console.warn).toHaveBeenCalledWith('warn message');
+    });
+
+    it('deve chamar console.info em desenvolvimento', () => {
+      const { logger } = require('../logger');
+      logger.info('info message');
+      expect(console.info).toHaveBeenCalledWith('info message');
+    });
+
+    it('deve chamar console.debug em desenvolvimento', () => {
+      const { logger } = require('../logger');
+      logger.debug('debug message');
+      expect(console.debug).toHaveBeenCalledWith('debug message');
+    });
+
+    it('deve passar múltiplos argumentos', () => {
+      const { logger } = require('../logger');
+      logger.log('message', { data: 'test' }, 123);
+      expect(console.log).toHaveBeenCalledWith('message', { data: 'test' }, 123);
     });
   });
 
-  describe('em produção', () => {
+  describe('em ambiente de produção', () => {
     beforeEach(() => {
       process.env.NODE_ENV = 'production';
-      jest.resetModules();
+      jest.spyOn(console, 'log').mockImplementation(() => {});
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+      jest.spyOn(console, 'info').mockImplementation(() => {});
+      jest.spyOn(console, 'debug').mockImplementation(() => {});
     });
 
-    it('não deve logar em produção', () => {
-      const { logger: prodLogger } = require('../logger');
-      prodLogger.log('test');
-      expect(consoleLogSpy).not.toHaveBeenCalled();
+    afterEach(() => {
+      jest.restoreAllMocks();
     });
 
-    it('não deve logar erros em produção', () => {
-      const { logger: prodLogger } = require('../logger');
-      prodLogger.error('error');
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
+    it('não deve chamar console.log em produção', () => {
+      const { logger } = require('../logger');
+      logger.log('test message');
+      expect(console.log).not.toHaveBeenCalled();
+    });
+
+    it('não deve chamar console.error em produção', () => {
+      const { logger } = require('../logger');
+      logger.error('error message');
+      expect(console.error).not.toHaveBeenCalled();
+    });
+
+    it('não deve chamar console.warn em produção', () => {
+      const { logger } = require('../logger');
+      logger.warn('warn message');
+      expect(console.warn).not.toHaveBeenCalled();
+    });
+
+    it('não deve chamar console.info em produção', () => {
+      const { logger } = require('../logger');
+      logger.info('info message');
+      expect(console.info).not.toHaveBeenCalled();
+    });
+
+    it('não deve chamar console.debug em produção', () => {
+      const { logger } = require('../logger');
+      logger.debug('debug message');
+      expect(console.debug).not.toHaveBeenCalled();
     });
   });
 });
-
-
