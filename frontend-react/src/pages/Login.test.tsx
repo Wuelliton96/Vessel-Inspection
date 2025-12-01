@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import Login from './Login';
 import { useAuth } from '../contexts/AuthContext';
 import { validarCPF, limparCPF, mascaraCPF } from '../utils/validators';
@@ -8,10 +8,6 @@ import { validarCPF, limparCPF, mascaraCPF } from '../utils/validators';
 // Mock dos módulos
 jest.mock('../contexts/AuthContext');
 jest.mock('../utils/validators');
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
-  useNavigate: () => jest.fn(),
-}));
 
 // Mock dos ícones do lucide-react
 jest.mock('lucide-react', () => ({
@@ -58,9 +54,9 @@ describe('Login Component', () => {
 
   const renderLogin = () => {
     return render(
-      <BrowserRouter>
+      <MemoryRouter>
         <Login />
-      </BrowserRouter>
+      </MemoryRouter>
     );
   };
 

@@ -7,13 +7,6 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import VistoriadorDashboard from '../VistoriadorDashboard';
 
-// Mock do navigate
-const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
-  useNavigate: () => mockNavigate
-}));
-
 // Mock do useAuth
 jest.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({

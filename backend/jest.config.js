@@ -35,6 +35,8 @@ module.exports = {
   forceExit: true,
   clearMocks: true,
   resetMocks: true,
+  collectCoverage: true,               // 🔹 garante coverage sempre
+  coverageProvider: 'v8',              // 🔹 usa v8 para melhor rastreamento
   restoreMocks: true,
   // Executar testes em série para evitar problemas de sincronização do banco
   maxWorkers: 1
