@@ -293,19 +293,37 @@ const FotosVistoria: React.FC = () => {
   const [errosCarregamento, setErrosCarregamento] = useState<number>(0);
   const [mostrarAvisoRecarregar, setMostrarAvisoRecarregar] = useState(false);
 
+  const [erroGeral, setErroGeral] = useState<string | null>(null);
+
   const loadDados = useCallback(async () => {
     if (!id) return;
     
     try {
       setLoading(true);
+      setErroGeral(null);
       
       // Carregar vistoria
-      const vistoriaData = await vistoriaService.getById(parseInt(id));
-      setVistoria(vistoriaData);
+      let vistoriaData;
+      try {
+        vistoriaData = await vistoriaService.getById(parseInt(id));
+        setVistoria(vistoriaData);
+      } catch (err: any) {
+        console.error('Erro ao carregar vistoria:', err);
+        setErroGeral('Erro ao carregar dados da vistoria. Tente novamente.');
+        setLoading(false);
+        return;
+      }
       
       // Carregar checklist com fotos
-      const itens = await checklistService.getChecklistVistoria(parseInt(id));
-      setChecklistItens(itens);
+      let itens: VistoriaChecklistItem[] = [];
+      try {
+        itens = await checklistService.getChecklistVistoria(parseInt(id));
+        setChecklistItens(itens);
+      } catch (err: any) {
+        console.error('Erro ao carregar checklist:', err);
+        // Nao travar a tela, apenas mostrar aviso
+        setChecklistItens([]);
+      }
       
       // Buscar URLs de todas as imagens em paralelo (otimizado)
       const urls: Record<number, string> = {};
@@ -315,21 +333,27 @@ const FotosVistoria: React.FC = () => {
       // Filtrar itens com foto
       const itensComFoto = itens.filter(item => item.foto?.id);
       
-      // Carregar URLs em paralelo (máximo 10 por vez para não sobrecarregar)
+      // Carregar URLs em paralelo (maximo 10 por vez para nao sobrecarregar)
       const batchSize = 10;
       for (let i = 0; i < itensComFoto.length; i += batchSize) {
         const batch = itensComFoto.slice(i, i + batchSize);
         
-        await Promise.all(
+        await Promise.allSettled(
           batch.map(async (item) => {
             if (!item.foto?.id) return;
             
             try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 10000);
+              
               const response = await fetch(buildImageUrlEndpoint(API_CONFIG.BASE_URL, item.foto.id), {
                 headers: {
                   'Authorization': `Bearer ${token}`
-                }
+                },
+                signal: controller.signal
               });
+              
+              clearTimeout(timeoutId);
               
               if (response.ok) {
                 const data = await response.json();
@@ -345,11 +369,13 @@ const FotosVistoria: React.FC = () => {
                 // Fallback: usar rota direta
                 urls[item.foto.id] = buildImageUrl(API_CONFIG.BASE_URL, item.foto.id);
               }
-            } catch (error) {
-              console.error(`Erro ao buscar URL da foto ${item.foto.id}:`, error);
+            } catch (error: any) {
+              console.error(`Erro ao buscar URL da foto ${item.foto?.id}:`, error?.message || error);
               errosCountRef.count++;
-              // Fallback: usar rota direta
-              urls[item.foto.id] = buildImageUrl(API_CONFIG.BASE_URL, item.foto.id);
+              // Fallback: usar rota direta (NUNCA deixar sem URL)
+              if (item.foto?.id) {
+                urls[item.foto.id] = buildImageUrl(API_CONFIG.BASE_URL, item.foto.id);
+              }
             }
           })
         );
@@ -362,8 +388,9 @@ const FotosVistoria: React.FC = () => {
       if (errosCountRef.count > 3) {
         setMostrarAvisoRecarregar(true);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao carregar dados:', err);
+      setErroGeral('Erro inesperado ao carregar pagina. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -422,6 +449,33 @@ const FotosVistoria: React.FC = () => {
 
   if (loading) {
     return <Container><EmptyState>Carregando...</EmptyState></Container>;
+  }
+
+  if (erroGeral) {
+    return (
+      <Container>
+        <div style={{
+          background: '#fef2f2',
+          border: '2px solid #fca5a5',
+          borderRadius: '0.75rem',
+          padding: '2rem',
+          textAlign: 'center'
+        }}>
+          <AlertCircle size={48} color="#dc2626" style={{ marginBottom: '1rem' }} />
+          <h3 style={{ color: '#991b1b', marginBottom: '1rem' }}>{erroGeral}</h3>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+            <ButtonPrimary onClick={loadDados}>
+              <RefreshCw size={20} />
+              Tentar Novamente
+            </ButtonPrimary>
+            <BackButton onClick={() => navigate('/vistorias')}>
+              <ArrowLeft size={20} />
+              Voltar
+            </BackButton>
+          </div>
+        </div>
+      </Container>
+    );
   }
 
   if (!vistoria) {

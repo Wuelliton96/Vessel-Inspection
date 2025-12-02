@@ -2400,11 +2400,18 @@ const VistoriadorVistoria: React.FC = () => {
                                   setUrlImagem(null);
                                   
                                   try {
+                                    // Adicionar timeout para evitar travamento
+                                    const controller = new AbortController();
+                                    const timeoutId = setTimeout(() => controller.abort(), 15000);
+                                    
                                     const response = await fetch(`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem-url`, {
                                       headers: {
                                         'Authorization': `Bearer ${token}`
-                                      }
+                                      },
+                                      signal: controller.signal
                                     });
+                                    
+                                    clearTimeout(timeoutId);
                                     
                                     if (response.ok) {
                                       const data = await response.json();
@@ -2412,15 +2419,19 @@ const VistoriadorVistoria: React.FC = () => {
                                         setUrlImagem(data.url);
                                         setCarregandoImagem(false);
                                       } else {
-                                        setErroCarregamentoImagem(true);
+                                        // Tentar fallback com URL direta
+                                        setUrlImagem(`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`);
                                         setCarregandoImagem(false);
                                       }
                                     } else {
-                                      setErroCarregamentoImagem(true);
+                                      // Tentar fallback com URL direta
+                                      setUrlImagem(`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`);
                                       setCarregandoImagem(false);
                                     }
-                                  } catch (error) {
-                                    setErroCarregamentoImagem(true);
+                                  } catch (error: any) {
+                                    console.error('Erro ao carregar URL da imagem:', error?.message);
+                                    // Tentar fallback com URL direta mesmo em caso de erro
+                                    setUrlImagem(`${API_CONFIG.BASE_URL}/api/fotos/${item.foto.id}/imagem`);
                                     setCarregandoImagem(false);
                                   }
                                 }}
