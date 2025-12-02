@@ -10,32 +10,67 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000, // Timeout global de 30 segundos
 });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// Interceptor de requisicao
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    console.error('[API] Erro na requisicao:', error);
+    return Promise.reject(error);
   }
-  return config;
-});
+);
 
+// Interceptor de resposta com tratamento de erros robusto
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Não fazer logout em erros 401 específicos que são erros de validação (como senha incorreta)
+    // Log do erro para debug
+    console.error('[API] Erro na resposta:', {
+      url: error.config?.url,
+      method: error.config?.method,
+      status: error.response?.status,
+      message: error.message
+    });
+
+    // Erro de timeout
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      const timeoutError = new Error('Tempo limite excedido. O servidor pode estar lento.');
+      (timeoutError as any).response = error.response;
+      (timeoutError as any).isTimeout = true;
+      return Promise.reject(timeoutError);
+    }
+
+    // Erro de rede (sem conexao)
+    if (!error.response && error.message === 'Network Error') {
+      const networkError = new Error('Erro de conexao. Verifique sua internet.');
+      (networkError as any).isNetworkError = true;
+      return Promise.reject(networkError);
+    }
+
+    // Nao fazer logout em erros 401 especificos que sao erros de validacao (como senha incorreta)
     const isChangePasswordError = error.config?.url?.includes('/change-password');
+    const isLoginError = error.config?.url?.includes('/login');
     
-    if (error.response?.status === 401 && !window.location.pathname.includes('/login') && !isChangePasswordError) {
+    if (error.response?.status === 401 && 
+        !globalThis.location.pathname.includes('/login') && 
+        !isChangePasswordError && 
+        !isLoginError) {
       localStorage.removeItem('token');
       localStorage.removeItem('usuario');
-      window.location.href = '/login';
+      globalThis.location.href = '/login';
     }
     
-    // Em produção, não expor detalhes do erro
+    // Em producao, nao expor detalhes sensiveis do erro
     if (process.env.NODE_ENV === 'production') {
-      // Criar um erro genérico sem expor detalhes sensíveis
-      const genericError = new Error('Erro ao processar requisição');
+      const genericError = new Error('Erro ao processar requisicao');
       (genericError as any).response = error.response;
       (genericError as any).config = error.config;
       return Promise.reject(genericError);
@@ -44,6 +79,24 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Servico para verificar conexao com o backend
+export const healthService = {
+  checkConnection: async (): Promise<{ connected: boolean; status?: string; error?: string }> => {
+    try {
+      const response = await api.get('/health', { timeout: 5000 });
+      return {
+        connected: response.data.status === 'healthy',
+        status: response.data.status
+      };
+    } catch (error: any) {
+      return {
+        connected: false,
+        error: error.message || 'Servidor indisponivel'
+      };
+    }
+  }
+};
 
 export const authService = {
   login: async (credentials: LoginRequest): Promise<AuthResponse> => {
