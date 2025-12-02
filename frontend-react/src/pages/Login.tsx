@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useAuth } from '../contexts/AuthContext';
-import { Ship, Eye, EyeOff, LogIn, AlertCircle, CheckCircle, Info, Loader2 } from 'lucide-react';
+import { Ship, Eye, EyeOff, LogIn, AlertCircle, CheckCircle, Info, Loader2, WifiOff } from 'lucide-react';
 import { validarCPF, limparCPF, mascaraCPF } from '../utils/validators';
+import { healthService } from '../services/api';
 
 const LoginContainer = styled.div`
   min-height: 100vh;
@@ -251,6 +252,43 @@ const InfoMessage = styled.div`
   gap: 0.5rem;
 `;
 
+const ConnectionWarning = styled.div`
+  background: #fef3c7;
+  border: 2px solid #f59e0b;
+  color: #92400e;
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  animation: fadeIn 0.3s ease-in;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
+`;
+
+const RetryButton = styled.button`
+  background: #f59e0b;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #d97706;
+  }
+
+  &:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+  }
+`;
+
 const Login: React.FC = () => {
   const [cpf, setCpf] = useState('');
   const [senha, setSenha] = useState('');
@@ -258,6 +296,8 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [messageType, setMessageType] = useState<'error' | 'success' | 'info' | null>(null);
+  const [backendConnected, setBackendConnected] = useState<boolean | null>(null);
+  const [checkingConnection, setCheckingConnection] = useState(true);
 
   const { login, isAuthenticated, usuario } = useAuth();
   const navigate = useNavigate();
@@ -266,6 +306,23 @@ const Login: React.FC = () => {
     setError('');
     setMessageType(null);
   };
+
+  // Verificar conexao com o backend ao carregar a pagina
+  useEffect(() => {
+    const checkBackendConnection = async () => {
+      setCheckingConnection(true);
+      const result = await healthService.checkConnection();
+      setBackendConnected(result.connected);
+      setCheckingConnection(false);
+      
+      if (!result.connected) {
+        setError('Servidor indisponivel. Verifique se o backend esta em execucao.');
+        setMessageType('error');
+      }
+    };
+
+    checkBackendConnection();
+  }, []);
 
   // Garantir que mensagens de erro não sejam limpas por mudanças de autenticação
   useEffect(() => {
@@ -284,8 +341,29 @@ const Login: React.FC = () => {
     }
   }, [isAuthenticated, usuario, navigate]);
 
+  // Funcao para tentar reconectar ao backend
+  const retryConnection = async () => {
+    setCheckingConnection(true);
+    clearErrorMessages();
+    const result = await healthService.checkConnection();
+    setBackendConnected(result.connected);
+    setCheckingConnection(false);
+    
+    if (!result.connected) {
+      setError('Servidor indisponivel. Verifique se o backend esta em execucao.');
+      setMessageType('error');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Verificar conexao antes de tentar login
+    if (!backendConnected) {
+      setError('Servidor indisponivel. Aguarde a conexao ser restabelecida.');
+      setMessageType('error');
+      return;
+    }
     
     setLoading(true);
     clearErrorMessages();
@@ -408,7 +486,33 @@ const Login: React.FC = () => {
         </Logo>
 
         <Form onSubmit={handleSubmit}>
-          {error && messageType === 'error' && (
+          {/* Aviso de conexao com o backend */}
+          {backendConnected === false && !checkingConnection && (
+            <ConnectionWarning>
+              <WifiOff size={20} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: '700', marginBottom: '0.5rem', fontSize: '1rem' }}>
+                  Servidor Indisponivel
+                </div>
+                <div style={{ fontSize: '0.875rem', lineHeight: '1.5' }}>
+                  Nao foi possivel conectar ao servidor. Verifique se o backend esta em execucao.
+                </div>
+                <RetryButton onClick={retryConnection} disabled={checkingConnection}>
+                  {checkingConnection ? 'Verificando...' : 'Tentar Novamente'}
+                </RetryButton>
+              </div>
+            </ConnectionWarning>
+          )}
+
+          {/* Verificando conexao */}
+          {checkingConnection && (
+            <InfoMessage>
+              <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+              Verificando conexao com o servidor...
+            </InfoMessage>
+          )}
+
+          {error && messageType === 'error' && backendConnected !== false && (
             <ErrorMessage>
               <AlertCircle size={20} />
               <div style={{ flex: 1 }}>
@@ -480,11 +584,21 @@ const Login: React.FC = () => {
             </PasswordInput>
           </FormGroup>
 
-          <Button type="submit" disabled={loading}>
+          <Button type="submit" disabled={loading || !backendConnected || checkingConnection}>
             {loading ? (
               <>
                 <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
                 Entrando...
+              </>
+            ) : checkingConnection ? (
+              <>
+                <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+                Verificando...
+              </>
+            ) : !backendConnected ? (
+              <>
+                <WifiOff size={20} />
+                Servidor Indisponivel
               </>
             ) : (
               <>
