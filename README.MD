@@ -164,14 +164,14 @@ Aplicação rodando em `http://localhost:3001`
 
 **Administrador:**
 ```
-Email: admin@sgvn.com
-Senha: admin123
+Cpf: 650.347.920-44
+Senha: Admin@123
 ```
 
 **Vistoriador:**
 ```
-Email: vistoriador@sgvn.com
-Senha: vistoriador123
+Cpf: 142.290.560-87
+Senha: Vstoriador@123
 ```
 
 ---
