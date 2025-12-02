@@ -160,10 +160,18 @@ npm start
 ```
 Aplicação rodando em `http://localhost:3001`
 
-### Login Padrão:
+### Usuários de Teste:
+
+**Administrador:**
 ```
 Email: admin@sgvn.com
 Senha: admin123
+```
+
+**Vistoriador:**
+```
+Email: vistoriador@sgvn.com
+Senha: vistoriador123
 ```
 
 ---
